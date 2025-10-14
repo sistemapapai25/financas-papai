@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { ymdToBr, brToYmd } from "@/utils/date";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -63,7 +64,8 @@ export default function EntradasCulto() {
   const { toast } = useToast();
 
   // Estados principais
-  const [dataCulto, setDataCulto] = useState("");
+  const [dataCulto, setDataCulto] = useState(""); // YYYY-MM-DD
+  const [dataCultoBr, setDataCultoBr] = useState(""); // DD/MM/YYYY
   const [tipoCultoId, setTipoCultoId] = useState("");
   const [contaId, setContaId] = useState("");
   const [pregador, setPregador] = useState("");
@@ -349,6 +351,7 @@ export default function EntradasCulto() {
   // --- Reset ---
   function resetForm() {
     setDataCulto("");
+    setDataCultoBr("");
     setTipoCultoId(tiposCulto.length > 0 ? tiposCulto[0].id : "");
     setContaId(contasCaixa.length > 0 ? contasCaixa[0].id : "");
     setPregador("");
@@ -388,9 +391,26 @@ export default function EntradasCulto() {
                   <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  type="date"
-                  value={dataCulto}
-                  onChange={(e) => setDataCulto(e.target.value)}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="DD/MM/AAAA"
+                  maxLength={10}
+                  value={dataCultoBr}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, "").slice(0, 8);
+                    let formatted = digits;
+                    if (digits.length > 2 && digits.length <= 4) {
+                      formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+                    } else if (digits.length > 4) {
+                      formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+                    }
+                    setDataCultoBr(formatted);
+                    if (/^\d{2}\/\d{2}\/\d{4}$/.test(formatted)) {
+                      setDataCulto(brToYmd(formatted));
+                    } else {
+                      setDataCulto("");
+                    }
+                  }}
                   className={`h-11 transition-colors ${
                     !dataCulto ? 'border-red-300 focus:border-red-500' : 'border-green-300 focus:border-green-500'
                   }`}
@@ -745,15 +765,15 @@ export default function EntradasCulto() {
                     Confirmar Salvamento
                   </AlertDialogTitle>
                   <AlertDialogDescription className="space-y-2">
-                    <p>Você está prestes a salvar as seguintes informações:</p>
+                    <div>Você está prestes a salvar as seguintes informações:</div>
                     <div className="bg-gray-50 p-4 rounded-lg space-y-2 text-sm">
-                      <div><strong>Data:</strong> {new Date(dataCulto).toLocaleDateString('pt-BR')}</div>
+                      <div><strong>Data:</strong> {ymdToBr(dataCulto)}</div>
                       <div><strong>Tipo:</strong> {tiposCulto.find(t => t.id === tipoCultoId)?.nome}</div>
                       <div><strong>Total de Dízimos:</strong> {moeda(totalDizimos)}</div>
                       <div><strong>Total de Ofertas:</strong> {moeda(totalOfertas)}</div>
                       <div><strong>Total Geral:</strong> {moeda(totalGeral)}</div>
                     </div>
-                    <p>Esta ação não pode ser desfeita. Deseja continuar?</p>
+                    <div>Esta ação não pode ser desfeita. Deseja continuar?</div>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
