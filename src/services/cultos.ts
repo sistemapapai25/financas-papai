@@ -33,21 +33,23 @@ export async function getCategoriaId(nome: string) {
 
 // Cria o culto (cabeçalho)
 export async function criarCulto(input: {
-  data: string; tipo?: string; pregador?: string; adultos?: number; criancas?: number;
+  data: string; tipo_id?: string; pregador?: string; adultos?: number; criancas?: number;
 }): Promise<Culto> {
+  const userId = await getUserId();
   const { data, error } = await supabase
     .from("cultos")
     .insert({
       data: input.data,
-      tipo: input.tipo ?? null,
+      tipo_id: input.tipo_id ?? null,
       pregador: input.pregador ?? null,
       adultos: input.adultos ?? 0,
       criancas: input.criancas ?? 0,
+      user_id: userId,
     })
     .select("*")
     .single();
   if (error) throw error;
-  return data as Culto;
+  return { ...data, tipo: null } as Culto;
 }
 
 // Insere dízimos (por pessoa)

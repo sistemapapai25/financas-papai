@@ -70,13 +70,13 @@ export default function LancamentosDashboard() {
         toast({ title: "Erro", description: error.message, variant: "destructive" });
         return;
       }
-      const arr: Mov[] = (data || []).map((r: { id: string; data: string; descricao: string | null; valor: number; tipo: "ENTRADA"|"SAIDA"; origem?: string|null; conta_id?: string|null; contas?: { nome?: string|null } | null }) => ({
+      const arr: Mov[] = (data || []).map((r: { id: string; data: string; descricao: string | null; valor: number; tipo: string; origem?: string|null; conta_id?: string|null; contas?: { nome?: string|null } | null }) => ({
         id: r.id,
         data: r.data,
         descricao: r.descricao ?? null,
         conta_id: r.conta_id ?? null,
         conta_nome: r.contas?.nome ?? null,
-        tipo: r.tipo,
+        tipo: r.tipo as "ENTRADA" | "SAIDA",
         valor: r.valor,
         origem: (r.origem as Mov["origem"]) ?? null,
       }));

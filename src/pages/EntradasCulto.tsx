@@ -125,7 +125,7 @@ export default function EntradasCulto() {
       return;
     }
 
-    setContasCaixa(data ?? []);
+    setContasCaixa((data ?? []).map(c => ({ ...c, tipo: c.tipo as "BANCO" | "CAIXA" })));
     if ((data ?? []).length > 0 && !contaId) {
       setContaId((data ?? [])[0].id);
     }
@@ -323,12 +323,7 @@ export default function EntradasCulto() {
         if (ofertasErr) throw new Error(ofertasErr.message);
       }
 
-      // 4. Atualizar saldo da conta
-      const { error: contaErr } = await supabase.rpc("atualizar_saldo_conta", {
-        conta_id: contaId,
-        valor: totalGeralNum,
-      });
-      if (contaErr) throw new Error(contaErr.message);
+      // 4. Saldo atualizado via movimentos financeiros (não precisa de RPC separada)
 
       toast({
         title: "Sucesso!",

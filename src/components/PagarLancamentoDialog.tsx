@@ -353,7 +353,7 @@ export default function PagarLancamentoDialog({
           variant: "destructive",
         });
       } else {
-        setContas(data ?? []);
+        setContas((data ?? []).map(c => ({ ...c, tipo: c.tipo as "BANCO" | "CAIXA" })));
         if (!contaId && data && data.length) {
           const prefer = data.find((c) => c.tipo === "BANCO") ?? data[0];
           setContaId(prefer.id);
