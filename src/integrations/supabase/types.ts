@@ -1,487 +1,838 @@
-// src/integrations/supabase/types.ts
-
 export type Json =
   | string
   | number
   | boolean
   | null
   | { [key: string]: Json | undefined }
-  | Json[];
+  | Json[]
 
 export type Database = {
-  __InternalSupabase: { PostgrestVersion: "13.0.4" };
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "13.0.4"
+  }
   public: {
     Tables: {
       auditoria: {
         Row: {
-          id: string;
-          user_id: string;
-          acao: Database["public"]["Enums"]["acao_auditoria"];
-          entidade: string;
-          entidade_id: string;
-          motivo: string | null;
-          antes: Json | null;
-          depois: Json | null;
-          timestamp: string | null; // timestamptz
-        };
+          acao: Database["public"]["Enums"]["acao_auditoria"]
+          antes: Json | null
+          depois: Json | null
+          entidade: string
+          entidade_id: string
+          id: string
+          motivo: string | null
+          timestamp: string | null
+          user_id: string
+        }
         Insert: {
-          id?: string;
-          user_id: string;
-          acao: Database["public"]["Enums"]["acao_auditoria"];
-          entidade?: string;
-          entidade_id: string;
-          motivo?: string | null;
-          antes?: Json | null;
-          depois?: Json | null;
-          timestamp?: string | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["auditoria"]["Insert"]>;
-        Relationships: [];
-      };
-
+          acao: Database["public"]["Enums"]["acao_auditoria"]
+          antes?: Json | null
+          depois?: Json | null
+          entidade?: string
+          entidade_id: string
+          id?: string
+          motivo?: string | null
+          timestamp?: string | null
+          user_id: string
+        }
+        Update: {
+          acao?: Database["public"]["Enums"]["acao_auditoria"]
+          antes?: Json | null
+          depois?: Json | null
+          entidade?: string
+          entidade_id?: string
+          id?: string
+          motivo?: string | null
+          timestamp?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       beneficiaries: {
         Row: {
-          id: string;
-          user_id: string;
-          name: string;
-          documento: string | null;
-          phone: string | null;
-          email: string | null;
-          observacoes: string | null;
-          created_at: string | null;
-          deleted_at: string | null;
-        };
+          created_at: string | null
+          deleted_at: string | null
+          documento: string | null
+          email: string | null
+          id: string
+          name: string
+          observacoes: string | null
+          phone: string | null
+          user_id: string
+        }
         Insert: {
-          id?: string;
-          user_id: string;
-          name: string;
-          documento?: string | null;
-          phone?: string | null;
-          email?: string | null;
-          observacoes?: string | null;
-          created_at?: string | null;
-          deleted_at?: string | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["beneficiaries"]["Insert"]>;
-        Relationships: [];
-      };
-
+          created_at?: string | null
+          deleted_at?: string | null
+          documento?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          observacoes?: string | null
+          phone?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          deleted_at?: string | null
+          documento?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          observacoes?: string | null
+          phone?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       bills: {
         Row: {
-          id: string;
-          user_id: string;
-          amount: number;
-          status: string;
-          due_date: string; // date
-          description: string | null;
-          attachment_path: string | null;
-          created_at: string | null;
-        };
+          amount: number
+          attachment_path: string | null
+          created_at: string | null
+          description: string | null
+          due_date: string
+          id: string
+          status: string
+          user_id: string
+        }
         Insert: {
-          id?: string;
-          user_id: string;
-          amount: number;
-          status?: string;
-          due_date: string;
-          description?: string | null;
-          attachment_path?: string | null;
-          created_at?: string | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["bills"]["Insert"]>;
-        Relationships: [];
-      };
-
+          amount: number
+          attachment_path?: string | null
+          created_at?: string | null
+          description?: string | null
+          due_date: string
+          id?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          attachment_path?: string | null
+          created_at?: string | null
+          description?: string | null
+          due_date?: string
+          id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
-          id: string;
-          user_id: string;
-          name: string;
-          tipo: Database["public"]["Enums"]["tipo_categoria"];
-          created_at: string | null;
-          deleted_at: string | null;
-        };
+          created_at: string | null
+          deleted_at: string | null
+          id: string
+          name: string
+          tipo: Database["public"]["Enums"]["tipo_categoria"]
+          user_id: string
+        }
         Insert: {
-          id?: string;
-          user_id: string;
-          name: string;
-          tipo?: Database["public"]["Enums"]["tipo_categoria"];
-          created_at?: string | null;
-          deleted_at?: string | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["categories"]["Insert"]>;
-        Relationships: [];
-      };
-
-      // ---------- NOVAS TABELAS DE CONTAS E MOVIMENTOS ----------
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: string
+          name: string
+          tipo?: Database["public"]["Enums"]["tipo_categoria"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: string
+          name?: string
+          tipo?: Database["public"]["Enums"]["tipo_categoria"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       contas_financeiras: {
         Row: {
-          id: string;
-          user_id: string;
-          tipo: "CAIXA" | "BANCO";
-          nome: string;
-          instituicao: string | null;
-          agencia: string | null;
-          numero: string | null;
-          saldo_inicial: number;
-          logo: string | null;
-          created_at: string | null;
-        };
+          agencia: string | null
+          created_at: string
+          id: string
+          instituicao: string | null
+          logo: string | null
+          nome: string
+          numero: string | null
+          saldo_inicial: number
+          tipo: string
+          user_id: string
+        }
         Insert: {
-          id?: string;
-          user_id: string;
-          tipo: "CAIXA" | "BANCO";
-          nome: string;
-          instituicao?: string | null;
-          agencia?: string | null;
-          numero?: string | null;
-          saldo_inicial?: number;
-          logo?: string | null;
-          created_at?: string | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["contas_financeiras"]["Insert"]>;
-        Relationships: [];
-      };
-
-      movimentos_financeiros: {
-        Row: {
-          id: string;
-          user_id: string;
-          conta_id: string;
-          data: string; // date
-          tipo: "ENTRADA" | "SAIDA";
-          valor: number;
-          descricao: string | null;
-          origem: "CULTO" | "LANCAMENTO" | "AJUSTE" | "EXTRATO" | null;
-          ref_id: string | null; // referencia ao culto/lancamento/ajuste
-          created_at: string | null;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          conta_id: string;
-          data: string;
-          tipo: "ENTRADA" | "SAIDA";
-          valor: number;
-          descricao?: string | null;
-          origem?: "CULTO" | "LANCAMENTO" | "AJUSTE" | "EXTRATO" | null;
-          ref_id?: string | null;
-          created_at?: string | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["movimentos_financeiros"]["Insert"]>;
-        Relationships: [
-          {
-            foreignKeyName: "movimentos_financeiros_conta_id_fkey";
-            columns: ["conta_id"];
-            isOneToOne: false;
-            referencedRelation: "contas_financeiras";
-            referencedColumns: ["id"];
-          }
-        ];
-      };
-      // ---------- FIM NOVAS TABELAS ----------
-
-      // ---------- TABELAS DE CULTOS ----------
-      tipos_culto: {
-        Row: {
-          id: string;
-          nome: string;
-          ativo: boolean;
-          ordem: number;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          nome: string;
-          ativo?: boolean;
-          ordem?: number;
-          created_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["tipos_culto"]["Insert"]>;
-        Relationships: [];
-      };
-
+          agencia?: string | null
+          created_at?: string
+          id?: string
+          instituicao?: string | null
+          logo?: string | null
+          nome: string
+          numero?: string | null
+          saldo_inicial?: number
+          tipo: string
+          user_id: string
+        }
+        Update: {
+          agencia?: string | null
+          created_at?: string
+          id?: string
+          instituicao?: string | null
+          logo?: string | null
+          nome?: string
+          numero?: string | null
+          saldo_inicial?: number
+          tipo?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       cultos: {
         Row: {
-          id: string;
-          data: string; // date
-          tipo_id: string | null;
-          pregador: string | null;
-          adultos: number;
-          criancas: number;
-          user_id: string;
-          created_at: string;
-        };
+          adultos: number
+          created_at: string
+          criancas: number
+          data: string
+          id: string
+          pregador: string | null
+          tipo_id: string | null
+          user_id: string
+        }
         Insert: {
-          id?: string;
-          data: string;
-          tipo_id?: string | null;
-          pregador?: string | null;
-          adultos?: number;
-          criancas?: number;
-          user_id: string;
-          created_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["cultos"]["Insert"]>;
+          adultos?: number
+          created_at?: string
+          criancas?: number
+          data: string
+          id?: string
+          pregador?: string | null
+          tipo_id?: string | null
+          user_id: string
+        }
+        Update: {
+          adultos?: number
+          created_at?: string
+          criancas?: number
+          data?: string
+          id?: string
+          pregador?: string | null
+          tipo_id?: string | null
+          user_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "cultos_tipo_id_fkey";
-            columns: ["tipo_id"];
-            isOneToOne: false;
-            referencedRelation: "tipos_culto";
-            referencedColumns: ["id"];
+            foreignKeyName: "cultos_tipo_id_fkey"
+            columns: ["tipo_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_culto"
+            referencedColumns: ["id"]
           },
-        ];
-      };
-
+        ]
+      }
       dizimos: {
         Row: {
-          id: string;
-          culto_id: string;
-          nome: string;
-          valor: number;
-          created_at: string;
-        };
+          created_at: string
+          culto_id: string
+          id: string
+          nome: string
+          valor: number
+        }
         Insert: {
-          id?: string;
-          culto_id: string;
-          nome: string;
-          valor: number;
-          created_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["dizimos"]["Insert"]>;
+          created_at?: string
+          culto_id: string
+          id?: string
+          nome: string
+          valor: number
+        }
+        Update: {
+          created_at?: string
+          culto_id?: string
+          id?: string
+          nome?: string
+          valor?: number
+        }
         Relationships: [
           {
-            foreignKeyName: "dizimos_culto_id_fkey";
-            columns: ["culto_id"];
-            isOneToOne: false;
-            referencedRelation: "cultos";
-            referencedColumns: ["id"];
+            foreignKeyName: "dizimos_culto_id_fkey"
+            columns: ["culto_id"]
+            isOneToOne: false
+            referencedRelation: "cultos"
+            referencedColumns: ["id"]
           },
-        ];
-      };
-
-      ofertas: {
-        Row: {
-          id: string;
-          culto_id: string;
-          // campo antigo "valor" pode existir no seu banco; mantemos opcional
-          valor: number | null;
-          // novos campos
-          valor_dinheiro: number;
-          valor_moedas: number;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          culto_id: string;
-          valor?: number | null;
-          valor_dinheiro?: number;
-          valor_moedas?: number;
-          created_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["ofertas"]["Insert"]>;
-        Relationships: [
           {
-            foreignKeyName: "ofertas_culto_id_fkey";
-            columns: ["culto_id"];
-            isOneToOne: false;
-            referencedRelation: "cultos";
-            referencedColumns: ["id"];
+            foreignKeyName: "dizimos_culto_id_fkey"
+            columns: ["culto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_culto_totais"
+            referencedColumns: ["culto_id"]
           },
-        ];
-      };
-      // ---------- FIM CULTOS ----------
-
+        ]
+      }
       lancamentos: {
         Row: {
-          id: string;
-          user_id: string;
-          tipo: Database["public"]["Enums"]["tipo_lancamento"];
-          beneficiario_id: string | null;
-          categoria_id: string;
-          descricao: string | null;
-          valor: number;
-          forma_pagamento: Database["public"]["Enums"]["forma_pagamento"] | null;
-          vencimento: string; // date
-          status: Database["public"]["Enums"]["status_lancamento"] | null;
-          data_pagamento: string | null; // date
-          valor_pago: number | null;
-          observacoes: string | null;
-          boleto_url: string | null;
-          comprovante_url: string | null;
-          created_at: string | null;
-          updated_at: string | null;
-          deleted_at: string | null;
-          // novo relacionamento para conciliação
-          conta_id: string | null;
-        };
+          beneficiario_id: string | null
+          boleto_url: string | null
+          categoria_id: string
+          comprovante_url: string | null
+          conta_id: string | null
+          created_at: string | null
+          data_pagamento: string | null
+          deleted_at: string | null
+          descricao: string | null
+          forma_pagamento: Database["public"]["Enums"]["forma_pagamento"] | null
+          id: string
+          observacoes: string | null
+          status: Database["public"]["Enums"]["status_lancamento"] | null
+          tipo: Database["public"]["Enums"]["tipo_lancamento"]
+          updated_at: string | null
+          user_id: string
+          valor: number
+          valor_pago: number | null
+          vencimento: string
+        }
         Insert: {
-          id?: string;
-          user_id: string;
-          tipo: Database["public"]["Enums"]["tipo_lancamento"];
-          beneficiario_id?: string | null;
-          categoria_id: string;
-          descricao?: string | null;
-          valor: number;
-          forma_pagamento?: Database["public"]["Enums"]["forma_pagamento"] | null;
-          vencimento: string;
-          status?: Database["public"]["Enums"]["status_lancamento"] | null;
-          data_pagamento?: string | null;
-          valor_pago?: number | null;
-          observacoes?: string | null;
-          boleto_url?: string | null;
-          comprovante_url?: string | null;
-          created_at?: string | null;
-          updated_at?: string | null;
-          deleted_at?: string | null;
-          conta_id?: string | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["lancamentos"]["Insert"]>;
+          beneficiario_id?: string | null
+          boleto_url?: string | null
+          categoria_id: string
+          comprovante_url?: string | null
+          conta_id?: string | null
+          created_at?: string | null
+          data_pagamento?: string | null
+          deleted_at?: string | null
+          descricao?: string | null
+          forma_pagamento?:
+            | Database["public"]["Enums"]["forma_pagamento"]
+            | null
+          id?: string
+          observacoes?: string | null
+          status?: Database["public"]["Enums"]["status_lancamento"] | null
+          tipo: Database["public"]["Enums"]["tipo_lancamento"]
+          updated_at?: string | null
+          user_id: string
+          valor: number
+          valor_pago?: number | null
+          vencimento: string
+        }
+        Update: {
+          beneficiario_id?: string | null
+          boleto_url?: string | null
+          categoria_id?: string
+          comprovante_url?: string | null
+          conta_id?: string | null
+          created_at?: string | null
+          data_pagamento?: string | null
+          deleted_at?: string | null
+          descricao?: string | null
+          forma_pagamento?:
+            | Database["public"]["Enums"]["forma_pagamento"]
+            | null
+          id?: string
+          observacoes?: string | null
+          status?: Database["public"]["Enums"]["status_lancamento"] | null
+          tipo?: Database["public"]["Enums"]["tipo_lancamento"]
+          updated_at?: string | null
+          user_id?: string
+          valor?: number
+          valor_pago?: number | null
+          vencimento?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "lancamentos_beneficiario_id_fkey";
-            columns: ["beneficiario_id"];
-            isOneToOne: false;
-            referencedRelation: "beneficiaries";
-            referencedColumns: ["id"];
+            foreignKeyName: "lancamentos_beneficiario_id_fkey"
+            columns: ["beneficiario_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiaries"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "lancamentos_categoria_id_fkey";
-            columns: ["categoria_id"];
-            isOneToOne: false;
-            referencedRelation: "categories";
-            referencedColumns: ["id"];
+            foreignKeyName: "lancamentos_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "lancamentos_conta_id_fkey";
-            columns: ["conta_id"];
-            isOneToOne: false;
-            referencedRelation: "contas_financeiras";
-            referencedColumns: ["id"];
+            foreignKeyName: "lancamentos_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas_financeiras"
+            referencedColumns: ["id"]
           },
-        ];
-      };
-
+        ]
+      }
+      movimentos_financeiros: {
+        Row: {
+          comprovante_url: string | null
+          conta_id: string
+          created_at: string
+          data: string
+          descricao: string | null
+          id: string
+          origem: string | null
+          ref_id: string | null
+          tipo: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          comprovante_url?: string | null
+          conta_id: string
+          created_at?: string
+          data: string
+          descricao?: string | null
+          id?: string
+          origem?: string | null
+          ref_id?: string | null
+          tipo: string
+          user_id: string
+          valor: number
+        }
+        Update: {
+          comprovante_url?: string | null
+          conta_id?: string
+          created_at?: string
+          data?: string
+          descricao?: string | null
+          id?: string
+          origem?: string | null
+          ref_id?: string | null
+          tipo?: string
+          user_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimentos_financeiros_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas_financeiras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ofertas: {
+        Row: {
+          created_at: string
+          culto_id: string
+          id: string
+          valor: number
+          valor_dinheiro: number
+          valor_moedas: number
+        }
+        Insert: {
+          created_at?: string
+          culto_id: string
+          id?: string
+          valor: number
+          valor_dinheiro?: number
+          valor_moedas?: number
+        }
+        Update: {
+          created_at?: string
+          culto_id?: string
+          id?: string
+          valor?: number
+          valor_dinheiro?: number
+          valor_moedas?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ofertas_culto_id_fkey"
+            columns: ["culto_id"]
+            isOneToOne: false
+            referencedRelation: "cultos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ofertas_culto_id_fkey"
+            columns: ["culto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_culto_totais"
+            referencedColumns: ["culto_id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
-          auth_user_id: string | null;
-          email: string;
-          name: string | null;
-          phone: string | null;
-          active: boolean | null;
-          created_at: string | null;
-        };
+          active: boolean | null
+          auth_user_id: string | null
+          created_at: string | null
+          email: string
+          name: string | null
+          phone: string | null
+        }
         Insert: {
-          auth_user_id?: string | null;
-          email: string;
-          name?: string | null;
-          phone?: string | null;
-          active?: boolean | null;
-          created_at?: string | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
-        Relationships: [];
-      };
-
-      user_roles: {
+          active?: boolean | null
+          auth_user_id?: string | null
+          created_at?: string | null
+          email: string
+          name?: string | null
+          phone?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          auth_user_id?: string | null
+          created_at?: string | null
+          email?: string
+          name?: string | null
+          phone?: string | null
+        }
+        Relationships: []
+      }
+      saldos_mensais: {
         Row: {
-          id: string;
-          user_id: string;
-          role: Database["public"]["Enums"]["app_role"];
-          created_at: string | null;
-        };
+          conta_id: string
+          id: string
+          mes: string
+          saldo_inicial: number
+          user_id: string
+        }
         Insert: {
-          id?: string;
-          user_id: string;
-          role?: Database["public"]["Enums"]["app_role"];
-          created_at?: string | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["user_roles"]["Insert"]>;
-        Relationships: [];
-      };
-    };
-
-    Views: {
-      vw_lancamentos_whatsapp: {
-        Row: {
-          id: string | null;
-          user_id: string | null;
-          beneficiario_id: string | null;
-          nomebenef: string | null;
-          descricao: string | null;
-          valor: number | null;
-          vencimento: string | null;
-          status: Database["public"]["Enums"]["status_lancamento"] | null;
-        };
+          conta_id: string
+          id?: string
+          mes: string
+          saldo_inicial?: number
+          user_id: string
+        }
+        Update: {
+          conta_id?: string
+          id?: string
+          mes?: string
+          saldo_inicial?: number
+          user_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "lancamentos_beneficiario_id_fkey";
-            columns: ["beneficiario_id"];
-            isOneToOne: false;
-            referencedRelation: "beneficiaries";
-            referencedColumns: ["id"];
+            foreignKeyName: "saldos_mensais_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas_financeiras"
+            referencedColumns: ["id"]
           },
-        ];
-      };
-    };
-
+        ]
+      }
+      tipos_culto: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          nome: string
+          ordem: number
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome: string
+          ordem?: number
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
+          ordem?: number
+        }
+        Relationships: []
+      }
+      transferencias: {
+        Row: {
+          conta_destino_id: string
+          conta_origem_id: string
+          created_at: string | null
+          data: string
+          descricao: string | null
+          id: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          conta_destino_id: string
+          conta_origem_id: string
+          created_at?: string | null
+          data: string
+          descricao?: string | null
+          id?: string
+          user_id: string
+          valor: number
+        }
+        Update: {
+          conta_destino_id?: string
+          conta_origem_id?: string
+          created_at?: string | null
+          data?: string
+          descricao?: string | null
+          id?: string
+          user_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transferencias_conta_destino_id_fkey"
+            columns: ["conta_destino_id"]
+            isOneToOne: false
+            referencedRelation: "contas_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transferencias_conta_origem_id_fkey"
+            columns: ["conta_origem_id"]
+            isOneToOne: false
+            referencedRelation: "contas_financeiras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      vw_conciliacao: {
+        Row: {
+          conta_id: string | null
+          data_real: string | null
+          lancamento_descricao: string | null
+          lancamento_id: string | null
+          lancamento_tipo: Database["public"]["Enums"]["tipo_lancamento"] | null
+          movimento_descricao: string | null
+          movimento_id: string | null
+          movimento_tipo: string | null
+          status: Database["public"]["Enums"]["status_lancamento"] | null
+          user_id: string | null
+          valor_previsto: number | null
+          valor_real: number | null
+          vencimento: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lancamentos_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas_financeiras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vw_culto_totais: {
+        Row: {
+          culto_id: string | null
+          total_dizimos: number | null
+          total_ofertas: number | null
+        }
+        Relationships: []
+      }
+      vw_lancamentos_whatsapp: {
+        Row: {
+          beneficiario_id: string | null
+          descricao: string | null
+          id: string | null
+          nomebenef: string | null
+          status: Database["public"]["Enums"]["status_lancamento"] | null
+          user_id: string | null
+          valor: number | null
+          vencimento: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lancamentos_beneficiario_id_fkey"
+            columns: ["beneficiario_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiaries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
     Functions: {
-      atualizar_saldo_conta: {
-        Args: { conta_id: string; valor: number };
-        Returns: undefined;
-      };
+      ensure_default_categories: { Args: never; Returns: undefined }
       has_role: {
-        Args: { _role: Database["public"]["Enums"]["app_role"]; _user_id: string };
-        Returns: boolean;
-      };
-      is_admin: {
-        Args: Record<PropertyKey, never>;
-        Returns: boolean;
-      };
-    };
-
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin: { Args: never; Returns: boolean }
+      registrar_transferencia: {
+        Args: {
+          _data: string
+          _descricao: string
+          _valor: number
+          destino: string
+          origem: string
+        }
+        Returns: string
+      }
+    }
     Enums: {
-      acao_auditoria: "CREATE" | "UPDATE" | "DELETE" | "STATUS_CHANGE";
-      app_role: "ADMIN" | "USER";
-      forma_pagamento: "PIX" | "DINHEIRO" | "CARTAO" | "BOLETO" | "TRANSFERENCIA" | "OUTRO";
-      status_lancamento: "EM_ABERTO" | "PAGO" | "CANCELADO";
-      tipo_categoria: "DESPESA" | "RECEITA";
-      tipo_lancamento: "DESPESA" | "RECEITA";
-      // (se tiver enums no banco para CAIXA/BANCO, ENTRADA/SAIDA, etc., podemos mover para cá)
-    };
-
+      acao_auditoria: "CREATE" | "UPDATE" | "DELETE" | "STATUS_CHANGE"
+      app_role: "ADMIN" | "USER"
+      forma_pagamento:
+        | "PIX"
+        | "DINHEIRO"
+        | "CARTAO"
+        | "BOLETO"
+        | "TRANSFERENCIA"
+        | "OUTRO"
+      status_lancamento: "EM_ABERTO" | "PAGO" | "CANCELADO"
+      tipo_categoria: "DESPESA" | "RECEITA"
+      tipo_lancamento: "DESPESA" | "RECEITA"
+    }
     CompositeTypes: {
-      [_ in never]: never;
-    };
-  };
-};
+      [_ in never]: never
+    }
+  }
+}
 
-// -------- Helpers para tipagem fácil --------
-type DB = Database;
-type PublicSchema = DB["public"];
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
-export type Tables<TName extends keyof PublicSchema["Tables"]> =
-  PublicSchema["Tables"][TName]["Row"];
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
-export type TablesInsert<TName extends keyof PublicSchema["Tables"]> =
-  PublicSchema["Tables"][TName]["Insert"];
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
 
-export type TablesUpdate<TName extends keyof PublicSchema["Tables"]> =
-  PublicSchema["Tables"][TName]["Update"];
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
 
-export type Enums<TName extends keyof PublicSchema["Enums"]> =
-  PublicSchema["Enums"][TName];
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
 
-// (opcional) constantes úteis
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
 export const Constants = {
   public: {
     Enums: {
-      acao_auditoria: ["CREATE", "UPDATE", "DELETE", "STATUS_CHANGE"] as const,
-      app_role: ["ADMIN", "USER"] as const,
-      forma_pagamento: ["PIX","DINHEIRO","CARTAO","BOLETO","TRANSFERENCIA","OUTRO"] as const,
-      status_lancamento: ["EM_ABERTO","PAGO","CANCELADO"] as const,
-      tipo_categoria: ["DESPESA","RECEITA"] as const,
-      tipo_lancamento: ["DESPESA","RECEITA"] as const,
+      acao_auditoria: ["CREATE", "UPDATE", "DELETE", "STATUS_CHANGE"],
+      app_role: ["ADMIN", "USER"],
+      forma_pagamento: [
+        "PIX",
+        "DINHEIRO",
+        "CARTAO",
+        "BOLETO",
+        "TRANSFERENCIA",
+        "OUTRO",
+      ],
+      status_lancamento: ["EM_ABERTO", "PAGO", "CANCELADO"],
+      tipo_categoria: ["DESPESA", "RECEITA"],
+      tipo_lancamento: ["DESPESA", "RECEITA"],
     },
   },
-} as const;
+} as const
