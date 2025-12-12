@@ -28,9 +28,12 @@ type TipoConta = ContaFinanceira["tipo"]; // "CAIXA" | "BANCO"
 export default function CadastroContasFinanceiras() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const LOGO_BUCKET = (import.meta.env.VITE_LOGO_BUCKET as string) || "logos";
 
   const [contas, setContas] = useState<ContaFinanceira[]>([]);
   const [loading, setLoading] = useState(true);
+  const [logoBucketOk, setLogoBucketOk] = useState(true);
+  const [logoBucketMsg, setLogoBucketMsg] = useState<string | null>(null);
 
   // filtros
   const [busca, setBusca] = useState("");
@@ -48,6 +51,7 @@ export default function CadastroContasFinanceiras() {
     agencia: string;
     numero: string;
     saldo_inicial: string; // como string para o input
+    logo?: string;
   }>({
     nome: "",
     tipo: "CAIXA",
@@ -55,10 +59,38 @@ export default function CadastroContasFinanceiras() {
     agencia: "",
     numero: "",
     saldo_inicial: "",
+    logo: "",
   });
+  const [logoFile, setLogoFile] = useState<File | null>(null);
 
   useEffect(() => {
-    if (user) fetchContas();
+    if (user) {
+      fetchContas();
+      // valida bucket de logos
+      (async () => {
+        try {
+          const { error } = await supabase.storage.from(LOGO_BUCKET).list("", { limit: 1 });
+          if (error) {
+            setLogoBucketOk(false);
+            const msg = String(error.message || "Bucket inválido");
+            setLogoBucketMsg(msg);
+            toast({
+              title: "Logo",
+              description: `Bucket "${LOGO_BUCKET}" indisponível: ${msg}. Verifique no Supabase se o bucket existe e as permissões (public ou política para authenticated).`,
+              variant: "destructive",
+            });
+          } else {
+            setLogoBucketOk(true);
+            setLogoBucketMsg(null);
+          }
+        } catch (err: unknown) {
+          setLogoBucketOk(false);
+          const msg = err instanceof Error ? err.message : String(err);
+          setLogoBucketMsg(msg);
+          toast({ title: "Logo", description: `Falha ao validar bucket "${LOGO_BUCKET}": ${msg}.`, variant: "destructive" });
+        }
+      })();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
@@ -67,7 +99,7 @@ export default function CadastroContasFinanceiras() {
       setLoading(true);
       const { data, error } = await supabase
         .from("contas_financeiras")
-        .select("id, user_id, nome, tipo, instituicao, agencia, numero, saldo_inicial, created_at")
+        .select("id, user_id, nome, tipo, instituicao, agencia, numero, saldo_inicial, logo, created_at")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -89,7 +121,9 @@ export default function CadastroContasFinanceiras() {
       agencia: "",
       numero: "",
       saldo_inicial: "",
+      logo: "",
     });
+    setLogoFile(null);
   };
 
   const abrirNovo = () => {
@@ -106,6 +140,7 @@ export default function CadastroContasFinanceiras() {
       agencia: c.agencia ?? "",
       numero: c.numero ?? "",
       saldo_inicial: (c.saldo_inicial ?? 0).toString(),
+      logo: c.logo ?? "",
     });
     setOpen(true);
   };
@@ -132,6 +167,28 @@ export default function CadastroContasFinanceiras() {
       setLoading(true);
 
       if (editing) {
+        let logoUrl: string | null = form.logo?.trim() ? form.logo!.trim() : null;
+        if (logoFile) {
+          if (!logoBucketOk) {
+            toast({ title: "Logo", description: `Bucket "${LOGO_BUCKET}" não encontrado. ${logoBucketMsg ?? "Verifique no Supabase."} Salvando sem alterar a logo.`, variant: "destructive" });
+          } else {
+          try {
+            const ext = (logoFile.name.split(".").pop() || "png").toLowerCase();
+            const path = `${user.id}/${editing.id}-${Date.now()}.${ext}`;
+            const { error: uploadError } = await supabase.storage.from(LOGO_BUCKET).upload(path, logoFile, {
+              upsert: true,
+              contentType: logoFile.type || "image/*",
+            });
+            if (uploadError) throw uploadError;
+            const pub = supabase.storage.from(LOGO_BUCKET).getPublicUrl(path);
+            logoUrl = pub.data.publicUrl || null;
+          } catch (err: unknown) {
+            console.error("Falha no upload da logo", err);
+            const msg = err instanceof Error ? err.message : String(err);
+            toast({ title: "Logo", description: `${msg} (bucket: ${LOGO_BUCKET}). Salvando sem alteração na logo.`, variant: "destructive" });
+          }
+          }
+        }
         const { error } = await supabase
           .from("contas_financeiras")
           .update({
@@ -141,13 +198,14 @@ export default function CadastroContasFinanceiras() {
             agencia: form.tipo === "BANCO" ? form.agencia.trim() || null : null,
             numero: form.tipo === "BANCO" ? form.numero.trim() || null : null,
             saldo_inicial: saldo,
+            logo: logoUrl,
           })
           .eq("id", editing.id);
 
         if (error) throw error;
         toast({ title: "Sucesso", description: "Conta atualizada com sucesso!" });
       } else {
-        const { error } = await supabase.from("contas_financeiras").insert({
+        const { data: created, error } = await supabase.from("contas_financeiras").insert({
           user_id: user.id,
           nome: form.nome.trim(),
           tipo: form.tipo,
@@ -155,18 +213,43 @@ export default function CadastroContasFinanceiras() {
           agencia: form.tipo === "BANCO" ? form.agencia.trim() || null : null,
           numero: form.tipo === "BANCO" ? form.numero.trim() || null : null,
           saldo_inicial: saldo,
-        });
+        }).select("id").single();
 
         if (error) throw error;
+        if (logoFile && created?.id) {
+          if (!logoBucketOk) {
+            toast({ title: "Logo", description: `Bucket "${LOGO_BUCKET}" não encontrado. ${logoBucketMsg ?? "Verifique no Supabase."} Conta criada sem logo.`, variant: "destructive" });
+          } else {
+          try {
+            const ext = (logoFile.name.split(".").pop() || "png").toLowerCase();
+            const path = `${user.id}/${created.id}-${Date.now()}.${ext}`;
+            const { error: uploadError } = await supabase.storage.from(LOGO_BUCKET).upload(path, logoFile, {
+              upsert: true,
+              contentType: logoFile.type || "image/*",
+            });
+            if (uploadError) throw uploadError;
+            const pub = supabase.storage.from(LOGO_BUCKET).getPublicUrl(path);
+            const logoUrl = pub.data.publicUrl || null;
+            if (logoUrl) {
+              await supabase.from("contas_financeiras").update({ logo: logoUrl }).eq("id", created.id);
+            }
+          } catch (err: unknown) {
+            console.error("Falha no upload da logo (criação)", err);
+            const msg = err instanceof Error ? err.message : String(err);
+            toast({ title: "Logo", description: `Conta criada, mas falhou o envio da logo: ${msg} (bucket: ${LOGO_BUCKET}).`, variant: "destructive" });
+          }
+          }
+        }
         toast({ title: "Sucesso", description: "Conta criada com sucesso!" });
       }
 
       setOpen(false);
       resetForm();
       fetchContas();
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
-      toast({ title: "Erro", description: "Não foi possível salvar a conta.", variant: "destructive" });
+      const msg = err instanceof Error ? err.message : "Não foi possível salvar a conta.";
+      toast({ title: "Erro", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -284,6 +367,14 @@ export default function CadastroContasFinanceiras() {
                   </div>
                 </div>
               )}
+
+              <div className="space-y-2">
+                <Label>Logo do Banco</Label>
+                {form.logo ? (
+                  <img src={form.logo} alt="Logo atual" className="h-10 object-contain" />
+                ) : null}
+                <Input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)} />
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2 sm:col-span-1">

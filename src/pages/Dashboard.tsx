@@ -7,9 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { DollarSign, Calendar, TrendingUp, AlertTriangle, Plus, Receipt, FileCheck2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { DashboardData, Lancamento } from '@/types/database';
-import { format, isBefore, startOfMonth, endOfMonth, addDays } from 'date-fns';
+import { format, startOfMonth, endOfMonth, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import NovoLancamentoDialog from '@/components/NovoLancamentoDialog';
+import { ymdToBr } from '@/utils/date';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -55,8 +56,8 @@ const Dashboard = () => {
         .from('lancamentos')
         .select(`
           *,
-          beneficiario:beneficiaries(name),
-          categoria:categories(name)
+          beneficiario:beneficiaries(id,name,user_id,created_at),
+          categoria:categories(id,name,tipo,user_id,created_at)
         `)
         .eq('status', 'EM_ABERTO')
         .gte('vencimento', format(hoje, 'yyyy-MM-dd'))
@@ -95,11 +96,16 @@ const Dashboard = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'dd/MM/yyyy', { locale: ptBR });
+    return ymdToBr(dateString);
   };
 
   const isVencido = (vencimento: string) => {
-    return isBefore(new Date(vencimento), new Date());
+    const [y, m, d] = vencimento.split('-').map(Number);
+    const dataV = new Date(y, m - 1, d);
+    const hoje = new Date();
+    dataV.setHours(0, 0, 0, 0);
+    hoje.setHours(0, 0, 0, 0);
+    return dataV.getTime() < hoje.getTime();
   };
 
   if (loading) {

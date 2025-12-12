@@ -2,29 +2,16 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import {
-  Calendar,
-  DollarSign,
-  User,
-  Tag,
-  FileText,
-  Edit,
-  Trash2,
-  MoreVertical,
-  Paperclip,
-  Receipt,
-  Search,
-  CreditCard,
-} from 'lucide-react';
+import { Filter, Rows, Square, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import NovoLancamentoDialog from '@/components/NovoLancamentoDialog';
-import EditarLancamentoDialog from '@/components/EditarLancamentoDialog';
-import PagarLancamentoDialog from '@/components/PagarLancamentoDialog';
 
 // 🔹 utils de data (sem UTC)
 import { ymdToBr } from '@/utils/date';
@@ -48,50 +35,55 @@ interface Lancamento {
 }
 
 export default function ContasAPagar() {
-  const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const [editandoLancamento, setEditandoLancamento] = useState<Lancamento | null>(null);
-  const [pagando, setPagando] = useState<Lancamento | null>(null);
-
   const { user } = useAuth();
   const { toast } = useToast();
-
-  // 🔎 única barra de pesquisa
+  const [loading, setLoading] = useState(true);
+  const [dataRef, setDataRef] = useState(() => new Date());
+  const [contas, setContas] = useState<{ id: string; nome: string }[]>([]);
+  const [contasSel, setContasSel] = useState<string[]>([]);
   const [busca, setBusca] = useState('');
+  const [modoCard, setModoCard] = useState(false);
+  const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
+
+  const ano = dataRef.getFullYear();
+  const mes = dataRef.getMonth();
+  const toYMD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const inicio = toYMD(new Date(ano, mes, 1));
+  const fim = toYMD(new Date(ano, mes + 1, 0));
 
   useEffect(() => {
-    if (user) loadContasAPagar();
+    if (!supabase || !user) return;
+    supabase
+      .from('contas_financeiras')
+      .select('id,nome')
+      .order('nome')
+      .then(({ data }) => {
+        const arr = (data || []).map((c: { id: string; nome: string }) => ({ id: c.id, nome: c.nome }));
+        setContas(arr);
+      });
   }, [user]);
 
-  async function loadContasAPagar() {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('lancamentos')
-        .select(
-          `
-          *,
-          categoria:categories(name),
-          beneficiario:beneficiaries(name)
-        `
-        )
-        .eq('status', 'EM_ABERTO')
-        .order('vencimento', { ascending: true });
-
-      if (error) throw error;
-      setLancamentos((data as Lancamento[]) || []);
-    } catch (error) {
-      console.error('Erro ao carregar contas a pagar:', error);
-      toast({
-        title: 'Erro',
-        description: 'Erro ao carregar as contas a pagar',
-        variant: 'destructive',
-      });
-    } finally {
+  useEffect(() => {
+    if (!supabase || !user) return;
+    setLoading(true);
+    let q = supabase
+      .from('lancamentos')
+      .select('id, descricao, categoria_id, beneficiario_id, observacoes, categoria:categories(name), beneficiario:beneficiaries(name), conta_id, tipo, valor, status, vencimento')
+      .eq('user_id', user.id)
+      .eq('status', 'EM_ABERTO')
+      .gte('vencimento', inicio)
+      .lte('vencimento', fim)
+      .order('vencimento');
+    if (contasSel.length > 0) q = q.in('conta_id', contasSel);
+    q.then(({ data, error }) => {
       setLoading(false);
-    }
-  }
+      if (error) {
+        toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+        return;
+      }
+      setLancamentos((data as Lancamento[]) || []);
+    });
+  }, [user, inicio, fim, contasSel]);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
@@ -117,6 +109,27 @@ export default function ContasAPagar() {
     if (!dataV) return false;
     dataV.setHours(0, 0, 0, 0);
     return dataV < hoje;
+  };
+
+  const loadContasAPagar = async () => {
+    if (!supabase || !user) return;
+    setLoading(true);
+    let q = supabase
+      .from('lancamentos')
+      .select('id, descricao, categoria_id, beneficiario_id, observacoes, categoria:categories(name), beneficiario:beneficiaries(name), conta_id, tipo, valor, status, vencimento')
+      .eq('user_id', user.id)
+      .eq('status', 'EM_ABERTO')
+      .gte('vencimento', inicio)
+      .lte('vencimento', fim)
+      .order('vencimento');
+    if (contasSel.length > 0) q = q.in('conta_id', contasSel);
+    const { data, error } = await q;
+    setLoading(false);
+    if (error) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setLancamentos((data as Lancamento[]) || []);
   };
 
   async function excluirLancamento(id: string) {
@@ -160,221 +173,121 @@ export default function ContasAPagar() {
     });
   }, [lancamentos, busca]);
 
+  const saldoAtual = useMemo(() => {
+    return lancamentos.reduce((s, r) => s + (r.tipo === 'RECEITA' ? r.valor : -r.valor), 0);
+  }, [lancamentos]);
+
+  const tituloMes = useMemo(() => {
+    const nomes = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+    return `${nomes[mes]} de ${ano}`;
+  }, [mes, ano]);
+
   if (loading) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="text-lg">Carregando...</div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Carregando...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-2 sm:px-4 py-6 space-y-6 w-full">
-      {/* Título + Novo Lançamento */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-primary">Contas a Pagar</h1>
-          <p className="text-muted-foreground">Gerencie e pesquise suas contas em aberto</p>
-        </div>
-        <NovoLancamentoDialog onSuccess={loadContasAPagar} />
-      </div>
-
-      {/* 🔎 Barra de pesquisa única (clean) com botão X para limpar */}
-      <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-          <input
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            className="w-full border rounded-lg pl-9 pr-9 py-2 outline-none focus:ring-2 focus:ring-primary"
-            placeholder="Pesquisar por descrição, beneficiário, categoria, data ou valor"
-          />
-          {busca && (
-            <button
-              type="button"
-              onClick={() => setBusca('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label="Limpar busca"
-              title="Limpar"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Lista */}
-      {filtrados.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center">
-            <div className="text-muted-foreground">
-              <DollarSign className="w-16 h-16 mx-auto mb-4 opacity-50" />
-              <h3 className="text-lg font-semibold mb-2">Nenhuma conta a pagar</h3>
-              <p className="mb-1">
-                {lancamentos.length > 0
-                  ? 'A pesquisa atual não retornou resultados.'
-                  : 'Você não possui contas em aberto no momento.'}
-              </p>
-              {busca ? (
-                <p className="text-xs text-muted-foreground">Dica: limpe a busca para ver todos os registros.</p>
-              ) : null}
-              <div className="mt-4">
-                <NovoLancamentoDialog onSuccess={loadContasAPagar} />
-              </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-4 py-6">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <NovoLancamentoDialog trigger={
+            <Button className="bg-emerald-600 hover:bg-emerald-700">Adicionar</Button>
+          } />
+          <div className="flex items-center gap-2">
+            <Button variant={modoCard ? 'secondary' : 'ghost'} onClick={() => setModoCard(false)}><Rows className="w-4 h-4"/></Button>
+            <Button variant={modoCard ? 'ghost' : 'secondary'} onClick={() => setModoCard(true)}><Square className="w-4 h-4"/></Button>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" onClick={() => setDataRef(new Date(ano, mes-1, 1))}><ChevronLeft className="w-4 h-4"/></Button>
+            <div className="font-semibold w-40 text-center">{tituloMes}</div>
+            <Button variant="ghost" onClick={() => setDataRef(new Date(ano, mes+1, 1))}><ChevronRight className="w-4 h-4"/></Button>
+          </div>
+          <div className="flex-1"/>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Input placeholder="Pesquisar" value={busca} onChange={e=>setBusca(e.target.value)} className="w-64"/>
             </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 w-full">
-          {filtrados.map((lancamento) => (
-            <Card
-              key={lancamento.id}
-              className={`w-full ${isVencido(lancamento.vencimento) ? 'border-destructive' : ''}`}
-            >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-2 w-full">
-                  <div className="flex-1 min-w-0 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-base sm:text-lg break-words leading-tight pr-2">
-                        {lancamento.descricao}
-                      </CardTitle>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 flex-shrink-0">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setPagando(lancamento)}>
-                            <CreditCard className="mr-2 h-4 w-4" />
-                            Pagar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setEditandoLancamento(lancamento)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => excluirLancamento(lancamento.id)}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
-                        <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
-                        {formatDate(lancamento.vencimento)}
-                      </span>
-                      {isVencido(lancamento.vencimento) && (
-                        <Badge variant="destructive" className="text-xs">
-                          Vencido
-                        </Badge>
-                      )}
-                      <Badge
-                        variant={lancamento.tipo === 'DESPESA' ? 'secondary' : 'default'}
-                        className="text-xs"
-                      >
-                        {lancamento.tipo === 'DESPESA' ? 'Despesa' : 'Receita'}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0 ml-2">
-                    <div className="text-lg sm:text-xl font-bold text-primary mb-2">
-                      {formatCurrency(lancamento.valor)}
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setPagando(lancamento)}
-                      className="text-xs px-2 py-1 h-auto whitespace-nowrap"
-                    >
-                      Pagar
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="pt-2">
-                <div className="grid grid-cols-1 gap-2 text-xs sm:text-sm">
-                  {lancamento.categoria?.name && (
-                    <div className="flex items-center gap-2">
-                      <Tag className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
-                      <span className="break-words">Categoria: {lancamento.categoria.name}</span>
-                    </div>
-                  )}
-                  {lancamento.beneficiario?.name && (
-                    <div className="flex items-center gap-2">
-                      <User className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
-                      <span className="break-words">Beneficiário: {lancamento.beneficiario.name}</span>
-                    </div>
-                  )}
-                  {lancamento.observacoes && (
-                    <div className="flex items-start gap-2">
-                      <FileText className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                      <span className="break-words">Obs: {lancamento.observacoes}</span>
-                    </div>
-                  )}
-
-                  {/* Arquivos */}
-                  <div className="flex flex-wrap gap-2">
-                    {lancamento.boleto_url && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                        onClick={() => window.open(lancamento.boleto_url!, '_blank')}
-                      >
-                        <Receipt className="w-3 h-3 mr-1" />
-                        Boleto
-                      </Button>
-                    )}
-                    {lancamento.comprovante_url && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                        onClick={() => window.open(lancamento.comprovante_url!, '_blank')}
-                      >
-                        <Paperclip className="w-3 h-3 mr-1" />
-                        Comprovante
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline"><Filter className="w-4 h-4 mr-2"/>Contas</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="min-w-[220px]">
+                {contas.map(c => (
+                  <DropdownMenuItem key={c.id} onSelect={(e)=>{e.preventDefault(); const s = new Set(contasSel); if (s.has(c.id)) { s.delete(c.id); } else { s.add(c.id); } setContasSel(Array.from(s));}}>
+                    <Checkbox checked={contasSel.includes(c.id)} onCheckedChange={(v)=>{const s=new Set(contasSel); if (v === true) s.add(c.id); else s.delete(c.id); setContasSel(Array.from(s));}}/>
+                    <span className="ml-2">{c.nome}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
-      )}
 
-      {/* Modal de edição */}
-      {editandoLancamento && (
-        <EditarLancamentoDialog
-          lancamento={editandoLancamento}
-          open={!!editandoLancamento}
-          onOpenChange={(open) => !open && setEditandoLancamento(null)}
-          onSuccess={loadContasAPagar}
-        />
-      )}
+        <div className="mb-4">
+          <Card>
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">Saldo atual no período</div>
+              <div className={`text-xl font-semibold ${saldoAtual>=0? 'text-emerald-600':'text-red-600'}`}>{formatCurrency(saldoAtual)}</div>
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* Diálogo de Pagamento */}
-      {pagando && (
-        <PagarLancamentoDialog
-          lancamento={{
-            id: pagando.id,
-            descricao: pagando.descricao,
-            valor: pagando.valor,
-            vencimento: pagando.vencimento, // YYYY-MM-DD
-            tipo: pagando.tipo,
-          }}
-          open={!!pagando}
-          onOpenChange={(open) => !open && setPagando(null)}
-          onSuccess={loadContasAPagar}
-        />
-      )}
+        {!modoCard ? (
+          <div className="overflow-auto rounded border bg-white">
+            <table className="min-w-full text-sm">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="p-2 text-left">Data</th>
+                  <th className="p-2 text-left">Descrição</th>
+                  <th className="p-2 text-left">Categoria</th>
+                  <th className="p-2 text-right">Valor</th>
+                  <th className="p-2 text-left">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtrados.map(r => (
+                  <tr key={r.id} className="border-t">
+                    <td className="p-2">{formatDate(r.vencimento)}</td>
+                    <td className="p-2">{r.descricao}</td>
+                    <td className="p-2">{r.categoria?.name||''}</td>
+                    <td className="p-2 text-right"><span className={r.tipo==='RECEITA'?'text-emerald-600':'text-red-600'}>R$ {r.valor.toFixed(2)}</span></td>
+                    <td className="p-2">{r.status||'EM_ABERTO'}</td>
+                  </tr>
+                ))}
+                {filtrados.length===0 && (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhum Lançamento</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtrados.map(r => (
+              <Card key={r.id}>
+                <CardContent className="p-4">
+                  <div className="text-xs text-muted-foreground">{formatDate(r.vencimento)}</div>
+                  <div className="font-medium">{r.descricao}</div>
+                  <div className="text-sm">{r.categoria?.name||''}</div>
+                  <div className={`mt-2 text-lg font-semibold ${r.tipo==='RECEITA'?'text-emerald-600':'text-red-600'}`}>R$ {r.valor.toFixed(2)}</div>
+                  <div className="text-xs text-muted-foreground">{r.status||'EM_ABERTO'}</div>
+                </CardContent>
+              </Card>
+            ))}
+            {filtrados.length===0 && (
+              <Card><CardContent className="p-8 text-center text-muted-foreground">Nenhum Lançamento</CardContent></Card>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

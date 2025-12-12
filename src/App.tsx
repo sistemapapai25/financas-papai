@@ -20,7 +20,10 @@ import RelatorioPagamentos from "./pages/RelatorioPagamentos";
 import EntradasCulto from "./pages/EntradasCulto";
 import ListaCultos from "./pages/ListaCultos";
 import CadastroTiposCulto from "./pages/CadastroTiposCulto";
-import CadastroContasFinanceiras from "./pages/CadastroContasFinanceiras";
+  import CadastroContasFinanceiras from "./pages/CadastroContasFinanceiras";
+  import ImportarExtrato from "./pages/ImportarExtrato";
+import LancamentosDashboard from "./pages/LancamentosDashboard";
+import Agenda from "@/pages/Agenda";
 
 // (opcionais p/ diagnóstico)
 import TesteSupabase from "./pages/TesteSupabase";
@@ -86,6 +89,11 @@ export default function App() {
                 <Route path="/contas-a-pagar" element={<ContasAPagar />} />
                 <Route path="/contas-pagas" element={<ContasPagas />} />
                 <Route path="/relatorio-pagamentos" element={<RelatorioPagamentos />} />
+                <Route path="/movimentacoes/importar-extrato" element={<ImportarExtrato />} />
+
+                {/* Financeiro */}
+                <Route path="/financeiro/lancamentos" element={<LancamentosDashboard />} />
+                <Route path="/financeiro/agenda" element={<Agenda />} />
 
                 {/* Cadastros */}
                 <Route path="/cadastros/beneficiarios" element={<CadastroBeneficiarios />} />

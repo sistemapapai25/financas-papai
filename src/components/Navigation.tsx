@@ -1,267 +1,94 @@
-// src/components/Navigation.tsx
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
-import {
-  Home,
-  Receipt,
-  FileCheck2,
-  Users,
-  UserPlus,
-  Tag,
-  Menu,
-  LogOut,
-  DollarSign,
-  FileBarChart,
-  Church,
-  Landmark, // ✅ ícone para Contas Financeiras
-} from 'lucide-react';
+import { Menu, LogOut } from 'lucide-react';
 
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { user, signOut } = useAuth();
   const location = useLocation();
 
-  const menuItems = [{ title: 'Dashboard', href: '/', icon: Home }];
-
-  // ✅ Entradas de Culto (3ª) e Relatório por último
-  const movimentacoesItems = [
-    { title: 'Contas a Pagar', href: '/contas-a-pagar', icon: Receipt },
-    { title: 'Contas Pagas', href: '/contas-pagas', icon: FileCheck2 },
-    { title: 'Entradas de Culto', href: '/movimentacoes/entradas-culto', icon: DollarSign },
-    { title: 'Lista de Cultos', href: '/lista-cultos', icon: Church },
-    { title: 'Relatório de Pagamentos', href: '/relatorio-pagamentos', icon: FileBarChart },
-  ];
-
-  // ✅ Inclui “Contas Financeiras” e “Tipos de Culto”
-  const cadastroItems = [
-    { title: 'Beneficiários', href: '/cadastros/beneficiarios', icon: UserPlus },
-    { title: 'Categorias', href: '/cadastros/categorias', icon: Tag },
-    { title: 'Usuários', href: '/cadastros/usuarios', icon: Users },
-    { title: 'Contas Financeiras', href: '/cadastros/contas-financeiras', icon: Landmark }, // ✅ novo
-    { title: 'Tipos de Culto', href: '/cadastros/tipos-culto', icon: Church },
-  ];
-
   const isActive = (path: string) => location.pathname === path;
-
-  const inMovimentacoes = useMemo(
-    () =>
-      ['/contas-a-pagar', '/contas-pagas', '/movimentacoes/entradas-culto', '/lista-cultos', '/relatorio-pagamentos'].some((p) =>
-        location.pathname.startsWith(p),
-      ),
-    [location.pathname],
-  );
-
-  const inCadastros = useMemo(
-    () => ['/cadastros/'].some((p) => location.pathname.startsWith(p)),
-    [location.pathname],
-  );
-
-  const NavLinks = ({
-    mobile = false,
-    onItemClick,
-  }: {
-    mobile?: boolean;
-    onItemClick?: () => void;
-  }) => (
-    <nav className={mobile ? 'flex flex-col space-y-2' : 'hidden md:flex md:items-center md:space-x-6'}>
-      {/* Principal */}
-      <div className={mobile ? 'space-y-2' : 'flex items-center space-x-2'}>
-        {menuItems.map((item) => (
-          <Link
-            key={item.href}
-            to={item.href}
-            onClick={onItemClick}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-              isActive(item.href)
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-            }`}
-          >
-            <item.icon className="w-4 h-4" />
-            {item.title}
-          </Link>
-        ))}
-      </div>
-
-      {mobile && <hr className="border-border" />}
-
-      {/* Movimentações - Mobile */}
-      <div className={mobile ? 'space-y-2' : 'hidden'}>
-        {mobile && (
-          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide px-3">
-            Movimentações
-          </h3>
-        )}
-        {movimentacoesItems.map((item) => (
-          <Link
-            key={item.href}
-            to={item.href}
-            onClick={onItemClick}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-              isActive(item.href)
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-            }`}
-          >
-            <item.icon className="w-4 h-4" />
-            {item.title}
-          </Link>
-        ))}
-      </div>
-
-      {mobile && <hr className="border-border" />}
-
-      {/* Cadastros - Mobile */}
-      <div className={mobile ? 'space-y-2' : 'hidden'}>
-        {mobile && (
-          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide px-3">
-            Cadastros
-          </h3>
-        )}
-        {cadastroItems.map((item) => (
-          <Link
-            key={item.href}
-            to={item.href}
-            onClick={onItemClick}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-              isActive(item.href)
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-            }`}
-          >
-            <item.icon className="w-4 h-4" />
-            {item.title}
-          </Link>
-        ))}
-      </div>
-
-      {/* Dropdown Movimentações - Desktop */}
-      {!mobile && (
-        <div className="relative group">
-          <Button
-            variant={inMovimentacoes ? 'secondary' : 'ghost'}
-            className={`flex items-center gap-1 ${inMovimentacoes ? 'text-foreground' : ''}`}
-          >
-            <DollarSign className="w-4 h-4" />
-            Movimentações
-          </Button>
-          <div className="absolute top-full left-0 mt-2 w-64 bg-background border border-border rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-            {movimentacoesItems.map((item, idx, arr) => (
-              <Link
-                key={item.href}
-                to={item.href}
-                className={`flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors ${
-                  idx === 0 ? 'rounded-t-md' : ''
-                } ${idx === arr.length - 1 ? 'rounded-b-md' : ''} ${
-                  isActive(item.href) ? 'bg-muted text-primary' : ''
-                }`}
-              >
-                <item.icon className="w-4 h-4" />
-                {item.title}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Dropdown Cadastros - Desktop */}
-      {!mobile && (
-        <div className="relative group">
-          <Button
-            variant={inCadastros ? 'secondary' : 'ghost'}
-            className={`flex items-center gap-1 ${inCadastros ? 'text-foreground' : ''}`}
-          >
-            <Tag className="w-4 h-4" />
-            Cadastros
-          </Button>
-          <div className="absolute top-full left-0 mt-2 w-56 bg-background border border-border rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-            {cadastroItems.map((item, idx, arr) => (
-              <Link
-                key={item.href}
-                to={item.href}
-                className={`flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors ${
-                  idx === 0 ? 'rounded-t-md' : ''
-                } ${idx === arr.length - 1 ? 'rounded-b-md' : ''} ${
-                  isActive(item.href) ? 'bg-muted text-primary' : ''
-                }`}
-              >
-                <item.icon className="w-4 h-4" />
-                {item.title}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-    </nav>
-  );
+  const subLinkCls = (path: string) => `py-3 border-b-2 ${isActive(path) ? 'border-emerald-700 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`;
+  const groupCls = (paths: string[]) => `py-3 border-b-2 ${paths.some(p => isActive(p)) ? 'border-emerald-700 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`;
+  const groupTitleCls = (paths: string[]) => `px-3 py-1 text-xs font-semibold ${paths.some(p => isActive(p)) ? 'text-emerald-700' : 'text-muted-foreground'}`;
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto px-4 py-3">
-        <div className="flex items-center justify-between">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
-            <img
-              src="/lovable-uploads/ddde374a-4e76-43e2-88da-fbfaa022f04c.png"
-              alt="Logo Igreja"
-              className="w-6 h-6 object-contain"
-            />
+    <header className="sticky top-0 z-50 w-full">
+      <div className="bg-emerald-700 text-white">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2 text-white">
+            <img src="/lovable-uploads/ddde374a-4e76-43e2-88da-fbfaa022f04c.png" alt="Logo" className="w-6 h-6 object-contain" />
             <span className="font-bold text-lg">Finanças Papai</span>
           </Link>
-
-          {/* Navegação Desktop */}
-          <NavLinks />
-
-          {/* Usuário + Ações */}
           <div className="flex items-center gap-4">
-            <span className="hidden sm:inline text-sm text-muted-foreground">{user?.email}</span>
-
-            {/* Botão Sair - Desktop */}
-            <Button variant="outline" size="sm" onClick={signOut} className="hidden sm:flex">
+            <span className="hidden sm:inline text-sm opacity-90">{user?.email}</span>
+            <Button variant="outline" size="sm" onClick={signOut} className="hidden sm:flex bg-white text-emerald-700 hover:bg-white/90">
               <LogOut className="w-4 h-4 mr-2" />
               Sair
             </Button>
-
-            {/* Menu Mobile (hambúrguer) */}
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="sm" className="md:hidden" aria-label="Abrir menu">
+                <Button variant="ghost" size="sm" className="md:hidden text-white" aria-label="Abrir menu">
                   <Menu className="w-5 h-5" />
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-72">
                 <div className="flex flex-col h-full">
-                  {/* Cabeçalho Mobile */}
                   <div className="pb-4 border-b">
                     <div className="flex items-center gap-2 mb-2">
-                      <img
-                        src="/lovable-uploads/ddde374a-4e76-43e2-88da-fbfaa022f04c.png"
-                        alt="Logo Igreja"
-                        className="w-5 h-5 object-contain"
-                      />
+                      <img src="/lovable-uploads/ddde374a-4e76-43e2-88da-fbfaa022f04c.png" alt="Logo" className="w-5 h-5 object-contain" />
                       <span className="font-semibold">Finanças Papai</span>
                     </div>
                     <p className="text-sm text-muted-foreground">{user?.email}</p>
                   </div>
-
-                  {/* Navegação Mobile */}
                   <div className="flex-1 py-4">
-                    <NavLinks mobile onItemClick={() => setIsOpen(false)} />
-                  </div>
+                    <nav className="flex flex-col space-y-4">
+                      <Link to="/" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Dashboard</Link>
 
-                  {/* Botão Sair - Mobile */}
+                      <div>
+                        <div className={groupTitleCls(['/financeiro/agenda','/contas-a-pagar','/contas-pagas','/relatorio-pagamentos'])}>Movimentações</div>
+                        <div className="flex flex-col">
+                          <Link to="/financeiro/agenda" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Agenda Financeira</Link>
+                          <Link to="/contas-a-pagar" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Contas a Pagar</Link>
+                          <Link to="/contas-pagas" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Contas Pagas</Link>
+                          <Link to="/relatorio-pagamentos" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Relatório de Pagamentos</Link>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className={groupTitleCls(['/movimentacoes/entradas-culto','/lista-cultos'])}>Cultos</div>
+                        <div className="flex flex-col">
+                          <Link to="/movimentacoes/entradas-culto" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Entradas de Culto</Link>
+                          <Link to="/lista-cultos" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Lista de Cultos</Link>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className={groupTitleCls(['/financeiro/lancamentos','/movimentacoes/importar-extrato'])}>Conciliação</div>
+                        <div className="flex flex-col">
+                          <Link to="/financeiro/lancamentos" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Lançamentos</Link>
+                          <Link to="/movimentacoes/importar-extrato" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Importar Extrato</Link>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className={groupTitleCls(['/cadastros/beneficiarios','/cadastros/categorias','/cadastros/usuarios','/cadastros/contas-financeiras','/cadastros/tipos-culto'])}>Cadastros</div>
+                        <div className="flex flex-col">
+                          <Link to="/cadastros/beneficiarios" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Beneficiários</Link>
+                          <Link to="/cadastros/categorias" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Categorias</Link>
+                          <Link to="/cadastros/contas-financeiras" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Contas Financeiras</Link>
+                          <Link to="/cadastros/tipos-culto" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Tipos de Culto</Link>
+                          <Link to="/cadastros/usuarios" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Usuários</Link>
+                        </div>
+                      </div>
+                    </nav>
+                  </div>
                   <div className="pt-4 border-t">
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => {
-                        signOut();
-                        setIsOpen(false);
-                      }}
-                    >
+                    <Button variant="outline" className="w-full" onClick={() => { signOut(); setIsOpen(false); }}>
                       <LogOut className="w-4 h-4 mr-2" />
                       Sair
                     </Button>
@@ -269,6 +96,82 @@ const Navigation = () => {
                 </div>
               </SheetContent>
             </Sheet>
+          </div>
+        </div>
+      </div>
+      <div className="bg-background border-b">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center gap-6 overflow-x-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className={groupCls(['/financeiro/agenda','/contas-a-pagar','/contas-pagas','/relatorio-pagamentos'])}>Movimentações</button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem asChild>
+                  <Link to="/financeiro/agenda">Agenda Financeira</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/contas-a-pagar">Contas a Pagar</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/contas-pagas">Contas Pagas</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/relatorio-pagamentos">Relatório de Pagamentos</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className={groupCls(['/movimentacoes/entradas-culto','/lista-cultos'])}>Cultos</button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem asChild>
+                  <Link to="/movimentacoes/entradas-culto">Entradas de Culto</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/lista-cultos">Lista de Cultos</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className={groupCls(['/financeiro/lancamentos','/movimentacoes/importar-extrato'])}>Conciliação</button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem asChild>
+                  <Link to="/financeiro/lancamentos">Lançamentos</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/movimentacoes/importar-extrato">Importar Extrato</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className={groupCls(['/cadastros/beneficiarios','/cadastros/categorias','/cadastros/usuarios','/cadastros/contas-financeiras','/cadastros/tipos-culto'])}>Cadastros</button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem asChild>
+                  <Link to="/cadastros/beneficiarios">Beneficiários</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/cadastros/categorias">Categorias</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/cadastros/contas-financeiras">Contas Financeiras</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/cadastros/tipos-culto">Tipos de Culto</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/cadastros/usuarios">Usuários</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>

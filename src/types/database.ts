@@ -81,6 +81,7 @@ export interface ContaFinanceira {
   agencia?: string | null;
   numero?: string | null;
   saldo_inicial: number;
+  logo?: string | null;
   created_at: string;
 }
 
@@ -92,7 +93,7 @@ export interface MovimentoFinanceiro {
   tipo: 'ENTRADA' | 'SAIDA';
   valor: number;
   descricao?: string | null;
-  origem: 'LANCAMENTO' | 'CULTO' | 'AJUSTE';
+  origem: 'LANCAMENTO' | 'CULTO' | 'AJUSTE' | 'EXTRATO';
   ref_id?: string | null;
   comprovante_url?: string | null;
   created_at: string;

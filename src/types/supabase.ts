@@ -163,6 +163,7 @@ export type Database = {
           agencia: string | null
           numero: string | null
           saldo_inicial: number
+          logo: string | null
           created_at: string | null
         }
         Insert: {
@@ -174,6 +175,7 @@ export type Database = {
           agencia?: string | null
           numero?: string | null
           saldo_inicial?: number
+          logo?: string | null
           created_at?: string | null
         }
         Update: {
@@ -185,6 +187,7 @@ export type Database = {
           agencia?: string | null
           numero?: string | null
           saldo_inicial?: number
+          logo?: string | null
           created_at?: string | null
         }
         Relationships: []
@@ -199,7 +202,7 @@ export type Database = {
           tipo: "ENTRADA" | "SAIDA"
           valor: number
           descricao: string | null
-          origem: "CULTO" | "LANCAMENTO" | "AJUSTE" | null
+          origem: "CULTO" | "LANCAMENTO" | "AJUSTE" | "EXTRATO" | null
           ref_id: string | null
           created_at: string | null
         }
@@ -211,7 +214,7 @@ export type Database = {
           tipo: "ENTRADA" | "SAIDA"
           valor: number
           descricao?: string | null
-          origem?: "CULTO" | "LANCAMENTO" | "AJUSTE" | null
+          origem?: "CULTO" | "LANCAMENTO" | "AJUSTE" | "EXTRATO" | null
           ref_id?: string | null
           created_at?: string | null
         }
