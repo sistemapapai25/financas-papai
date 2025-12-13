@@ -14,9 +14,10 @@ interface FileUploadProps {
   bucket: string;
   folder: string;
   accept?: string;
+  filenameHint?: string;
 }
 
-const FileUpload = ({ label, value, onChange, bucket, folder, accept = "*" }: FileUploadProps) => {
+const FileUpload = ({ label, value, onChange, bucket, folder, accept = "*", filenameHint }: FileUploadProps) => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -28,7 +29,9 @@ const FileUpload = ({ label, value, onChange, bucket, folder, accept = "*" }: Fi
     setLoading(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      const slug = String(filenameHint || "").toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      const suffix = slug && slug.length >= 3 ? `-${slug}` : '';
+      const fileName = `${user.id}/${Date.now()}${suffix}.${fileExt}`;
       const filePath = `${folder}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage

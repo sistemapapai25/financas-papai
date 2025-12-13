@@ -416,6 +416,7 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess, res
               onChange={(url) => setFormData({ ...formData, comprovante_url: url || '' })}
               bucket="Comprovantes"
               folder="comprovantes"
+              filenameHint={formData.descricao}
               accept=".pdf,.jpg,.jpeg,.png"
             />
           </div>

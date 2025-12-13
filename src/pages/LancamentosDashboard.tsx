@@ -6,7 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { ChevronLeft, ChevronRight, Filter, Rows, Square, Edit3, Search, X, Wand2, FileText, ExternalLink } from "lucide-react";
+import { ChevronLeft, ChevronRight, Filter, Rows, Square, Edit3, Search, X, Wand2, FileText, ExternalLink, ScanText } from "lucide-react";
 import { ymdToBr } from "@/utils/date";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -60,6 +60,7 @@ export default function LancamentosDashboard() {
   const [addingBenef, setAddingBenef] = useState(false);
   const [applyingRules, setApplyingRules] = useState(false);
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
+  const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set());
   const ano = dataRef.getFullYear();
   const mes = dataRef.getMonth();
   const toYmd = (d: Date) => {
@@ -461,6 +462,39 @@ export default function LancamentosDashboard() {
     }
   }
 
+  async function lerEAplicar(m: Mov) {
+    if (!m.comprovante_url) {
+      toast({ title: "Comprovante", description: "Este movimento não possui comprovante.", variant: "destructive" });
+      return;
+    }
+    const set = new Set(analyzingIds);
+    set.add(m.id);
+    setAnalyzingIds(set);
+    try {
+      const { data, error } = await supabase.functions.invoke('analisar-comprovante', {
+        body: { url: m.comprovante_url, user_id: user?.id, descricao: m.descricao || '' }
+      });
+      if (error) throw error;
+      const recebedorNome = (data as any)?.recebedor_nome as string | undefined;
+      if (recebedorNome) {
+        toast({ title: "Dados do Recebedor", description: `Para: ${recebedorNome}` });
+        return;
+      }
+      const sugestao = (data as any)?.sugestao as { categoria_id?: string | null; beneficiario_id?: string | null; motivo?: string } | undefined;
+      if (sugestao?.beneficiario_id) {
+        toast({ title: "Dados do Recebedor", description: sugestao.motivo ? `${sugestao.motivo}` : `Beneficiário identificado.` });
+        return;
+      }
+      toast({ title: "Leitura feita", description: "Nenhuma informação de recebedor encontrada.", });
+    } catch (e: unknown) {
+      toast({ title: "Erro", description: e instanceof Error ? e.message : "Falha ao ler comprovante.", variant: "destructive" });
+    } finally {
+      const s2 = new Set(analyzingIds);
+      s2.delete(m.id);
+      setAnalyzingIds(s2);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
       <div className="container mx-auto px-4 py-8">
@@ -609,9 +643,20 @@ export default function LancamentosDashboard() {
                       <td className="p-2">{r.beneficiario_nome || ''}</td>
                       <td className="p-2 text-center">
                         {r.comprovante_url ? (
-                          <Button variant="ghost" size="icon" onClick={() => openComprovante(r.comprovante_url)} aria-label="Abrir comprovante">
-                            <FileText className="w-4 h-4" />
-                          </Button>
+                          <div className="flex items-center justify-center gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => openComprovante(r.comprovante_url)} aria-label="Abrir comprovante">
+                              <FileText className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => lerEAplicar(r)}
+                              disabled={analyzingIds.has(r.id)}
+                              aria-label="Ler e aplicar"
+                            >
+                              <ScanText className={`w-4 h-4 ${analyzingIds.has(r.id) ? 'animate-pulse' : ''}`} />
+                            </Button>
+                          </div>
                         ) : null}
                       </td>
                       <td className="p-2 text-right"><span className={r.tipo === 'ENTRADA' ? 'text-emerald-600' : 'text-red-600'}>{formatCurrency(r.valor)}</span></td>
@@ -645,9 +690,18 @@ export default function LancamentosDashboard() {
                   <div className={`mt-2 text-lg font-semibold ${r.tipo === 'ENTRADA' ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(r.valor)}</div>
                   <div className="text-xs text-muted-foreground">{r.tipo}</div>
                   {r.comprovante_url ? (
-                    <div className="mt-2">
+                    <div className="mt-2 flex items-center gap-2">
                       <Button variant="ghost" size="sm" onClick={() => openComprovante(r.comprovante_url)} aria-label="Abrir comprovante">
                         <ExternalLink className="w-4 h-4 mr-2" /> Comprovante
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => lerEAplicar(r)}
+                        disabled={analyzingIds.has(r.id)}
+                        aria-label="Ler e aplicar"
+                      >
+                        <ScanText className={`w-4 h-4 mr-2 ${analyzingIds.has(r.id) ? 'animate-pulse' : ''}`} /> Ler e aplicar
                       </Button>
                     </div>
                   ) : null}
@@ -730,6 +784,7 @@ export default function LancamentosDashboard() {
                 onChange={(url) => setEditComprovanteUrl(url || "")}
                 bucket="Comprovantes"
                 folder="comprovantes"
+                filenameHint={editDesc}
                 accept=".pdf,.jpg,.jpeg,.png"
               />
             </div>
