@@ -124,7 +124,7 @@ export default function LancamentosDashboard() {
         toast({ title: "Erro", description: error.message, variant: "destructive" });
         return;
       }
-      const arr: Mov[] = (data || []).map((r: { id: string; data: string; descricao: string | null; valor: number; tipo: "ENTRADA" | "SAIDA"; origem?: string | null; conta_id?: string | null; categoria_id?: string | null; beneficiario_id?: string | null; comprovante_url?: string | null; contas?: { nome?: string | null } | null; categoria?: { name?: string | null } | null; beneficiario?: { name?: string | null } | null }) => ({
+      const arr: Mov[] = (data || []).map((r) => ({
         id: r.id,
         data: r.data,
         descricao: r.descricao ?? null,
@@ -134,7 +134,7 @@ export default function LancamentosDashboard() {
         beneficiario_id: r.beneficiario_id ?? null,
         categoria_nome: r.categoria?.name ?? null,
         beneficiario_nome: r.beneficiario?.name ?? null,
-        tipo: r.tipo,
+        tipo: r.tipo as Mov["tipo"],
         valor: r.valor,
         origem: (r.origem as Mov["origem"]) ?? null,
         comprovante_url: r.comprovante_url ?? null,
@@ -159,7 +159,7 @@ export default function LancamentosDashboard() {
     }
     q.then(({ data, error }) => {
       if (error) return;
-      const net = (data || []).reduce((s: number, r: { valor: number; tipo: "ENTRADA" | "SAIDA"; categoria?: { name?: string } }) => {
+      const net = (data || []).reduce((s: number, r) => {
         // If it's a transfer, ignore for "Gain/Loss" but here we are calculating Initial Balance based on past transactions.
         // Wait, balance MUST include transfers because money actually moved.
         // The user asked to not appear in "Reports of Expense/Revenue", implying "Earnings vs Spendings".
@@ -244,17 +244,23 @@ export default function LancamentosDashboard() {
 
   async function openComprovante(url?: string | null) {
     if (!url) return;
-    const cands = [
-      url,
-      url.replace("/public/Comprovantes/", "/public/comprovantes/"),
-      url.replace("/public/comprovantes/", "/public/Comprovantes/"),
-    ];
-    for (const u of cands) {
-      try {
-        const r = await fetch(u, { method: "HEAD" });
-        if (r.ok) { window.open(u, "_blank"); return; }
-      } catch {}
+    
+    // Extract the file path from the URL
+    // URL format: https://xxx.supabase.co/storage/v1/object/public/Comprovantes/comprovantes/...
+    const pathMatch = url.match(/\/storage\/v1\/object\/public\/Comprovantes\/(.+)$/i);
+    if (pathMatch) {
+      const filePath = pathMatch[1];
+      const { data, error } = await supabase.storage
+        .from("Comprovantes")
+        .createSignedUrl(filePath, 3600); // 1 hour expiry
+      
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, "_blank");
+        return;
+      }
     }
+    
+    // Fallback: try opening the original URL
     window.open(url, "_blank");
   }
 
@@ -376,7 +382,7 @@ export default function LancamentosDashboard() {
     try {
       // Buscar todas as regras
       const { data: rules, error: rulesError } = await supabase
-        .from("classification_rules" as unknown as string)
+        .from("classification_rules")
         .select("id, term, category_id, beneficiary_id")
         .eq("user_id", user.id);
 
@@ -432,7 +438,7 @@ export default function LancamentosDashboard() {
         q = q.in("conta_id", contasSel);
       }
       const { data } = await q;
-      const arr: Mov[] = (data || []).map((r: { id: string; data: string; descricao: string | null; valor: number; tipo: "ENTRADA" | "SAIDA"; origem?: string | null; conta_id?: string | null; categoria_id?: string | null; beneficiario_id?: string | null; comprovante_url?: string | null; contas?: { nome?: string | null } | null; categoria?: { name?: string | null } | null; beneficiario?: { name?: string | null } | null }) => ({
+      const arr: Mov[] = (data || []).map((r) => ({
         id: r.id,
         data: r.data,
         descricao: r.descricao ?? null,
@@ -442,7 +448,7 @@ export default function LancamentosDashboard() {
         beneficiario_id: r.beneficiario_id ?? null,
         categoria_nome: r.categoria?.name ?? null,
         beneficiario_nome: r.beneficiario?.name ?? null,
-        tipo: r.tipo,
+        tipo: r.tipo as Mov["tipo"],
         valor: r.valor,
         origem: (r.origem as Mov["origem"]) ?? null,
         comprovante_url: r.comprovante_url ?? null,

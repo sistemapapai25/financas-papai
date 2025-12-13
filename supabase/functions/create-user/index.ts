@@ -123,12 +123,13 @@ serve(async (req) => {
       },
     )
 
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create user';
     console.error('Error creating user:', error)
     console.error('Error details:', JSON.stringify(error, null, 2))
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'Failed to create user',
+        error: errorMessage,
         details: error 
       }),
       {
