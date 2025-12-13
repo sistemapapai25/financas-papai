@@ -20,10 +20,11 @@ import RelatorioPagamentos from "./pages/RelatorioPagamentos";
 import EntradasCulto from "./pages/EntradasCulto";
 import ListaCultos from "./pages/ListaCultos";
 import CadastroTiposCulto from "./pages/CadastroTiposCulto";
-  import CadastroContasFinanceiras from "./pages/CadastroContasFinanceiras";
-  import ImportarExtrato from "./pages/ImportarExtrato";
+import CadastroContasFinanceiras from "./pages/CadastroContasFinanceiras";
+import ImportarExtrato from "./pages/ImportarExtrato";
 import LancamentosDashboard from "./pages/LancamentosDashboard";
 import Agenda from "@/pages/Agenda";
+import RegrasClassificacao from "./pages/RegrasClassificacao";
 
 // (opcionais p/ diagnóstico)
 import TesteSupabase from "./pages/TesteSupabase";
@@ -101,6 +102,9 @@ export default function App() {
                 <Route path="/cadastros/usuarios" element={<CadastroUsuarios />} />
                 <Route path="/cadastros/tipos-culto" element={<CadastroTiposCulto />} />
                 <Route path="/cadastros/contas-financeiras" element={<CadastroContasFinanceiras />} />
+
+                {/* Configurações */}
+                <Route path="/configuracoes/regras-classificacao" element={<RegrasClassificacao />} />
               </Route>
 
               {/* 404 */}

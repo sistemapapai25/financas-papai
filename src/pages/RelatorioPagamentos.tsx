@@ -33,7 +33,7 @@ const RelatorioPagamentos = () => {
     const hoje = new Date();
     const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
     const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
-    
+
     setDataInicial(format(primeiroDia, 'yyyy-MM-dd'));
     setDataFinal(format(ultimoDia, 'yyyy-MM-dd'));
   }, []);
@@ -59,7 +59,11 @@ const RelatorioPagamentos = () => {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // Get Transferência Interna IDs to exclude
+      const { data: catTransf } = await supabase.from('categories').select('id').eq('name', 'Transferência Interna');
+      const transfIds = catTransf?.map(c => c.id) || [];
+
+      let query = supabase
         .from('lancamentos')
         .select(`
           id,
@@ -74,6 +78,12 @@ const RelatorioPagamentos = () => {
         .gte('vencimento', dataInicial)
         .lte('vencimento', dataFinal)
         .order('vencimento', { ascending: true });
+
+      if (transfIds.length > 0) {
+        query = query.not('categoria_id', 'in', `(${transfIds.join(',')})`);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -121,7 +131,7 @@ const RelatorioPagamentos = () => {
     }
 
     setEnviandoZap(true);
-    
+
     try {
       const response = await fetch(webhookUrl, {
         method: "POST",
@@ -191,7 +201,7 @@ const RelatorioPagamentos = () => {
                   onChange={(e) => setDataInicial(e.target.value)}
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="dataFinal">Data Final</Label>
                 <Input
@@ -203,8 +213,8 @@ const RelatorioPagamentos = () => {
               </div>
 
               <div className="flex items-end">
-                <Button 
-                  onClick={buscarDados} 
+                <Button
+                  onClick={buscarDados}
                   disabled={loading}
                   className="w-full"
                 >
@@ -223,7 +233,7 @@ const RelatorioPagamentos = () => {
               <AlertCircle className="w-16 h-16 mx-auto mb-4 opacity-50" />
               <h3 className="text-lg font-semibold mb-2">Nenhum lançamento encontrado</h3>
               <p className="text-muted-foreground">
-                {dataInicial && dataFinal 
+                {dataInicial && dataFinal
                   ? `Não foram encontrados lançamentos em aberto no período de ${formatarData(dataInicial)} a ${formatarData(dataFinal)}.`
                   : 'Selecione um período para visualizar os lançamentos em aberto.'
                 }
@@ -255,7 +265,7 @@ const RelatorioPagamentos = () => {
                       </span>
                     </div>
                   ))}
-                  
+
                   <div className="flex items-center justify-between pt-4 border-t-2 border-primary">
                     <span className="font-bold text-lg">Total:</span>
                     <span className="font-bold text-lg text-destructive">
@@ -267,7 +277,7 @@ const RelatorioPagamentos = () => {
             </Card>
 
             <div className="mt-4">
-              <Button 
+              <Button
                 onClick={enviarParaZap}
                 disabled={enviandoZap}
                 className="w-full"

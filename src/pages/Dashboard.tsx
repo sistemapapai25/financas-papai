@@ -31,24 +31,37 @@ const Dashboard = () => {
       const fimMes = endOfMonth(hoje);
       const proximaSemana = addDays(hoje, 7);
 
-      // Total em aberto do mês
-      const { data: emAberto } = await supabase
+      // Get Transferência Interna IDs to exclude
+      const { data: catTransf } = await supabase.from('categories').select('id').eq('name', 'Transferência Interna');
+      const transfIds = catTransf?.map(c => c.id) || [];
+      const transfFilter = transfIds.length > 0 ? `(${transfIds.join(',')})` : null;
+
+      // Total em aberto do mês (excluding transfers)
+      let qAberto = supabase
         .from('lancamentos')
-        .select('valor')
+        .select('valor, categoria_id')
         .eq('status', 'EM_ABERTO')
         .gte('vencimento', format(inicioMes, 'yyyy-MM-dd'))
         .lte('vencimento', format(fimMes, 'yyyy-MM-dd'));
 
+      if (transfFilter) {
+        qAberto = qAberto.not('categoria_id', 'in', transfFilter);
+      }
+      const { data: emAberto } = await qAberto;
       const totalEmAberto = emAberto?.reduce((sum, item) => sum + parseFloat(String(item.valor) || '0'), 0) || 0;
 
-      // Total pago do mês
-      const { data: pagos } = await supabase
+      // Total pago do mês (excluding transfers)
+      let qPago = supabase
         .from('lancamentos')
-        .select('valor_pago')
+        .select('valor_pago, categoria_id')
         .eq('status', 'PAGO')
         .gte('data_pagamento', format(inicioMes, 'yyyy-MM-dd'))
         .lte('data_pagamento', format(fimMes, 'yyyy-MM-dd'));
 
+      if (transfFilter) {
+        qPago = qPago.not('categoria_id', 'in', transfFilter);
+      }
+      const { data: pagos } = await qPago;
       const totalPagoMes = pagos?.reduce((sum, item) => sum + parseFloat(String(item.valor_pago) || '0'), 0) || 0;
 
       // Próximos vencimentos (7 dias)
@@ -65,13 +78,18 @@ const Dashboard = () => {
         .order('vencimento', { ascending: true })
         .limit(5);
 
-      // Receitas do mês
-      const { data: receitas } = await supabase
+      // Receitas do mês (excluding transfers)
+      let qReceitas = supabase
         .from('lancamentos')
-        .select('valor')
+        .select('valor, categoria_id')
         .eq('tipo', 'RECEITA')
         .gte('vencimento', format(inicioMes, 'yyyy-MM-dd'))
         .lte('vencimento', format(fimMes, 'yyyy-MM-dd'));
+
+      if (transfFilter) {
+        qReceitas = qReceitas.not('categoria_id', 'in', transfFilter);
+      }
+      const { data: receitas } = await qReceitas;
 
       const receitasMes = receitas?.reduce((sum, item) => sum + parseFloat(String(item.valor) || '0'), 0) || 0;
 
@@ -224,11 +242,10 @@ const Dashboard = () => {
                 {dashboardData.proximosVencimentos.map((lancamento) => (
                   <div
                     key={lancamento.id}
-                    className={`flex items-center justify-between p-4 rounded-lg border ${
-                      isVencido(lancamento.vencimento) 
-                        ? 'border-destructive bg-destructive/10' 
-                        : 'border-border'
-                    }`}
+                    className={`flex items-center justify-between p-4 rounded-lg border ${isVencido(lancamento.vencimento)
+                      ? 'border-destructive bg-destructive/10'
+                      : 'border-border'
+                      }`}
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
@@ -244,7 +261,7 @@ const Dashboard = () => {
                         {lancamento.beneficiario?.name || lancamento.categoria?.name}
                       </p>
                     </div>
-                    
+
                     <div className="text-right">
                       <p className="font-bold">{formatCurrency(lancamento.valor)}</p>
                       <p className="text-sm text-muted-foreground">
@@ -253,7 +270,7 @@ const Dashboard = () => {
                     </div>
                   </div>
                 ))}
-                
+
                 <div className="pt-4 border-t flex gap-2">
                   <Link to="/contas-a-pagar" className="flex-1">
                     <Button variant="outline" className="w-full">
@@ -273,7 +290,7 @@ const Dashboard = () => {
                 <p className="text-muted-foreground mb-4">
                   Nenhum lançamento próximo do vencimento
                 </p>
-                <NovoLancamentoDialog 
+                <NovoLancamentoDialog
                   onSuccess={loadDashboardData}
                   trigger={
                     <Button>

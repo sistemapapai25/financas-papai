@@ -8,7 +8,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import type { TablesInsert } from "@/integrations/supabase/types";
 
 type LinhaPreview = {
   idx: number;
@@ -43,7 +42,7 @@ function normalizarDataPT(s: unknown): string | null {
   const m = txt.match(/(\d{1,2})\s+de\s+([a-zç]+)\s+de\s+(\d{4})/i);
   if (m) {
     const dia = Number(m[1]);
-    const meses = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"]; 
+    const meses = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
     const nome = m[2].toLowerCase();
     const mes = meses.indexOf(nome);
     const ano = Number(m[3]);
@@ -69,8 +68,7 @@ export default function ImportarExtrato() {
   const [contas, setContas] = useState<{ id: string; nome: string }[]>([]);
   const [contaId, setContaId] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [ignorarDuplicados, setIgnorarDuplicados] = useState(true);
-  const [permitirDuplicados, setPermitirDuplicados] = useState(false);
+  const [permitirDuplicados, setPermitirDuplicados] = useState(true);
 
   useEffect(() => {
     if (!supabase || !user) return;
@@ -154,11 +152,11 @@ export default function ImportarExtrato() {
   async function importarSelecionados() {
     if (!user) { toast({ title: "Sessão", description: "Você precisa estar logado" }); return; }
     if (!supabase) { toast({ title: "Ambiente", description: "Supabase não configurado", variant: "destructive" }); return; }
-    if (!contaId) { toast({ title: "Conta financeira", description: "Selecione a conta" , variant: "destructive"}); return; }
+    if (!contaId) { toast({ title: "Conta financeira", description: "Selecione a conta", variant: "destructive" }); return; }
     let selecionadas = linhas.filter(l => l.selecionado && l.valido);
 
     // Deduplicação básica por conjunto (data|valor|descricao) no intervalo selecionado
-    if (!permitirDuplicados && ignorarDuplicados && selecionadas.length > 0) {
+    if (!permitirDuplicados && selecionadas.length > 0) {
       const minData = selecionadas.map(l => l.data!).sort()[0];
       const maxData = selecionadas.map(l => l.data!).sort().slice(-1)[0];
       const { data: existentes } = await supabase
@@ -180,7 +178,7 @@ export default function ImportarExtrato() {
         }
       }
       const antes = selecionadas.length;
-      selecionadas = selecionadas.filter(l => !setKeys.has(`${l.data}|${(l.valor||0).toFixed(2)}|${String(l.descricao||'').toLowerCase().trim()}`));
+      selecionadas = selecionadas.filter(l => !setKeys.has(`${l.data}|${(l.valor || 0).toFixed(2)}|${String(l.descricao || '').toLowerCase().trim()}`));
       const removidos = antes - selecionadas.length;
       if (removidos > 0) {
         toast({ title: 'Duplicados ignorados', description: `${removidos} linhas já existiam e foram removidas do envio.` });
@@ -202,7 +200,7 @@ export default function ImportarExtrato() {
       let inseridos = 0;
       let duplicados = 0;
       for (const rec of registros) {
-        const payload: TablesInsert<"movimentos_financeiros"> = {
+        const payload = {
           user_id: rec.user_id,
           conta_id: rec.conta_id,
           data: rec.data,
@@ -254,22 +252,14 @@ export default function ImportarExtrato() {
 
             {linhas.length > 0 && (
               <div className="space-y-3">
-                <div className="flex items-center gap-4">
-                  <div>Selecionados: <b>{resumo.totalSelecionado}</b></div>
-                  <div>Entradas: <b>{formatCurrency(resumo.entradas)}</b></div>
-                  <div>Saídas: <b>{formatCurrency(resumo.saídas)}</b></div>
-                  <label className="flex items-center gap-2 text-sm">
-                    <Checkbox checked={ignorarDuplicados} onCheckedChange={(v) => setIgnorarDuplicados(Boolean(v))} />
-                    Ignorar duplicados já existentes
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-4 font-bold">
+                  <div>Selecionados: {resumo.totalSelecionado}</div>
+                  <div>Entradas: {formatCurrency(resumo.entradas)}</div>
+                  <div>Saídas: {formatCurrency(resumo.saídas)}</div>
+                  <label className="flex items-center gap-2 text-sm font-normal">
                     <Checkbox
                       checked={permitirDuplicados}
-                      onCheckedChange={(v) => {
-                        const c = Boolean(v);
-                        setPermitirDuplicados(c);
-                        if (c) setIgnorarDuplicados(false);
-                      }}
+                      onCheckedChange={(v) => setPermitirDuplicados(Boolean(v))}
                     />
                     Permitir duplicados
                   </label>
@@ -299,10 +289,10 @@ export default function ImportarExtrato() {
                           </td>
                           <td className="p-2">{l.data || ""}</td>
                           <td className="p-2">{l.descricao || ""}</td>
-                          <td className="p-2">{l.credito != null ? l.credito.toFixed(2) : ""}</td>
-                          <td className="p-2">{l.debito != null ? l.debito.toFixed(2) : ""}</td>
+                          <td className="p-2">{l.credito != null ? formatCurrency(l.credito) : ""}</td>
+                          <td className="p-2">{l.debito != null ? formatCurrency(l.debito) : ""}</td>
                           <td className="p-2">{l.tipo || ""}</td>
-                          <td className="p-2">{l.valor != null ? l.valor.toFixed(2) : ""}</td>
+                          <td className="p-2">{l.valor != null ? formatCurrency(l.valor) : ""}</td>
                           <td className="p-2">{l.valido ? "OK" : l.erro}</td>
                         </tr>
                       ))}
@@ -316,8 +306,8 @@ export default function ImportarExtrato() {
               </div>
             )}
           </CardContent>
-        </Card>
-      </div>
-    </div>
+        </Card >
+      </div >
+    </div >
   );
 }

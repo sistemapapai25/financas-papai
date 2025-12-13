@@ -50,7 +50,7 @@ const Navigation = () => {
                       <Link to="/" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Dashboard</Link>
 
                       <div>
-                        <div className={groupTitleCls(['/financeiro/agenda','/contas-a-pagar','/contas-pagas','/relatorio-pagamentos'])}>Movimentações</div>
+                        <div className={groupTitleCls(['/financeiro/agenda', '/contas-a-pagar', '/contas-pagas', '/relatorio-pagamentos'])}>Movimentações</div>
                         <div className="flex flex-col">
                           <Link to="/financeiro/agenda" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Agenda Financeira</Link>
                           <Link to="/contas-a-pagar" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Contas a Pagar</Link>
@@ -60,7 +60,7 @@ const Navigation = () => {
                       </div>
 
                       <div>
-                        <div className={groupTitleCls(['/movimentacoes/entradas-culto','/lista-cultos'])}>Cultos</div>
+                        <div className={groupTitleCls(['/movimentacoes/entradas-culto', '/lista-cultos'])}>Cultos</div>
                         <div className="flex flex-col">
                           <Link to="/movimentacoes/entradas-culto" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Entradas de Culto</Link>
                           <Link to="/lista-cultos" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Lista de Cultos</Link>
@@ -68,7 +68,7 @@ const Navigation = () => {
                       </div>
 
                       <div>
-                        <div className={groupTitleCls(['/financeiro/lancamentos','/movimentacoes/importar-extrato'])}>Conciliação</div>
+                        <div className={groupTitleCls(['/financeiro/lancamentos', '/movimentacoes/importar-extrato'])}>Conciliação</div>
                         <div className="flex flex-col">
                           <Link to="/financeiro/lancamentos" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Lançamentos</Link>
                           <Link to="/movimentacoes/importar-extrato" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Importar Extrato</Link>
@@ -76,13 +76,20 @@ const Navigation = () => {
                       </div>
 
                       <div>
-                        <div className={groupTitleCls(['/cadastros/beneficiarios','/cadastros/categorias','/cadastros/usuarios','/cadastros/contas-financeiras','/cadastros/tipos-culto'])}>Cadastros</div>
+                        <div className={groupTitleCls(['/cadastros/beneficiarios', '/cadastros/categorias', '/cadastros/usuarios', '/cadastros/contas-financeiras', '/cadastros/tipos-culto'])}>Cadastros</div>
                         <div className="flex flex-col">
                           <Link to="/cadastros/beneficiarios" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Beneficiários</Link>
                           <Link to="/cadastros/categorias" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Categorias</Link>
                           <Link to="/cadastros/contas-financeiras" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Contas Financeiras</Link>
                           <Link to="/cadastros/tipos-culto" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Tipos de Culto</Link>
                           <Link to="/cadastros/usuarios" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Usuários</Link>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className={groupTitleCls(['/configuracoes/regras-classificacao'])}>Configurações</div>
+                        <div className="flex flex-col">
+                          <Link to="/configuracoes/regras-classificacao" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Regras de Classificação</Link>
                         </div>
                       </div>
                     </nav>
@@ -104,7 +111,7 @@ const Navigation = () => {
           <div className="flex items-center gap-6 overflow-x-auto">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={groupCls(['/financeiro/agenda','/contas-a-pagar','/contas-pagas','/relatorio-pagamentos'])}>Movimentações</button>
+                <button className={groupCls(['/financeiro/agenda', '/contas-a-pagar', '/contas-pagas', '/relatorio-pagamentos'])}>Movimentações</button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem asChild>
@@ -124,7 +131,7 @@ const Navigation = () => {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={groupCls(['/movimentacoes/entradas-culto','/lista-cultos'])}>Cultos</button>
+                <button className={groupCls(['/movimentacoes/entradas-culto', '/lista-cultos'])}>Cultos</button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem asChild>
@@ -138,7 +145,7 @@ const Navigation = () => {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={groupCls(['/financeiro/lancamentos','/movimentacoes/importar-extrato'])}>Conciliação</button>
+                <button className={groupCls(['/financeiro/lancamentos', '/movimentacoes/importar-extrato'])}>Conciliação</button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem asChild>
@@ -152,7 +159,7 @@ const Navigation = () => {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={groupCls(['/cadastros/beneficiarios','/cadastros/categorias','/cadastros/usuarios','/cadastros/contas-financeiras','/cadastros/tipos-culto'])}>Cadastros</button>
+                <button className={groupCls(['/cadastros/beneficiarios', '/cadastros/categorias', '/cadastros/usuarios', '/cadastros/contas-financeiras', '/cadastros/tipos-culto'])}>Cadastros</button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem asChild>
@@ -169,6 +176,17 @@ const Navigation = () => {
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/cadastros/usuarios">Usuários</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className={groupCls(['/configuracoes/regras-classificacao'])}>Configurações</button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem asChild>
+                  <Link to="/configuracoes/regras-classificacao">Regras de Classificação</Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

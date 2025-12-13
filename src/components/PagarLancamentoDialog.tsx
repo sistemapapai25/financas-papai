@@ -380,7 +380,7 @@ export default function PagarLancamentoDialog({
       const path = `comprovantes/${user?.id ?? "anon"}/${lancamento.id}-${Date.now()}.${ext}`;
 
       const { error: upErr } = await supabase.storage
-        .from("comprovantes")
+        .from("Comprovantes")
         .upload(path, file, {
           cacheControl: "3600",
           contentType: file.type || "application/octet-stream",
@@ -389,7 +389,7 @@ export default function PagarLancamentoDialog({
 
       if (upErr) throw upErr;
 
-      const { data: pub } = supabase.storage.from("comprovantes").getPublicUrl(path);
+      const { data: pub } = supabase.storage.from("Comprovantes").getPublicUrl(path);
       return pub?.publicUrl ?? null;
     } catch (e) {
       console.error("Upload erro:", e);

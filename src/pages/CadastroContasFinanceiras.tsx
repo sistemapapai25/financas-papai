@@ -20,7 +20,8 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 
-import { Banknote, Plus, Edit2, Trash2, Search } from "lucide-react";
+import { Banknote, Plus, Edit2, Trash2, Search, MoreVertical } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 type ContaFinanceira = Tables<"contas_financeiras">;
 type TipoConta = TablesInsert<"contas_financeiras">["tipo"]; // "CAIXA" | "BANCO"
@@ -172,21 +173,21 @@ export default function CadastroContasFinanceiras() {
           if (!logoBucketOk) {
             toast({ title: "Logo", description: `Bucket "${LOGO_BUCKET}" não encontrado. ${logoBucketMsg ?? "Verifique no Supabase."} Salvando sem alterar a logo.`, variant: "destructive" });
           } else {
-          try {
-            const ext = (logoFile.name.split(".").pop() || "png").toLowerCase();
-            const path = `${user.id}/${editing.id}-${Date.now()}.${ext}`;
-            const { error: uploadError } = await supabase.storage.from(LOGO_BUCKET).upload(path, logoFile, {
-              upsert: true,
-              contentType: logoFile.type || "image/*",
-            });
-            if (uploadError) throw uploadError;
-            const pub = supabase.storage.from(LOGO_BUCKET).getPublicUrl(path);
-            logoUrl = pub.data.publicUrl || null;
-          } catch (err: unknown) {
-            console.error("Falha no upload da logo", err);
-            const msg = err instanceof Error ? err.message : String(err);
-            toast({ title: "Logo", description: `${msg} (bucket: ${LOGO_BUCKET}). Salvando sem alteração na logo.`, variant: "destructive" });
-          }
+            try {
+              const ext = (logoFile.name.split(".").pop() || "png").toLowerCase();
+              const path = `${user.id}/${editing.id}-${Date.now()}.${ext}`;
+              const { error: uploadError } = await supabase.storage.from(LOGO_BUCKET).upload(path, logoFile, {
+                upsert: true,
+                contentType: logoFile.type || "image/*",
+              });
+              if (uploadError) throw uploadError;
+              const pub = supabase.storage.from(LOGO_BUCKET).getPublicUrl(path);
+              logoUrl = pub.data.publicUrl || null;
+            } catch (err: unknown) {
+              console.error("Falha no upload da logo", err);
+              const msg = err instanceof Error ? err.message : String(err);
+              toast({ title: "Logo", description: `${msg} (bucket: ${LOGO_BUCKET}). Salvando sem alteração na logo.`, variant: "destructive" });
+            }
           }
         }
         const { error } = await supabase
@@ -220,24 +221,24 @@ export default function CadastroContasFinanceiras() {
           if (!logoBucketOk) {
             toast({ title: "Logo", description: `Bucket "${LOGO_BUCKET}" não encontrado. ${logoBucketMsg ?? "Verifique no Supabase."} Conta criada sem logo.`, variant: "destructive" });
           } else {
-          try {
-            const ext = (logoFile.name.split(".").pop() || "png").toLowerCase();
-            const path = `${user.id}/${created.id}-${Date.now()}.${ext}`;
-            const { error: uploadError } = await supabase.storage.from(LOGO_BUCKET).upload(path, logoFile, {
-              upsert: true,
-              contentType: logoFile.type || "image/*",
-            });
-            if (uploadError) throw uploadError;
-            const pub = supabase.storage.from(LOGO_BUCKET).getPublicUrl(path);
-            const logoUrl = pub.data.publicUrl || null;
-            if (logoUrl) {
-              await supabase.from("contas_financeiras").update({ logo: logoUrl }).eq("id", created.id);
+            try {
+              const ext = (logoFile.name.split(".").pop() || "png").toLowerCase();
+              const path = `${user.id}/${created.id}-${Date.now()}.${ext}`;
+              const { error: uploadError } = await supabase.storage.from(LOGO_BUCKET).upload(path, logoFile, {
+                upsert: true,
+                contentType: logoFile.type || "image/*",
+              });
+              if (uploadError) throw uploadError;
+              const pub = supabase.storage.from(LOGO_BUCKET).getPublicUrl(path);
+              const logoUrl = pub.data.publicUrl || null;
+              if (logoUrl) {
+                await supabase.from("contas_financeiras").update({ logo: logoUrl }).eq("id", created.id);
+              }
+            } catch (err: unknown) {
+              console.error("Falha no upload da logo (criação)", err);
+              const msg = err instanceof Error ? err.message : String(err);
+              toast({ title: "Logo", description: `Conta criada, mas falhou o envio da logo: ${msg} (bucket: ${LOGO_BUCKET}).`, variant: "destructive" });
             }
-          } catch (err: unknown) {
-            console.error("Falha no upload da logo (criação)", err);
-            const msg = err instanceof Error ? err.message : String(err);
-            toast({ title: "Logo", description: `Conta criada, mas falhou o envio da logo: ${msg} (bucket: ${LOGO_BUCKET}).`, variant: "destructive" });
-          }
           }
         }
         toast({ title: "Sucesso", description: "Conta criada com sucesso!" });
@@ -411,11 +412,20 @@ export default function CadastroContasFinanceiras() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                className="pl-9"
+                className="pl-9 pr-10"
                 placeholder="Buscar por nome, banco, agência, número..."
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
               />
+              {busca && (
+                <button
+                  onClick={() => setBusca('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <span className="sr-only">Limpar</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                </button>
+              )}
             </div>
             <div>
               <Label className="sr-only">Tipo</Label>
@@ -488,18 +498,25 @@ export default function CadastroContasFinanceiras() {
                       <td className="p-3">{c.numero ?? "-"}</td>
                       <td className="p-3 text-right">{formatMoney(c.saldo_inicial || 0)}</td>
                       <td className="p-3">
-                        <div className="flex items-center justify-center gap-2">
-                          <Button size="sm" variant="outline" onClick={() => abrirEditar(c)}>
-                            <Edit2 className="w-3 h-3 mr-1" />
-                            Editar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => excluirConta(c)}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
+                        <div className="flex items-center justify-center">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Abrir menu</span>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => abrirEditar(c)}>
+                                <Edit2 className="w-4 h-4 mr-2" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => excluirConta(c)} className="text-red-600 focus:text-red-600">
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Excluir
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </td>
                     </tr>

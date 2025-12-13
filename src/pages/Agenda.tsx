@@ -26,30 +26,44 @@ export default function Agenda() {
 
   useEffect(() => {
     if (!supabase || !user) return;
-    supabase
-      .from("lancamentos")
-      .select("id, tipo, valor, vencimento")
-      .eq("user_id", user.id)
-      .gte("vencimento", inicio)
-      .lte("vencimento", fim)
-      .order("vencimento")
-      .then(({ data, error }) => {
-        if (error) {
-          toast({ title: "Erro", description: error.message, variant: "destructive" });
-          return;
-        }
-        const arr: Lanc[] = (data || []).map((r: any) => ({
-          id: r.id,
-          tipo: r.tipo,
-          valor: r.valor,
-          vencimento: r.vencimento,
-        }));
-        setRows(arr);
-      });
+
+    const fetchData = async () => {
+      // Get Transferência Interna IDs to exclude
+      const { data: catTransf } = await supabase.from('categories').select('id').eq('name', 'Transferência Interna');
+      const transfIds = catTransf?.map(c => c.id) || [];
+
+      let query = supabase
+        .from("lancamentos")
+        .select("id, tipo, valor, vencimento, categoria_id")
+        .eq("user_id", user.id)
+        .gte("vencimento", inicio)
+        .lte("vencimento", fim)
+        .order("vencimento");
+
+      if (transfIds.length > 0) {
+        query = query.not('categoria_id', 'in', `(${transfIds.join(',')})`);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        toast({ title: "Erro", description: error.message, variant: "destructive" });
+        return;
+      }
+      const arr: Lanc[] = (data || []).map((r: any) => ({
+        id: r.id,
+        tipo: r.tipo,
+        valor: r.valor,
+        vencimento: r.vencimento,
+      }));
+      setRows(arr);
+    };
+
+    fetchData();
   }, [user, inicio, fim]);
 
   const tituloMes = useMemo(() => {
-    const nomes = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+    const nomes = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
     return `${nomes[mes]} de ${ano}`;
   }, [mes, ano]);
 
@@ -82,6 +96,8 @@ export default function Agenda() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">Agenda Financeira</h1>
+
         <div className="flex items-center gap-3 mb-4">
           <Button variant="ghost" onClick={() => setDataRef(new Date(ano, mes - 1, 1))}>
             <ChevronLeft className="w-4 h-4" />

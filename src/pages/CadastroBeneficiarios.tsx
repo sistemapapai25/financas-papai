@@ -7,7 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { UserPlus, Edit2, Trash2, Search } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { UserPlus, Edit2, Trash2, Search, MoreVertical } from 'lucide-react';
 
 interface Beneficiario {
   id: string;
@@ -232,14 +233,24 @@ const CadastroBeneficiarios = () => {
       </div>
 
       {/* Search */}
+      {/* Search */}
       <div className="relative mb-6">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
         <Input
           placeholder="Buscar beneficiários..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
+          className="pl-10 pr-10"
         />
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <span className="sr-only">Limpar</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+          </button>
+        )}
       </div>
 
       {/* Lista */}
@@ -277,7 +288,7 @@ const CadastroBeneficiarios = () => {
                     <th className="text-left p-4 font-medium">Telefone</th>
                     <th className="text-left p-4 font-medium">Email</th>
                     <th className="text-left p-4 font-medium">Observações</th>
-                    <th className="text-left p-4 font-medium">Criado em</th>
+
                     <th className="text-center p-4 font-medium">Ações</th>
                   </tr>
                 </thead>
@@ -292,18 +303,27 @@ const CadastroBeneficiarios = () => {
                       <td className="p-4 text-muted-foreground">{b.phone || '-'}</td>
                       <td className="p-4 text-muted-foreground">{b.email || '-'}</td>
                       <td className="p-4 text-muted-foreground max-w-xs truncate">{b.observacoes || '-'}</td>
-                      <td className="p-4 text-muted-foreground">
-                        {new Date(b.created_at).toLocaleDateString('pt-BR')}
-                      </td>
+
                       <td className="p-4">
-                        <div className="flex justify-center gap-2">
-                          <Button size="sm" variant="outline" onClick={() => handleEdit(b)}>
-                            <Edit2 className="w-3 h-3 mr-1" />
-                            Editar
-                          </Button>
-                          <Button size="sm" variant="destructive" onClick={() => handleDelete(b.id, b.name)}>
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
+                        <div className="flex justify-center">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Abrir menu</span>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEdit(b)}>
+                                <Edit2 className="w-4 h-4 mr-2" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDelete(b.id, b.name)} className="text-red-600 focus:text-red-600">
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Excluir
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </td>
                     </tr>

@@ -11,6 +11,10 @@ import { supabase } from '@/integrations/supabase/client';
 import NovoBeneficiarioModal from './NovoBeneficiarioModal';
 import NovaCategoriaModal from './NovaCategoriaModal';
 import FileUpload from './FileUpload';
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface EditarLancamentoDialogProps {
   lancamento: {
@@ -31,6 +35,7 @@ interface EditarLancamentoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  restrictedEditing?: boolean;
 }
 
 interface Categoria {
@@ -44,7 +49,7 @@ interface Beneficiario {
   name: string;
 }
 
-const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess }: EditarLancamentoDialogProps) => {
+const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess, restrictedEditing = false }: EditarLancamentoDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [beneficiarios, setBeneficiarios] = useState<Beneficiario[]>([]);
@@ -62,6 +67,7 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess }: E
     boleto_url: '',
     comprovante_url: ''
   });
+  const [openCategoria, setOpenCategoria] = useState(false);
 
   const { toast } = useToast();
   const { user } = useAuth();
@@ -128,7 +134,7 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess }: E
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.descricao || !formData.valor || !formData.vencimento || !formData.categoria_id) {
       toast({
         title: "Erro",
@@ -204,8 +210,9 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess }: E
               onValueChange={(value: 'DESPESA' | 'RECEITA') => {
                 setFormData({ ...formData, tipo: value, categoria_id: '' });
               }}
+              disabled={restrictedEditing}
             >
-              <SelectTrigger>
+              <SelectTrigger disabled={restrictedEditing}>
                 <SelectValue placeholder="Selecione o tipo" />
               </SelectTrigger>
               <SelectContent>
@@ -242,26 +249,55 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess }: E
           {/* Categoria - Terceiro campo */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="categoria">Categoria *</Label>
+              <Label>Categoria *</Label>
               <NovaCategoriaModal onSuccess={handleNovaCategoria} tipoFiltro={formData.tipo} />
             </div>
-            <Select
-              value={formData.categoria_id}
-              onValueChange={(value) => setFormData({ ...formData, categoria_id: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione uma categoria" />
-              </SelectTrigger>
-              <SelectContent className="bg-background border border-border z-50">
-                {categorias
-                  .filter(cat => cat.tipo === formData.tipo)
-                  .map((categoria) => (
-                    <SelectItem key={categoria.id} value={categoria.id}>
-                      {categoria.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
+            <Popover open={openCategoria} onOpenChange={setOpenCategoria}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={openCategoria}
+                  className="w-full justify-between"
+                  disabled={restrictedEditing}
+                >
+                  {formData.categoria_id
+                    ? categorias.find((categoria) => categoria.id === formData.categoria_id)?.name
+                    : "Selecione uma categoria..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+                <Command>
+                  <CommandInput placeholder="Buscar categoria..." />
+                  <CommandList>
+                    <CommandEmpty>Nenhuma categoria encontrada.</CommandEmpty>
+                    <CommandGroup>
+                      {categorias
+                        .filter(cat => cat.tipo === formData.tipo)
+                        .map((categoria) => (
+                          <CommandItem
+                            key={categoria.id}
+                            value={categoria.name}
+                            onSelect={() => {
+                              setFormData({ ...formData, categoria_id: categoria.id });
+                              setOpenCategoria(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                formData.categoria_id === categoria.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {categoria.name}
+                          </CommandItem>
+                        ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Descrição e Valor */}
@@ -287,6 +323,7 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess }: E
                 onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
                 placeholder="0,00"
                 required
+                disabled={restrictedEditing}
               />
             </div>
           </div>
@@ -301,6 +338,7 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess }: E
                 value={formData.vencimento}
                 onChange={(e) => setFormData({ ...formData, vencimento: e.target.value })}
                 required
+                disabled={restrictedEditing}
               />
             </div>
             <div className="space-y-2">
@@ -308,8 +346,9 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess }: E
               <Select
                 value={formData.status}
                 onValueChange={(value: 'EM_ABERTO' | 'PAGO' | 'CANCELADO') => setFormData({ ...formData, status: value })}
+                disabled={restrictedEditing}
               >
-                <SelectTrigger>
+                <SelectTrigger disabled={restrictedEditing}>
                   <SelectValue placeholder="Selecione o status" />
                 </SelectTrigger>
                 <SelectContent>

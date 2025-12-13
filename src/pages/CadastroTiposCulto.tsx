@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
+import { Search } from "lucide-react";
+
 type TipoCultoRow = Database["public"]["Tables"]["tipos_culto"]["Row"];
 type TipoCultoInsert = Database["public"]["Tables"]["tipos_culto"]["Insert"];
 
@@ -17,6 +19,7 @@ export default function CadastroTiposCulto() {
   const [tipos, setTipos] = useState<TipoCultoRow[]>([]);
   const [nome, setNome] = useState("");
   const [ordem, setOrdem] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -88,6 +91,10 @@ export default function CadastroTiposCulto() {
     carregar();
   }
 
+  const filteredTipos = tipos.filter(t =>
+    t.nome.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="mx-auto max-w-3xl">
       <Card>
@@ -126,10 +133,29 @@ export default function CadastroTiposCulto() {
 
           {/* Lista */}
           <div className="space-y-2">
-            {tipos.length === 0 ? (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input
+                placeholder="Buscar tipos..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 pr-10"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <span className="sr-only">Limpar</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                </button>
+              )}
+            </div>
+
+            {filteredTipos.length === 0 ? (
               <p className="text-muted-foreground">Nenhum tipo de culto cadastrado.</p>
             ) : (
-              tipos.map((t) => (
+              filteredTipos.map((t) => (
                 <div key={t.id} className="flex items-center justify-between border rounded-md px-3 py-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
