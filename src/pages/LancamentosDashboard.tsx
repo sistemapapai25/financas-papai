@@ -471,8 +471,21 @@ export default function LancamentosDashboard() {
     set.add(m.id);
     setAnalyzingIds(set);
     try {
+      // Generate signed URL for private bucket
+      let urlToAnalyze = m.comprovante_url;
+      const pathMatch = m.comprovante_url.match(/\/storage\/v1\/object\/public\/Comprovantes\/(.+)$/i);
+      if (pathMatch) {
+        const filePath = pathMatch[1];
+        const { data: signedData } = await supabase.storage
+          .from("Comprovantes")
+          .createSignedUrl(filePath, 3600);
+        if (signedData?.signedUrl) {
+          urlToAnalyze = signedData.signedUrl;
+        }
+      }
+
       const { data, error } = await supabase.functions.invoke('analisar-comprovante', {
-        body: { url: m.comprovante_url, user_id: user?.id, descricao: m.descricao || '' }
+        body: { url: urlToAnalyze, user_id: user?.id, descricao: m.descricao || '' }
       });
       if (error) throw error;
       const recebedorNome = (data as any)?.recebedor_nome as string | undefined;
