@@ -29,8 +29,8 @@ export default function Auth() {
       }
       try {
         await ensureDefaultCategories();
-      } catch (err: any) {
-        console.error("ensureDefaultCategories:", err?.message || err);
+      } catch (err: unknown) {
+        console.error("ensureDefaultCategories:", err);
       }
       toast.success("Login realizado!");
       nav("/");
@@ -76,8 +76,8 @@ export default function Auth() {
             </label>
             <input
               type="email"
-              className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-[color:var(--brand)]"
-              style={{ borderColor: "rgba(0,0,0,.12)", ["--brand" as any]: brand }}
+            className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-[color:var(--brand)]"
+            style={{ borderColor: "rgba(0,0,0,.12)", ["--brand" as string]: brand }}
               placeholder="seu@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -93,8 +93,8 @@ export default function Auth() {
             </label>
             <input
               type="password"
-              className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-[color:var(--brand)]"
-              style={{ borderColor: "rgba(0,0,0,.12)", ["--brand" as any]: brand }}
+            className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-[color:var(--brand)]"
+            style={{ borderColor: "rgba(0,0,0,.12)", ["--brand" as string]: brand }}
               placeholder="Sua senha"
               value={senha}
               onChange={(e) => setSenha(e.target.value)}

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -87,7 +88,7 @@ const NovoLancamentoDialog = ({ onSuccess, trigger }: NovoLancamentoDialogProps)
     setFormData({ ...formData, beneficiario_id: novoBeneficiario.id });
   };
 
-  const handleNovaCategoria = (novaCategoria: { id: string; name: string; tipo: 'DESPESA' | 'RECEITA' }) => {
+  const handleNovaCategoria = (novaCategoria: { id: string; name: string; tipo: 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA' }) => {
     setCategorias(prev => [...prev, novaCategoria]);
     setFormData({ ...formData, categoria_id: novaCategoria.id });
   };
@@ -245,10 +246,13 @@ const NovoLancamentoDialog = ({ onSuccess, trigger }: NovoLancamentoDialogProps)
               </SelectTrigger>
               <SelectContent className="bg-background border border-border z-50">
                 {categorias
-                  .filter(cat => cat.tipo === formData.tipo)
+                  .filter(cat => cat.tipo === 'TRANSFERENCIA' || cat.tipo === formData.tipo)
                   .map((categoria) => (
                     <SelectItem key={categoria.id} value={categoria.id}>
                       {categoria.name}
+                      {categoria.name === 'Transferência Interna' ? (
+                        <span className="ml-2"><Badge variant="secondary">Transferência</Badge></span>
+                      ) : null}
                     </SelectItem>
                   ))}
               </SelectContent>

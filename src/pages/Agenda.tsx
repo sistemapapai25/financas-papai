@@ -50,9 +50,10 @@ export default function Agenda() {
         toast({ title: "Erro", description: error.message, variant: "destructive" });
         return;
       }
-      const arr: Lanc[] = (data || []).map((r: any) => ({
+      type RowBasic = { id: string; tipo: string; valor: number; vencimento: string };
+      const arr: Lanc[] = (data || []).map((r: RowBasic) => ({
         id: r.id,
-        tipo: r.tipo,
+        tipo: r.tipo as Lanc["tipo"],
         valor: r.valor,
         vencimento: r.vencimento,
       }));

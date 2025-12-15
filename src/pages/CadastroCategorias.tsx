@@ -19,7 +19,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } fro
 interface Categoria {
   id: string;
   name: string;
-  tipo: 'DESPESA' | 'RECEITA';
+  tipo: 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA';
   created_at: string;
   parent_id?: string | null;
   ordem?: number;
@@ -38,12 +38,12 @@ const CadastroCategorias = () => {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterTipo, setFilterTipo] = useState<'ALL' | 'DESPESA' | 'RECEITA'>('ALL');
+  const [filterTipo, setFilterTipo] = useState<'ALL' | 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA'>('ALL');
   const [editingCategoria, setEditingCategoria] = useState<Categoria | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
-    tipo: 'DESPESA' as 'DESPESA' | 'RECEITA'
+    tipo: 'DESPESA' as 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA'
   });
   const [chipFiltro, setChipFiltro] = useState('todas');
   const [detalheOpen, setDetalheOpen] = useState(false);
@@ -63,6 +63,7 @@ const CadastroCategorias = () => {
 
   const loadCategorias = async () => {
     try {
+      await ensureTransferCategory();
       const { data, error } = await supabase
         .from('categories')
         .select('id,name,tipo,created_at,parent_id,ordem')
@@ -82,6 +83,30 @@ const CadastroCategorias = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const ensureTransferCategory = async () => {
+    if (!user) return;
+    try {
+      const { data: existing } = await supabase
+        .from('categories')
+        .select('id, name, tipo')
+        .eq('user_id', user.id)
+        .eq('name', 'Transferência Interna');
+      if (!existing || existing.length === 0) {
+        await supabase.from('categories').insert({ user_id: user.id, name: 'Transferência Interna', tipo: 'TRANSFERENCIA', parent_id: null });
+      } else {
+        const cat = existing[0] as { id: string; name: string; tipo: 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA' };
+        if (cat.tipo !== 'TRANSFERENCIA') {
+          await supabase.from('categories').update({ tipo: 'TRANSFERENCIA', parent_id: null }).eq('id', cat.id);
+        }
+      }
+    } catch (e: unknown) {
+      toast({
+        title: "Aviso",
+        description: e instanceof Error ? e.message : "Falha ao preparar categoria de Transferência",
+      });
     }
   };
 
@@ -273,7 +298,7 @@ const CadastroCategorias = () => {
   const countEntradasBanco = baseCats.filter(c => c.name.toLowerCase().includes('entradas banco')).length;
 
   type CatNode = Categoria & { children: CatNode[] };
-  const buildTree = (list: Categoria[], tipo: 'DESPESA' | 'RECEITA'): CatNode[] => {
+  const buildTree = (list: Categoria[], tipo: 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA'): CatNode[] => {
     // Only build tree from available items. 
     // If we filtered by tab, parent/children links might be broken if we only kept children?
     // No, our filter logic keeps the whole branch (root + descendants).
@@ -304,6 +329,7 @@ const CadastroCategorias = () => {
   };
   const treeReceitas = buildTree(filteredCategorias, 'RECEITA');
   const treeDespesas = buildTree(filteredCategorias, 'DESPESA');
+  const treeTransferencias = buildTree(filteredCategorias, 'TRANSFERENCIA');
 
   const findSiblings = (cat: Categoria) => filteredCategorias.filter(c => c.tipo === cat.tipo && (c.parent_id ?? null) === (cat.parent_id ?? null)).sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0) || a.name.localeCompare(b.name));
 
@@ -337,7 +363,7 @@ const CadastroCategorias = () => {
           {/* Indentation based on depth */}
           <div style={{ paddingLeft: depth * 20 }} className="flex items-center gap-2">
             <span className="text-muted-foreground font-mono text-sm min-w-[30px]">{numberPrefix}.</span>
-            <FolderOpen className={`w-4 h-4 ${n.tipo === 'RECEITA' ? 'text-emerald-700' : 'text-red-600'}`} />
+            <FolderOpen className={`w-4 h-4 ${n.tipo === 'RECEITA' ? 'text-emerald-700' : n.tipo === 'DESPESA' ? 'text-red-600' : 'text-sky-700'}`} />
             <span className="font-medium">{n.name}</span>
           </div>
         </button>
@@ -389,12 +415,13 @@ const CadastroCategorias = () => {
               </button>
             )}
           </div>
-          <Select value={filterTipo} onValueChange={(value: 'ALL' | 'DESPESA' | 'RECEITA') => setFilterTipo(value)}>
+          <Select value={filterTipo} onValueChange={(value: 'ALL' | 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA') => setFilterTipo(value)}>
             <SelectTrigger className="w-48"><SelectValue placeholder="Tipo" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Todas</SelectItem>
               <SelectItem value="DESPESA">Despesas</SelectItem>
               <SelectItem value="RECEITA">Receitas</SelectItem>
+              <SelectItem value="TRANSFERENCIA">Transferências</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -470,6 +497,14 @@ const CadastroCategorias = () => {
                     {treeDespesas.map((root, idx) => renderNode(root, 0, `${idx + 1}`))}
                   </>
                 )}
+
+                {chipFiltro === 'todas' && (
+                  <div className="bg-sky-50/50 px-4 py-3 flex items-center gap-2 border-b border-sky-100 mt-0">
+                    <FolderOpen className="w-4 h-4 text-sky-700" />
+                    <span className="font-semibold text-sky-900">Transferências</span>
+                  </div>
+                )}
+                {treeTransferencias.map((root, idx) => renderNode(root, 0, `${idx + 1}`))}
               </div>
             </CardContent>
           </Card>
@@ -535,13 +570,14 @@ const CadastroCategorias = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="tipo">Tipo *</Label>
-                <Select value={formData.tipo} onValueChange={(value: 'DESPESA' | 'RECEITA') => setFormData({ ...formData, tipo: value })}>
+                <Select value={formData.tipo} onValueChange={(value: 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA') => setFormData({ ...formData, tipo: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o tipo" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="DESPESA">Despesa</SelectItem>
                     <SelectItem value="RECEITA">Receita</SelectItem>
+                    <SelectItem value="TRANSFERENCIA">Transferência</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

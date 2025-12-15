@@ -25,6 +25,7 @@ import ImportarExtrato from "./pages/ImportarExtrato";
 import LancamentosDashboard from "./pages/LancamentosDashboard";
 import Agenda from "@/pages/Agenda";
 import RegrasClassificacao from "./pages/RegrasClassificacao";
+import ConfiguracaoIgreja from "./pages/ConfiguracaoIgreja";
 
 // (opcionais p/ diagnóstico)
 import TesteSupabase from "./pages/TesteSupabase";
@@ -105,6 +106,7 @@ export default function App() {
 
                 {/* Configurações */}
                 <Route path="/configuracoes/regras-classificacao" element={<RegrasClassificacao />} />
+                <Route path="/configuracoes/igreja" element={<ConfiguracaoIgreja />} />
               </Route>
 
               {/* 404 */}

@@ -63,6 +63,27 @@ export default function CadastroContasFinanceiras() {
     logo: "",
   });
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const appKey = useMemo(() => (user?.id ? `app:applicationAccountId:${user.id}` : null), [user?.id]);
+  const getAppAccountId = () => (appKey ? localStorage.getItem(appKey) : null);
+  const [appAccountId, setAppAccountIdState] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAppAccountIdState(getAppAccountId());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appKey]);
+
+  const setAppAccountId = (id: string | null) => {
+    if (!appKey) return;
+    if (id) {
+      localStorage.setItem(appKey, id);
+      setAppAccountIdState(id);
+      toast({ title: 'Configuração', description: 'Conta marcada como Aplicação.' });
+    } else {
+      localStorage.removeItem(appKey);
+      setAppAccountIdState(null);
+      toast({ title: 'Configuração', description: 'Conta de Aplicação desmarcada.' });
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -476,7 +497,14 @@ export default function CadastroContasFinanceiras() {
                       key={c.id}
                       className={`border-b ${idx % 2 ? "bg-muted/20" : ""}`}
                     >
-                      <td className="p-3">{c.nome}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <span>{c.nome}</span>
+                          {appAccountId === c.id ? (
+                            <Badge variant="outline">Aplicação</Badge>
+                          ) : null}
+                        </div>
+                      </td>
                       <td className="p-3">
                         <Badge variant={c.tipo === "BANCO" ? "default" : "secondary"}>
                           {c.tipo === "BANCO" ? "Banco" : "Caixa"}
@@ -511,6 +539,17 @@ export default function CadastroContasFinanceiras() {
                                 <Edit2 className="w-4 h-4 mr-2" />
                                 Editar
                               </DropdownMenuItem>
+                              {appAccountId === c.id ? (
+                                <DropdownMenuItem onClick={() => setAppAccountId(null)}>
+                                  <Banknote className="w-4 h-4 mr-2" />
+                                  Desmarcar como Conta de Aplicação
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem onClick={() => setAppAccountId(c.id)}>
+                                  <Banknote className="w-4 h-4 mr-2" />
+                                  Marcar como Conta de Aplicação
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => excluirConta(c)} className="text-red-600 focus:text-red-600">
                                 <Trash2 className="w-4 h-4 mr-2" />
                                 Excluir

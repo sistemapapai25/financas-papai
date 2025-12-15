@@ -121,7 +121,7 @@ export default function ListaCultos() {
 
       if (error) throw error;
       setTiposCulto(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao carregar tipos de culto:", error);
     }
   };
@@ -164,7 +164,7 @@ export default function ListaCultos() {
       }
 
       setModalEdicaoAberto(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao preparar edição:", error);
       toast({
         title: "Erro",
@@ -222,7 +222,7 @@ export default function ListaCultos() {
       );
 
       setCultos(cultosComTotais);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao carregar cultos:", error);
       toast({
         title: "Erro",
@@ -270,7 +270,7 @@ export default function ListaCultos() {
 
       // Recarregar lista
       carregarCultos();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao excluir culto:", error);
       toast({
         title: "Erro",
@@ -291,7 +291,7 @@ export default function ListaCultos() {
     setDizimos(dizimos.filter((_, i) => i !== index));
   };
 
-  const atualizarDizimo = (index: number, campo: keyof DizimoItem, valor: any) => {
+  const atualizarDizimo = (index: number, campo: keyof DizimoItem, valor: string | number) => {
     const novosDizimos = [...dizimos];
     novosDizimos[index] = { ...novosDizimos[index], [campo]: valor };
     setDizimos(novosDizimos);
@@ -381,7 +381,7 @@ export default function ListaCultos() {
 
       setModalEdicaoAberto(false);
       carregarCultos();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao salvar edição:", error);
       toast({
         title: "Erro",

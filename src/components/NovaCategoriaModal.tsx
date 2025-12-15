@@ -11,9 +11,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Plus } from 'lucide-react';
 
 interface NovaCategoriaModalProps {
-  onSuccess?: (categoria: { id: string; name: string; tipo: 'DESPESA' | 'RECEITA' }) => void;
+  onSuccess?: (categoria: { id: string; name: string; tipo: 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA' }) => void;
   trigger?: React.ReactNode;
-  tipoFiltro?: 'DESPESA' | 'RECEITA';
+  tipoFiltro?: 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA';
 }
 
 const NovaCategoriaModal = ({ onSuccess, trigger, tipoFiltro }: NovaCategoriaModalProps) => {
@@ -21,7 +21,7 @@ const NovaCategoriaModal = ({ onSuccess, trigger, tipoFiltro }: NovaCategoriaMod
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
-    tipo: tipoFiltro || ('DESPESA' as 'DESPESA' | 'RECEITA')
+    tipo: tipoFiltro || ('DESPESA' as 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA')
   });
   const [mode, setMode] = useState<'ROOT' | 'CHILD'>('ROOT');
   const [parentId, setParentId] = useState<string | null>(null);
@@ -59,23 +59,52 @@ const NovaCategoriaModal = ({ onSuccess, trigger, tipoFiltro }: NovaCategoriaMod
 
     try {
       setLoading(true);
+      const nome = formData.name.trim();
 
-      const { data, error } = await supabase
+      // Primeiro, verificar se já existe categoria com este nome para o usuário
+      const { data: existing } = await supabase
         .from('categories')
-        .insert({
-          user_id: user?.id,
-          name: formData.name.trim(),
-          tipo: formData.tipo,
-          parent_id: mode === 'CHILD' ? parentId : null
-        })
-        .select()
-        .single();
+        .select('id, name, tipo, parent_id')
+        .eq('user_id', user?.id as string)
+        .eq('name', nome);
 
-      if (error) throw error;
+      let createdOrUpdated: { id: string; name: string; tipo: 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA' } | null = null;
+
+      if (existing && existing.length > 0) {
+        const cat = existing[0] as { id: string; name: string; tipo: 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA'; parent_id: string | null };
+        // Se já existe, alinhar tipo e parent conforme seleção
+        const desiredParent = mode === 'CHILD' ? parentId : null;
+        if (cat.tipo !== formData.tipo || (cat.parent_id ?? null) !== (desiredParent ?? null)) {
+          const { data: upd, error: updErr } = await supabase
+            .from('categories')
+            .update({ tipo: formData.tipo, parent_id: desiredParent })
+            .eq('id', cat.id)
+            .select('id, name, tipo')
+            .single();
+          if (updErr) throw updErr;
+          createdOrUpdated = upd as any;
+        } else {
+          createdOrUpdated = { id: cat.id, name: cat.name, tipo: cat.tipo };
+        }
+      } else {
+        // Não existe: inserir normalmente
+        const { data, error } = await supabase
+          .from('categories')
+          .insert({
+            user_id: user?.id,
+            name: nome,
+            tipo: formData.tipo,
+            parent_id: mode === 'CHILD' ? parentId : null
+          })
+          .select('id, name, tipo')
+          .single();
+        if (error) throw error;
+        createdOrUpdated = data as any;
+      }
 
       toast({
         title: "Sucesso",
-        description: "Categoria criada com sucesso!",
+        description: existing && existing.length > 0 ? "Categoria atualizada/ajustada com sucesso!" : "Categoria criada com sucesso!",
       });
 
       setFormData({
@@ -86,12 +115,12 @@ const NovaCategoriaModal = ({ onSuccess, trigger, tipoFiltro }: NovaCategoriaMod
       setParentId(null);
 
       setOpen(false);
-      onSuccess?.(data);
-    } catch (error) {
+      if (createdOrUpdated) onSuccess?.(createdOrUpdated);
+    } catch (error: any) {
       console.error('Erro ao criar categoria:', error);
       toast({
         title: "Erro",
-        description: "Erro ao criar categoria. Tente novamente.",
+        description: error?.message || "Erro ao criar/atualizar categoria. Tente novamente.",
         variant: "destructive",
       });
     } finally {
@@ -148,7 +177,7 @@ const NovaCategoriaModal = ({ onSuccess, trigger, tipoFiltro }: NovaCategoriaMod
             <Label htmlFor="tipo">Tipo *</Label>
             <Select
               value={formData.tipo}
-              onValueChange={(value: 'DESPESA' | 'RECEITA') => setFormData({ ...formData, tipo: value })}
+              onValueChange={(value: 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA') => setFormData({ ...formData, tipo: value })}
               disabled={!!tipoFiltro}
             >
               <SelectTrigger>
@@ -157,6 +186,7 @@ const NovaCategoriaModal = ({ onSuccess, trigger, tipoFiltro }: NovaCategoriaMod
               <SelectContent>
                 <SelectItem value="DESPESA">Despesa</SelectItem>
                 <SelectItem value="RECEITA">Receita</SelectItem>
+                <SelectItem value="TRANSFERENCIA">Transferência</SelectItem>
               </SelectContent>
             </Select>
           </div>

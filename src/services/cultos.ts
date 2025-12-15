@@ -92,7 +92,15 @@ export async function criarLancamentosFinanceiros(params: {
 }) {
   const user_id = await getUserId();
 
-  const rows: any[] = [];
+  type NovoLancamento = {
+    tipo: "DESPESA" | "RECEITA";
+    categoria_id: string;
+    descricao: string;
+    valor: number;
+    vencimento: string;
+    user_id: string;
+  };
+  const rows: NovoLancamento[] = [];
   if (params.totalDizimos > 0) {
     const catDiz = await getCategoriaId("Dízimos");
     rows.push({
@@ -117,6 +125,28 @@ export async function criarLancamentosFinanceiros(params: {
   }
   if (rows.length === 0) return;
 
-  const { error } = await supabase.from("lancamentos").insert(rows);
+  // Evitar duplicações: verifica existentes por (user_id, categoria_id, descricao, valor, vencimento)
+  const descricoes = rows.map(r => r.descricao);
+  const { data: existentes } = await supabase
+    .from("lancamentos")
+    .select("id, categoria_id, descricao, valor, vencimento")
+    .eq("user_id", user_id)
+    .in("descricao", descricoes);
+
+  const isDup = (r: NovoLancamento) => {
+    const match = (existentes as { categoria_id: string; descricao: string | null; valor: number; vencimento: string }[] | null || [])
+      .find((e) =>
+        e.categoria_id === r.categoria_id &&
+        (e.descricao || "") === r.descricao &&
+        Number(e.valor) === Number(r.valor) &&
+        String(e.vencimento) === String(r.vencimento)
+      );
+    return !!match;
+  };
+
+  const novos = rows.filter(r => !isDup(r));
+  if (novos.length === 0) return;
+
+  const { error } = await supabase.from("lancamentos").insert(novos);
   if (error) throw error;
 }

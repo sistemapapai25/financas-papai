@@ -459,20 +459,43 @@ export default function PagarLancamentoDialog({
 
       if (upErr) throw upErr;
 
-      // 3) Registra movimento financeiro (SAÍDA)
-      const { error: movErr } = await supabase.from("movimentos_financeiros").insert([
-        {
-          user_id: user.id,
-          conta_id: contaId,
-          data: dataPagamento, // YYYY-MM-DD (DATE)
-          tipo: "SAIDA",
-          valor: valorNumber,
-          descricao: `Pagamento: ${lancamento.descricao ?? "Lançamento"}`,
-          origem: "LANCAMENTO",
-          ref_id: lancamento.id,
-        },
-      ]);
-      if (movErr) throw movErr;
+      // 3) Registrar movimento financeiro (SAÍDA) sem duplicar
+      const { data: existente } = await supabase
+        .from("movimentos_financeiros")
+        .select("id")
+        .eq("ref_id", lancamento.id)
+        .eq("origem", "LANCAMENTO")
+        .limit(1);
+
+      if (Array.isArray(existente) && existente.length > 0) {
+        const movId = existente[0].id as string;
+        const { error: updErr } = await supabase
+          .from("movimentos_financeiros")
+          .update({
+            conta_id: contaId,
+            data: dataPagamento,
+            tipo: "SAIDA",
+            valor: valorNumber,
+            descricao: `Pagamento: ${lancamento.descricao ?? "Lançamento"}`,
+            origem: "LANCAMENTO",
+          })
+          .eq("id", movId);
+        if (updErr) throw updErr;
+      } else {
+        const { error: insErr } = await supabase.from("movimentos_financeiros").insert([
+          {
+            user_id: user.id,
+            conta_id: contaId,
+            data: dataPagamento, // YYYY-MM-DD (DATE)
+            tipo: "SAIDA",
+            valor: valorNumber,
+            descricao: `Pagamento: ${lancamento.descricao ?? "Lançamento"}`,
+            origem: "LANCAMENTO",
+            ref_id: lancamento.id,
+          },
+        ]);
+        if (insErr) throw insErr;
+      }
 
       toast({
         title: "Sucesso",

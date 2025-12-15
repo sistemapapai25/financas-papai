@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -15,6 +16,44 @@ import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ExternalLink, PenTool, Image as ImageIcon, FileText } from "lucide-react";
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { ymdToBr } from '@/utils/date';
+
+function onlyDigits(s: string | null | undefined) { return String(s ?? '').replace(/\D+/g, ''); }
+function formatCPF(s: string | null | undefined) {
+  const d = onlyDigits(s).slice(0, 11);
+  const p1 = d.slice(0, 3);
+  const p2 = d.slice(3, 6);
+  const p3 = d.slice(6, 9);
+  const p4 = d.slice(9, 11);
+  let out = '';
+  if (p1) out += p1;
+  if (p2) out += '.' + p2;
+  if (p3) out += '.' + p3;
+  if (p4) out += '-' + p4;
+  return out;
+}
+function formatCNPJ(s: string | null | undefined) {
+  const d = onlyDigits(s).slice(0, 14);
+  const p1 = d.slice(0, 2);
+  const p2 = d.slice(2, 5);
+  const p3 = d.slice(5, 8);
+  const p4 = d.slice(8, 12);
+  const p5 = d.slice(12, 14);
+  let out = '';
+  if (p1) out += p1;
+  if (p2) out += '.' + p2;
+  if (p3) out += '.' + p3;
+  if (p4) out += '/' + p4;
+  if (p5) out += '-' + p5;
+  return out;
+}
+function formatDocAuto(s: string | null | undefined) {
+  const d = onlyDigits(s);
+  if (d.length >= 14) return formatCNPJ(s);
+  return formatCPF(s);
+}
 
 interface EditarLancamentoDialogProps {
   lancamento: {
@@ -36,12 +75,13 @@ interface EditarLancamentoDialogProps {
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   restrictedEditing?: boolean;
+  enableRecibo?: boolean;
 }
 
 interface Categoria {
   id: string;
   name: string;
-  tipo: 'DESPESA' | 'RECEITA';
+  tipo: 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA';
 }
 
 interface Beneficiario {
@@ -49,7 +89,7 @@ interface Beneficiario {
   name: string;
 }
 
-const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess, restrictedEditing = false }: EditarLancamentoDialogProps) => {
+const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess, restrictedEditing = false, enableRecibo = false }: EditarLancamentoDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [beneficiarios, setBeneficiarios] = useState<Beneficiario[]>([]);
@@ -72,9 +112,45 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess, res
   const { toast } = useToast();
   const { user } = useAuth();
 
+  const [reciboInfo, setReciboInfo] = useState<{ path: string | null; numero: number | null; ano: number | null }>(() => ({ path: null, numero: null, ano: null }));
+  const [church, setChurch] = useState<{ igreja_nome: string; igreja_cnpj: string; responsavel_nome: string; responsavel_cpf: string; assinatura_path?: string | null } | null>(null);
+  const [assinaturaFile, setAssinaturaFile] = useState<File | null>(null);
+  const [assinaturaDataUrl, setAssinaturaDataUrl] = useState<string | null>(null);
+  const [showAssinaturaPad, setShowAssinaturaPad] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const drawingRef = useRef<{ drawing: boolean; ctx: CanvasRenderingContext2D | null }>({ drawing: false, ctx: null });
+  const [showReciboModal, setShowReciboModal] = useState(false);
+  const [reciboUrl, setReciboUrl] = useState<string | null>(null);
+  const [addingComprovante, setAddingComprovante] = useState(false);
+  const [reciboLoading, setReciboLoading] = useState(false);
+  const [reciboBlob, setReciboBlob] = useState<Blob | null>(null);
+  const [docType, setDocType] = useState<'RECIBO' | 'REEMBOLSO'>('RECIBO');
+  const [reembolsoBenefId, setReembolsoBenefId] = useState<string | null>(null);
+  const [reembolsoBenefName, setReembolsoBenefName] = useState<string | null>(null);
+  const [reembolsoBenefDoc, setReembolsoBenefDoc] = useState<string | null>(null);
+  const [reembolsoBenefAssUrl, setReembolsoBenefAssUrl] = useState<string | null>(null);
+  const [openBenefReemb, setOpenBenefReemb] = useState(false);
+  const [rbSearch, setRbSearch] = useState("");
+
+  const isLocked = restrictedEditing || !!reciboInfo.path;
+
   useEffect(() => {
     if (open && user) {
       carregarDados();
+      (async () => {
+        const { data: lanc } = await supabase
+          .from('lancamentos')
+          .select('recibo_pdf_path, recibo_numero, recibo_ano')
+          .eq('id', lancamento.id)
+          .single();
+        setReciboInfo({ path: lanc?.recibo_pdf_path ?? null, numero: lanc?.recibo_numero ?? null, ano: lanc?.recibo_ano ?? null });
+        const { data: cs } = await supabase
+          .from('church_settings')
+          .select('igreja_nome, igreja_cnpj, responsavel_nome, responsavel_cpf, assinatura_path')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (cs) setChurch({ igreja_nome: cs.igreja_nome, igreja_cnpj: cs.igreja_cnpj, responsavel_nome: cs.responsavel_nome, responsavel_cpf: cs.responsavel_cpf, assinatura_path: cs.assinatura_path });
+      })();
     }
   }, [open, user]);
 
@@ -122,12 +198,302 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess, res
     }
   };
 
+  function initCanvas() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    drawingRef.current.ctx = ctx;
+    ctx.strokeStyle = '#111827';
+    ctx.lineWidth = 2;
+    const start = (x: number, y: number) => { drawingRef.current.drawing = true; ctx.beginPath(); ctx.moveTo(x, y); };
+    const draw = (x: number, y: number) => { if (!drawingRef.current.drawing) return; ctx.lineTo(x, y); ctx.stroke(); };
+    const end = () => { drawingRef.current.drawing = false; };
+    const getXY = (e: MouseEvent | TouchEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      if (e instanceof TouchEvent) {
+        const t = e.touches[0];
+        return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+      }
+      const m = e as MouseEvent;
+      return { x: m.clientX - rect.left, y: m.clientY - rect.top };
+    };
+    canvas.onmousedown = (e) => { const { x, y } = getXY(e); start(x, y); };
+    canvas.onmousemove = (e) => { const { x, y } = getXY(e); draw(x, y); };
+    canvas.onmouseup = () => end();
+    canvas.onmouseleave = () => end();
+    canvas.ontouchstart = (e) => { const { x, y } = getXY(e); start(x, y); };
+    canvas.ontouchmove = (e) => { const { x, y } = getXY(e); draw(x, y); };
+    canvas.ontouchend = () => end();
+  }
+
+  async function gerarRecibo() {
+    try {
+      setLoading(true);
+      if (!user) { toast({ title: 'Sessão', description: 'Usuário não autenticado', variant: 'destructive' }); return; }
+      if (reciboInfo.path) { toast({ title: 'Recibo já gerado', description: 'Este lançamento já possui recibo.' }); return; }
+      if (!church) {
+        toast({ title: 'Configuração necessária', description: 'Preencha os dados da igreja antes de gerar.' });
+        return;
+      }
+
+      const ano = new Date().getFullYear();
+      const { data: nextNumRes, error: nextErr } = await supabase.rpc('next_recibo_num', { _user_id: user.id, _ano: ano });
+      if (nextErr) throw nextErr;
+      const numero = Number(nextNumRes);
+      const numeroFmt = String(numero).padStart(6, '0');
+
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([595.28, 841.89]);
+      const { width } = page.getSize();
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+      const drawText = (text: string, x: number, y: number, size = 12, bold = false) => {
+        page.drawText(text, { x, y, size, font: bold ? fontBold : font, color: rgb(0, 0, 0) });
+      };
+      const center = (text: string, y: number, size = 12, bold = false) => {
+        const w = (bold ? fontBold : font).widthOfTextAtSize(text, size);
+        const x = (width - w) / 2;
+        drawText(text, x, y, size, bold);
+      };
+      const MARGIN_L = 60;
+      const MARGIN_R = 60;
+      const CONTENT_W = width - MARGIN_L - MARGIN_R;
+      function wrapByWidth(s: string, size = 12) {
+        const words = s.split(/\s+/);
+        const lines: string[] = [];
+        let cur = "";
+        for (const w of words) {
+          const test = cur ? cur + " " + w : w;
+          const wpx = font.widthOfTextAtSize(test, size);
+          if (wpx <= CONTENT_W) {
+            cur = test;
+          } else {
+            if (cur) lines.push(cur);
+            cur = w;
+          }
+        }
+        if (cur) lines.push(cur);
+        return lines;
+      }
+
+      center(church.igreja_nome, 800, 16, true);
+      center(`CNPJ: ${formatCNPJ(church.igreja_cnpj)}`, 780, 12, false);
+      center(`RECIBO Nº ${numeroFmt}/${ano}`, 750, 14, true);
+
+      const valor = formData.status === 'PAGO' ? parseFloat(formData.valor_pago) || formData.valor : formData.valor;
+      const dataStrIso = formData.status === 'PAGO' && formData.data_pagamento ? formData.data_pagamento : formData.vencimento;
+      const dataStr = ymdToBr(dataStrIso);
+      const corpo = `Recebi da Igreja ${church.igreja_nome} a quantia de R$ ${Number(valor).toFixed(2)} referente a "${formData.descricao}" na data ${dataStr}.`;
+      let y = 700;
+      for (const line of wrapByWidth(corpo, 12)) { drawText(line, MARGIN_L, y, 12, false); y -= 18; }
+
+      // Assinatura
+      let assinaturaImgBytes: Uint8Array | null = null;
+      if (assinaturaDataUrl) {
+        const b64 = assinaturaDataUrl.split(',')[1];
+        assinaturaImgBytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+      } else if (assinaturaFile) {
+        assinaturaImgBytes = new Uint8Array(await assinaturaFile.arrayBuffer());
+      } else if (church.assinatura_path) {
+        const { data: signed } = await supabase.storage.from('Assinaturas').createSignedUrl(church.assinatura_path, 300);
+        if (signed?.signedUrl) {
+          const resp = await fetch(signed.signedUrl);
+          if (resp.ok) {
+            const buf = new Uint8Array(await resp.arrayBuffer());
+            assinaturaImgBytes = buf;
+          }
+        }
+      }
+      if (assinaturaImgBytes) {
+        try {
+          const img = await pdfDoc.embedPng(assinaturaImgBytes).catch(async () => pdfDoc.embedJpg(assinaturaImgBytes!));
+          const imgW = 200;
+          const scale = imgW / img.width;
+          const imgH = img.height * scale;
+          page.drawImage(img, { x: (width - imgW) / 2, y: 620 - imgH, width: imgW, height: imgH });
+        } catch { /* ignore */ }
+      }
+      center(church.responsavel_nome, 600, 12, true);
+      center(`CPF: ${formatCPF(church.responsavel_cpf)}`, 582, 12, false);
+
+      const pdfBytes = await pdfDoc.save();
+      const ab = new ArrayBuffer(pdfBytes.byteLength);
+      new Uint8Array(ab).set(pdfBytes);
+      const pdfBlob = new Blob([ab], { type: 'application/pdf' });
+      const path = `recibos/${user.id}/${lancamento.id}-${ano}-${numeroFmt}.pdf`;
+      const { error: upErr } = await supabase.storage.from('Recibos').upload(path, pdfBlob, { contentType: 'application/pdf', upsert: false });
+      if (upErr) throw upErr;
+
+      const { error: upLancErr } = await supabase
+        .from('lancamentos')
+        .update({ recibo_numero: numero, recibo_ano: ano, recibo_pdf_path: path, recibo_gerado_em: new Date().toISOString() })
+        .eq('id', lancamento.id);
+      if (upLancErr) throw upLancErr;
+
+      setReciboInfo({ path, numero, ano });
+      toast({ title: 'Recibo gerado', description: `RECIBO Nº ${numeroFmt}/${ano}` });
+    } catch (e: any) {
+      toast({ title: 'Erro ao gerar recibo', description: e?.message || 'Falha na geração', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function abrirRecibo() {
+    if (!reciboInfo.path) return;
+    setDocType('RECIBO');
+    setShowReciboModal(true);
+    setReciboLoading(true);
+    try {
+      const { data } = await supabase.storage.from('Recibos').createSignedUrl(reciboInfo.path, 3600);
+      if (data?.signedUrl) {
+        setReciboUrl(data.signedUrl);
+        return;
+      }
+      const { data: pub } = supabase.storage.from('Recibos').getPublicUrl(reciboInfo.path);
+      if (pub?.publicUrl) {
+        setReciboUrl(pub.publicUrl);
+        return;
+      }
+      setReciboUrl(null);
+    } finally {
+      setReciboLoading(false);
+    }
+  }
+
+  function gerarReembolso() {
+    if (!user) { toast({ title: 'Sessão', description: 'Usuário não autenticado', variant: 'destructive' }); return; }
+    if (!church) { toast({ title: 'Configuração necessária', description: 'Preencha os dados da igreja antes de gerar.' }); return; }
+    setDocType('REEMBOLSO');
+    setShowReciboModal(true);
+    setReciboUrl(null);
+  }
+
+  async function gerarReembolsoPdf() {
+    try {
+      if (!user || !church) return;
+      setReciboLoading(true);
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([595.28, 841.89]);
+      const { width } = page.getSize();
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      const drawText = (text: string, x: number, y: number, size = 12, bold = false) => { page.drawText(text, { x, y, size, font: bold ? fontBold : font, color: rgb(0, 0, 0) }); };
+      const center = (text: string, y: number, size = 12, bold = false) => { const w = (bold ? fontBold : font).widthOfTextAtSize(text, size); const x = (width - w) / 2; drawText(text, x, y, size, bold); };
+      const MARGIN_L = 60; const MARGIN_R = 60; const CONTENT_W = width - MARGIN_L - MARGIN_R;
+      function wrapByWidth(s: string, size = 12) { const words = s.split(/\s+/); const lines: string[] = []; let cur = ''; for (const w of words) { const test = cur ? cur + ' ' + w : w; const wpx = font.widthOfTextAtSize(test, size); if (wpx <= CONTENT_W) { cur = test; } else { if (cur) lines.push(cur); cur = w; } } if (cur) lines.push(cur); return lines; }
+      center(church.igreja_nome, 780, 16, true);
+      center(`CNPJ: ${formatCNPJ(church.igreja_cnpj)}`, 758, 12);
+      let numero = reciboInfo.numero || null;
+      const ano = reciboInfo.ano || new Date().getFullYear();
+      if (!numero) {
+        const { data: nextNumRes, error: nextErr } = await supabase.rpc('next_recibo_num', { _user_id: user.id, _ano: ano });
+        if (nextErr) throw nextErr;
+        numero = Number(nextNumRes);
+        const { error: upLancErr } = await supabase
+          .from('lancamentos')
+          .update({ recibo_numero: numero, recibo_ano: ano })
+          .eq('id', lancamento.id);
+        if (upLancErr) throw upLancErr;
+        setReciboInfo({ path: reciboInfo.path, numero, ano });
+      }
+      const numeroFmt = String(numero).padStart(6, '0');
+      center(`REEMBOLSO Nº ${numeroFmt}/${ano}`, 730, 14, true);
+      const valor = formData.status === 'PAGO' ? parseFloat(formData.valor_pago) || formData.valor : formData.valor;
+      const dataStrIso = formData.status === 'PAGO' && formData.data_pagamento ? formData.data_pagamento : formData.vencimento;
+      const dataStr = ymdToBr(dataStrIso);
+      const corpo = `Recebi da Igreja ${church.igreja_nome} a reembolso no valor de R$ ${Number(valor).toFixed(2)}, ${formData.descricao} na data ${dataStr}.`;
+      let y = 700; for (const line of wrapByWidth(corpo, 12)) { drawText(line, MARGIN_L, y, 12, false); y -= 18; }
+      let assinaturaImgBytes: Uint8Array | null = null;
+      if (reembolsoBenefAssUrl) { const resp = await fetch(reembolsoBenefAssUrl); if (resp.ok) { assinaturaImgBytes = new Uint8Array(await resp.arrayBuffer()); } }
+      else if (assinaturaDataUrl) { const b64 = assinaturaDataUrl.split(',')[1]; assinaturaImgBytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); }
+      else if (assinaturaFile) { assinaturaImgBytes = new Uint8Array(await assinaturaFile.arrayBuffer()); }
+      else if (church.assinatura_path) { const { data: signed } = await supabase.storage.from('Assinaturas').createSignedUrl(church.assinatura_path, 300); if (signed?.signedUrl) { const resp = await fetch(signed.signedUrl); if (resp.ok) { const buf = new Uint8Array(await resp.arrayBuffer()); assinaturaImgBytes = buf; } } }
+      if (assinaturaImgBytes) { try { const img = await pdfDoc.embedPng(assinaturaImgBytes).catch(async () => pdfDoc.embedJpg(assinaturaImgBytes!)); const imgW = 200; const scale = imgW / img.width; const imgH = img.height * scale; page.drawImage(img, { x: (width - imgW) / 2, y: 620 - imgH, width: imgW, height: imgH }); } catch { void 0; } }
+      if (reembolsoBenefName) { center(reembolsoBenefName, 600, 12, true); }
+      if (reembolsoBenefDoc) { center(`CPF/CNPJ: ${formatDocAuto(reembolsoBenefDoc)}`, 582, 12, false); }
+      if (!reembolsoBenefName) { center(church.responsavel_nome, 600, 12, true); center(`CPF/CNPJ: ${formatDocAuto(church.responsavel_cpf)}`, 582, 12, false); }
+      const pdfBytes = await pdfDoc.save();
+      const ab = new ArrayBuffer(pdfBytes.byteLength); new Uint8Array(ab).set(pdfBytes);
+      const pdfBlob = new Blob([ab], { type: 'application/pdf' });
+      setReciboBlob(pdfBlob);
+      const url = URL.createObjectURL(pdfBlob);
+      setReciboUrl(url);
+    } catch (e) {
+      toast({ title: 'Erro ao gerar reembolso', description: e instanceof Error ? e.message : 'Falha na geração', variant: 'destructive' });
+    } finally {
+      setReciboLoading(false);
+    }
+  }
+
+  async function selecionarBeneficiarioReembolso(id: string) {
+    try {
+      setReembolsoBenefId(id);
+      const name = beneficiarios.find(b => b.id === id)?.name || null;
+      setReembolsoBenefName(name);
+      let doc: string | null = null;
+      const { data: ben } = await supabase.from('beneficiaries').select('documento').eq('id', id).maybeSingle();
+      if (ben?.documento) doc = ben.documento;
+      setReembolsoBenefDoc(doc);
+      let assUrl: string | null = null;
+      if (user) {
+        const folder = `assinaturas/${user.id}/beneficiarios`;
+        const { data: files } = await supabase.storage.from('Assinaturas').list(folder, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } });
+        const match = (files || []).find(f => f.name.startsWith(`${id}-`));
+        if (match) {
+          const { data: signed } = await supabase.storage.from('Assinaturas').createSignedUrl(`${folder}/${match.name}`, 300);
+          if (signed?.signedUrl) assUrl = signed.signedUrl;
+        }
+      }
+      setReembolsoBenefAssUrl(assUrl);
+      await gerarReembolsoPdf();
+    } catch {
+      await gerarReembolsoPdf();
+    }
+  }
+
+  async function adicionarReciboComoComprovante() {
+    if (!user) return;
+    try {
+      setAddingComprovante(true);
+      let blob: Blob | null = reciboBlob;
+      if (!blob && reciboInfo.path) {
+        const { data: blobRes } = await supabase.storage.from('Recibos').download(reciboInfo.path);
+        if (!blobRes) throw new Error('Falha ao baixar recibo');
+        blob = blobRes;
+      }
+      if (!blob) throw new Error('Arquivo indisponível');
+      const destPath = `comprovantes/${user.id}/${lancamento.id}-${Date.now()}.pdf`;
+      const { error: upErr } = await supabase.storage
+        .from('Comprovantes')
+        .upload(destPath, blob, { cacheControl: '3600', contentType: 'application/pdf', upsert: false });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from('Comprovantes').getPublicUrl(destPath);
+      const publicUrl = pub?.publicUrl ?? null;
+      if (publicUrl) {
+        const { error: upLancErr } = await supabase
+          .from('lancamentos')
+          .update({ comprovante_url: publicUrl })
+          .eq('id', lancamento.id);
+        if (upLancErr) throw upLancErr;
+        setFormData({ ...formData, comprovante_url: publicUrl });
+        toast({ title: 'Comprovante', description: 'Recibo adicionado como comprovante.' });
+      }
+    } catch (e) {
+      toast({ title: 'Erro', description: e instanceof Error ? e.message : 'Falha ao adicionar comprovante', variant: 'destructive' });
+    } finally {
+      setAddingComprovante(false);
+    }
+  }
+
   const handleNovoBeneficiario = (novoBeneficiario: { id: string; name: string }) => {
     setBeneficiarios(prev => [...prev, novoBeneficiario]);
     setFormData({ ...formData, beneficiario_id: novoBeneficiario.id });
   };
 
-  const handleNovaCategoria = (novaCategoria: { id: string; name: string; tipo: 'DESPESA' | 'RECEITA' }) => {
+  const handleNovaCategoria = (novaCategoria: { id: string; name: string; tipo: 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA' }) => {
     setCategorias(prev => [...prev, novaCategoria]);
     setFormData({ ...formData, categoria_id: novaCategoria.id });
   };
@@ -196,8 +562,9 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess, res
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar Lançamento</DialogTitle>
         </DialogHeader>
@@ -212,7 +579,7 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess, res
               }}
               disabled={restrictedEditing}
             >
-              <SelectTrigger disabled={restrictedEditing}>
+              <SelectTrigger disabled={isLocked}>
                 <SelectValue placeholder="Selecione o tipo" />
               </SelectTrigger>
               <SelectContent>
@@ -259,7 +626,7 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess, res
                   role="combobox"
                   aria-expanded={openCategoria}
                   className="w-full justify-between"
-                  disabled={restrictedEditing}
+                  disabled={isLocked}
                 >
                   {formData.categoria_id
                     ? categorias.find((categoria) => categoria.id === formData.categoria_id)?.name
@@ -274,7 +641,7 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess, res
                     <CommandEmpty>Nenhuma categoria encontrada.</CommandEmpty>
                     <CommandGroup>
                       {categorias
-                        .filter(cat => cat.tipo === formData.tipo)
+                        .filter(cat => cat.tipo === 'TRANSFERENCIA' || cat.tipo === formData.tipo)
                         .map((categoria) => (
                           <CommandItem
                             key={categoria.id}
@@ -291,6 +658,9 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess, res
                               )}
                             />
                             {categoria.name}
+                            {categoria.name === 'Transferência Interna' ? (
+                              <Badge variant="secondary" className="ml-2">Transferência</Badge>
+                            ) : null}
                           </CommandItem>
                         ))}
                     </CommandGroup>
@@ -323,7 +693,7 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess, res
                 onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
                 placeholder="0,00"
                 required
-                disabled={restrictedEditing}
+                disabled={isLocked}
               />
             </div>
           </div>
@@ -338,7 +708,7 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess, res
                 value={formData.vencimento}
                 onChange={(e) => setFormData({ ...formData, vencimento: e.target.value })}
                 required
-                disabled={restrictedEditing}
+                disabled={isLocked}
               />
             </div>
             <div className="space-y-2">
@@ -346,7 +716,7 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess, res
               <Select
                 value={formData.status}
                 onValueChange={(value: 'EM_ABERTO' | 'PAGO' | 'CANCELADO') => setFormData({ ...formData, status: value })}
-                disabled={restrictedEditing}
+                disabled={isLocked}
               >
                 <SelectTrigger disabled={restrictedEditing}>
                   <SelectValue placeholder="Selecione o status" />
@@ -421,6 +791,81 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess, res
             />
           </div>
 
+          <div className="space-y-3 border-t pt-4">
+            <div className="flex items-center justify-between">
+              <Label>Recibo ERP</Label>
+              {reciboInfo.path ? (
+                <Button type="button" variant="outline" onClick={abrirRecibo}>
+                  <FileText className="w-4 h-4 mr-2" /> Abrir Recibo
+                </Button>
+              ) : (
+                <Button type="button" variant="default" onClick={gerarRecibo} disabled={loading}>
+                  {loading ? 'Gerando...' : 'Gerar Recibo PDF'}
+                </Button>
+              )}
+            </div>
+
+            {!church && (
+              <div className="text-sm text-muted-foreground">
+                Preencha os dados da igreja para gerar o recibo.
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Assinatura</Label>
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" onClick={() => { setShowAssinaturaPad(true); setTimeout(initCanvas, 0); }}>
+                    <PenTool className="w-4 h-4 mr-2" /> Capturar
+                  </Button>
+                  <Button asChild variant="outline">
+                    <label className="cursor-pointer">
+                      <input type="file" accept="image/png,image/jpeg" className="hidden" onChange={(e) => setAssinaturaFile(e.target.files?.[0] || null)} />
+                      <ImageIcon className="w-4 h-4 mr-2" /> Enviar Imagem
+                    </label>
+                  </Button>
+                </div>
+                {showAssinaturaPad && (
+                  <div className="mt-2">
+                    <canvas ref={canvasRef} width={400} height={160} className="border rounded bg-white" />
+                    <div className="flex items-center gap-2 mt-2">
+                      <Button type="button" variant="outline" onClick={() => {
+                        const c = canvasRef.current; if (!c) return; const ctx = c.getContext('2d'); if (!ctx) return; ctx.clearRect(0, 0, c.width, c.height);
+                      }}>Limpar</Button>
+                      <Button type="button" variant="secondary" onClick={() => {
+                        const c = canvasRef.current; if (!c) return; setAssinaturaDataUrl(c.toDataURL('image/png'));
+                        setShowAssinaturaPad(false);
+                      }}>Usar Assinatura</Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Dados da Igreja</Label>
+                {church ? (
+                  <div className="text-sm">
+                    <div><strong>{church.igreja_nome}</strong></div>
+                    <div>CNPJ: {formatCNPJ(church.igreja_cnpj)}</div>
+                    <div>Responsável: {church.responsavel_nome}</div>
+                    <div>CPF: {formatCPF(church.responsavel_cpf)}</div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-red-600">Dados não configurados</div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3 border-t pt-4">
+            <div className="flex items-center justify-between">
+              <Label>Reembolso</Label>
+              <Button type="button" variant="default" onClick={gerarReembolso} disabled={reciboLoading}>
+                {reciboLoading && docType === 'REEMBOLSO' ? 'Gerando...' : 'Gerar Reembolso PDF'}
+              </Button>
+            </div>
+            <div className="text-sm text-muted-foreground">Gera um PDF com texto de reembolso e permite adicionar como comprovante.</div>
+          </div>
+
           <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
             <Button
               type="button"
@@ -435,8 +880,95 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess, res
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showReciboModal} onOpenChange={setShowReciboModal}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>{docType === 'RECIBO' ? 'Recibo ERP' : 'Reembolso'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {docType === 'REEMBOLSO' && (
+              <div className="space-y-2">
+                <Label>Beneficiário</Label>
+                <Popover open={openBenefReemb} onOpenChange={setOpenBenefReemb}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" aria-expanded={openBenefReemb} className="w-full justify-between">
+                      {reembolsoBenefId ? (beneficiarios.find(b => b.id === reembolsoBenefId)?.name || 'Selecionado') : 'Selecione um beneficiário...'}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+                    <Command>
+                      <CommandInput placeholder="Buscar beneficiário..." value={rbSearch} onValueChange={setRbSearch} />
+                      <CommandList>
+                        <CommandEmpty>
+                          <div className="p-2 flex flex-col items-center gap-2">
+                            <span className="text-sm text-muted-foreground">Não encontrado.</span>
+                            {rbSearch.length > 2 && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="w-full h-8"
+                                onClick={async () => {
+                                  if (!user) return;
+                                  try {
+                                    const nome = rbSearch.trim();
+                                    const { data, error } = await supabase
+                                      .from('beneficiaries')
+                                      .insert({ user_id: user.id, name: nome })
+                                      .select('id,name')
+                                      .single();
+                                    if (error) throw error;
+                                    setBeneficiarios(prev => [{ id: data.id, name: data.name }, ...prev]);
+                                    setOpenBenefReemb(false);
+                                    setRbSearch('');
+                                    await selecionarBeneficiarioReembolso(data.id);
+                                    toast({ title: 'Beneficiário criado', description: data.name });
+                                  } catch (err: unknown) {
+                                    toast({ title: 'Erro ao criar beneficiário', description: err instanceof Error ? err.message : 'Falha ao criar', variant: 'destructive' });
+                                  }
+                                }}
+                              >
+                                {`Criar "${rbSearch}"`}
+                              </Button>
+                            )}
+                          </div>
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {beneficiarios.filter(b => b.name.toLowerCase().includes(rbSearch.toLowerCase())).map(b => (
+                            <CommandItem key={b.id} value={b.name} onSelect={() => { setOpenBenefReemb(false); selecionarBeneficiarioReembolso(b.id); }}>
+                              <Check className={cn("mr-2 h-4 w-4", reembolsoBenefId === b.id ? "opacity-100" : "opacity-0")} />
+                              {b.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {!reembolsoBenefId && (
+                  <div className="text-xs text-muted-foreground">Selecione um beneficiário para gerar o PDF.</div>
+                )}
+              </div>
+            )}
+            {reciboLoading ? (
+              <div className="text-sm text-muted-foreground">Carregando recibo...</div>
+            ) : reciboUrl ? (
+              <iframe src={reciboUrl} className="w-full h-[70vh] rounded border" />
+            ) : (
+              <div className="text-sm text-muted-foreground">Selecione um beneficiário para gerar o reembolso.</div>
+            )}
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setShowReciboModal(false)}>Fechar</Button>
+                <Button type="button" onClick={adicionarReciboComoComprovante} disabled={addingComprovante || !!formData.comprovante_url || (docType === 'REEMBOLSO' && !reembolsoBenefId)}>
+                  {addingComprovante ? 'Adicionando...' : (formData.comprovante_url ? 'Comprovante já definido' : 'Adicionar como comprovante')}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+    </>
   );
 };
 

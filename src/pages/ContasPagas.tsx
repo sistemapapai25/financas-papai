@@ -186,11 +186,11 @@ const ContasPagas = () => {
       toast({ title: 'Sucesso', description: 'Lançamento reaberto com sucesso!' });
       setUpdateTrigger(prev => prev + 1);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao reabrir lançamento:', error);
       toast({
         title: 'Erro',
-        description: error.message || 'Erro ao reabrir lançamento',
+        description: error instanceof Error ? error.message : 'Erro ao reabrir lançamento',
         variant: 'destructive',
       });
     }

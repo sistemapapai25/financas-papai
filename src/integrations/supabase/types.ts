@@ -60,6 +60,7 @@ export type Database = {
           name: string
           observacoes: string | null
           phone: string | null
+          assinatura_path: string | null
           user_id: string
         }
         Insert: {
@@ -71,6 +72,7 @@ export type Database = {
           name: string
           observacoes?: string | null
           phone?: string | null
+          assinatura_path?: string | null
           user_id: string
         }
         Update: {
@@ -82,6 +84,7 @@ export type Database = {
           name?: string
           observacoes?: string | null
           phone?: string | null
+          assinatura_path?: string | null
           user_id?: string
         }
         Relationships: []
@@ -335,6 +338,10 @@ export type Database = {
           forma_pagamento: Database["public"]["Enums"]["forma_pagamento"] | null
           id: string
           observacoes: string | null
+          recibo_numero: number | null
+          recibo_ano: number | null
+          recibo_pdf_path: string | null
+          recibo_gerado_em: string | null
           status: Database["public"]["Enums"]["status_lancamento"] | null
           tipo: Database["public"]["Enums"]["tipo_lancamento"]
           updated_at: string | null
@@ -358,6 +365,10 @@ export type Database = {
             | null
           id?: string
           observacoes?: string | null
+          recibo_numero?: number | null
+          recibo_ano?: number | null
+          recibo_pdf_path?: string | null
+          recibo_gerado_em?: string | null
           status?: Database["public"]["Enums"]["status_lancamento"] | null
           tipo: Database["public"]["Enums"]["tipo_lancamento"]
           updated_at?: string | null
@@ -381,6 +392,10 @@ export type Database = {
             | null
           id?: string
           observacoes?: string | null
+          recibo_numero?: number | null
+          recibo_ano?: number | null
+          recibo_pdf_path?: string | null
+          recibo_gerado_em?: string | null
           status?: Database["public"]["Enums"]["status_lancamento"] | null
           tipo?: Database["public"]["Enums"]["tipo_lancamento"]
           updated_at?: string | null
@@ -549,6 +564,39 @@ export type Database = {
           email?: string
           name?: string | null
           phone?: string | null
+        }
+        Relationships: []
+      }
+      church_settings: {
+        Row: {
+          user_id: string
+          igreja_nome: string
+          igreja_cnpj: string
+          responsavel_nome: string
+          responsavel_cpf: string
+          assinatura_path: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          user_id: string
+          igreja_nome: string
+          igreja_cnpj: string
+          responsavel_nome: string
+          responsavel_cpf: string
+          assinatura_path?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          user_id?: string
+          igreja_nome?: string
+          igreja_cnpj?: string
+          responsavel_nome?: string
+          responsavel_cpf?: string
+          assinatura_path?: string | null
+          created_at?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -745,6 +793,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      next_recibo_num: { Args: { _user_id: string; _ano: number }; Returns: number }
       registrar_transferencia: {
         Args: {
           _data: string
@@ -767,7 +816,7 @@ export type Database = {
         | "TRANSFERENCIA"
         | "OUTRO"
       status_lancamento: "EM_ABERTO" | "PAGO" | "CANCELADO"
-      tipo_categoria: "DESPESA" | "RECEITA"
+      tipo_categoria: "DESPESA" | "RECEITA" | "TRANSFERENCIA"
       tipo_lancamento: "DESPESA" | "RECEITA"
     }
     CompositeTypes: {
@@ -907,7 +956,7 @@ export const Constants = {
         "OUTRO",
       ],
       status_lancamento: ["EM_ABERTO", "PAGO", "CANCELADO"],
-      tipo_categoria: ["DESPESA", "RECEITA"],
+      tipo_categoria: ["DESPESA", "RECEITA", "TRANSFERENCIA"],
       tipo_lancamento: ["DESPESA", "RECEITA"],
     },
   },

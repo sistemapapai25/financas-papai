@@ -1,7 +1,7 @@
 export type TipoLancamento = 'DESPESA' | 'RECEITA';
 export type StatusLancamento = 'EM_ABERTO' | 'PAGO' | 'CANCELADO';
 export type FormaPagamento = 'PIX' | 'DINHEIRO' | 'CARTAO' | 'BOLETO' | 'TRANSFERENCIA' | 'OUTRO';
-export type TipoCategoria = 'DESPESA' | 'RECEITA';
+export type TipoCategoria = 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA';
 export type AppRole = 'ADMIN' | 'USER';
 
 /** ✅ Tipos de Culto (tabela public.tipos_culto) */

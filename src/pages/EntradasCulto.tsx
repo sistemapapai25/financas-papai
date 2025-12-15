@@ -332,10 +332,10 @@ export default function EntradasCulto() {
       });
 
       resetForm();
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast({
         title: "Erro ao salvar",
-        description: e.message || "Erro desconhecido",
+        description: e instanceof Error ? e.message : "Erro desconhecido",
         variant: "destructive",
       });
     } finally {

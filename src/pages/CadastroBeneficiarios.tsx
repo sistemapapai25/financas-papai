@@ -17,6 +17,7 @@ interface Beneficiario {
   phone?: string;
   email?: string;
   observacoes?: string;
+  assinatura_path?: string | null;
   created_at: string;
 }
 
@@ -31,11 +32,58 @@ const CadastroBeneficiarios = () => {
     documento: '',
     phone: '',
     email: '',
-    observacoes: ''
+    observacoes: '',
+    assinatura_path: '' as string | null,
   });
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const { user } = useAuth();
   const { toast } = useToast();
+
+  function formatCPF(s: string) {
+    const d = String(s).replace(/\D+/g, '');
+    const p1 = d.slice(0, 3);
+    const p2 = d.slice(3, 6);
+    const p3 = d.slice(6, 9);
+    const p4 = d.slice(9, 11);
+    let out = '';
+    if (p1) out += p1;
+    if (p2) out += '.' + p2;
+    if (p3) out += '.' + p3;
+    if (p4) out += '-' + p4;
+    return out;
+  }
+  function formatCNPJ(s: string) {
+    const d = String(s).replace(/\D+/g, '');
+    const p1 = d.slice(0, 2);
+    const p2 = d.slice(2, 5);
+    const p3 = d.slice(5, 8);
+    const p4 = d.slice(8, 12);
+    const p5 = d.slice(12, 14);
+    let out = '';
+    if (p1) out += p1;
+    if (p2) out += '.' + p2;
+    if (p3) out += '.' + p3;
+    if (p4) out += '/' + p4;
+    if (p5) out += '-' + p5;
+    return out;
+  }
+  function formatDoc(s: string) {
+    const d = String(s).replace(/\D+/g, '');
+    return d.length >= 12 ? formatCNPJ(s) : formatCPF(s);
+  }
+  function formatPhone(s: string) {
+    const d = String(s).replace(/\D+/g, '');
+    const isCel = d.length >= 11;
+    const p1 = d.slice(0, 2);
+    const p2 = isCel ? d.slice(2, 7) : d.slice(2, 6);
+    const p3 = isCel ? d.slice(7, 11) : d.slice(6, 10);
+    let out = '';
+    if (p1) out += '(' + p1 + ') ';
+    if (p2) out += p2;
+    if (p3) out += '-' + p3;
+    return out || s;
+  }
 
   useEffect(() => {
     if (user) loadBeneficiarios();
@@ -46,6 +94,7 @@ const CadastroBeneficiarios = () => {
       const { data, error } = await supabase
         .from('beneficiaries')
         .select('*')
+        .eq('user_id', user!.id)
         .order('name', { ascending: true });
 
       if (error) throw error;
@@ -76,7 +125,7 @@ const CadastroBeneficiarios = () => {
             documento: formData.documento.trim() || null,
             phone: formData.phone.trim() || null,
             email: formData.email.trim() || null,
-            observacoes: formData.observacoes.trim() || null
+            observacoes: formData.observacoes.trim() || null,
           })
           .eq('id', editingBeneficiario.id);
 
@@ -89,7 +138,7 @@ const CadastroBeneficiarios = () => {
           documento: formData.documento.trim() || null,
           phone: formData.phone.trim() || null,
           email: formData.email.trim() || null,
-          observacoes: formData.observacoes.trim() || null
+          observacoes: formData.observacoes.trim() || null,
         });
 
         if (error) throw error;
@@ -110,11 +159,31 @@ const CadastroBeneficiarios = () => {
     setEditingBeneficiario(beneficiario);
     setFormData({
       name: beneficiario.name,
-      documento: beneficiario.documento || '',
-      phone: beneficiario.phone || '',
+      documento: beneficiario.documento ? formatDoc(beneficiario.documento) : '',
+      phone: beneficiario.phone ? formatPhone(beneficiario.phone) : '',
       email: beneficiario.email || '',
-      observacoes: beneficiario.observacoes || ''
+      observacoes: beneficiario.observacoes || '',
+      assinatura_path: beneficiario.assinatura_path || '',
     });
+    if (beneficiario.assinatura_path) {
+      supabase.storage.from('Assinaturas').createSignedUrl(beneficiario.assinatura_path, 600).then(({ data }) => setPreviewUrl(data?.signedUrl ?? null));
+    } else {
+      if (user) {
+        const folder = `assinaturas/${user.id}/beneficiarios`;
+        supabase.storage.from('Assinaturas').list(folder, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } }).then(({ data }) => {
+          const match = (data || []).find(f => f.name.startsWith(`${beneficiario.id}-`));
+          if (match) {
+            const path = `${folder}/${match.name}`;
+            setFormData(prev => ({ ...prev, assinatura_path: path }));
+            supabase.storage.from('Assinaturas').createSignedUrl(path, 600).then(({ data }) => setPreviewUrl(data?.signedUrl ?? null));
+            return;
+          }
+          setPreviewUrl(null);
+        });
+      } else {
+        setPreviewUrl(null);
+      }
+    }
     setIsDialogOpen(true);
   };
 
@@ -133,9 +202,27 @@ const CadastroBeneficiarios = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', documento: '', phone: '', email: '', observacoes: '' });
+    setFormData({ name: '', documento: '', phone: '', email: '', observacoes: '', assinatura_path: '' });
+    setPreviewUrl(null);
     setEditingBeneficiario(null);
     setIsDialogOpen(false);
+  };
+
+  const uploadAssinatura = async (file: File) => {
+    if (!user) return;
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
+      const baseId = editingBeneficiario?.id || 'novo';
+      const path = `assinaturas/${user.id}/beneficiarios/${baseId}-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('Assinaturas').upload(path, file, { contentType: file.type || 'image/png', upsert: false });
+      if (upErr) throw upErr;
+      setFormData(prev => ({ ...prev, assinatura_path: path }));
+      const { data: signed } = await supabase.storage.from('Assinaturas').createSignedUrl(path, 600);
+      setPreviewUrl(signed?.signedUrl ?? null);
+      toast({ title: 'Assinatura', description: 'Imagem enviada com sucesso' });
+    } catch (e: unknown) {
+      toast({ title: 'Erro', description: e instanceof Error ? e.message : 'Falha no upload', variant: 'destructive' });
+    }
   };
 
   const filteredBeneficiarios = beneficiarios.filter((b) =>
@@ -179,23 +266,23 @@ const CadastroBeneficiarios = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="documento">Documento</Label>
-                  <Input
-                    id="documento"
-                    value={formData.documento}
-                    onChange={(e) => setFormData({ ...formData, documento: e.target.value })}
-                    placeholder="CPF/CNPJ"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Telefone</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="(11) 99999-9999"
-                  />
-                </div>
+                <Input
+                  id="documento"
+                  value={formData.documento}
+                  onChange={(e) => setFormData({ ...formData, documento: formatDoc(e.target.value) })}
+                  placeholder="CPF/CNPJ"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Telefone</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: formatPhone(e.target.value) })}
+                  placeholder="(11) 99999-9999"
+                />
+              </div>
               </div>
 
               <div className="space-y-2">
@@ -217,6 +304,24 @@ const CadastroBeneficiarios = () => {
                   onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
                   placeholder="Observações adicionais"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Assinatura (PNG/JPG)</Label>
+                <div className="flex items-center gap-2">
+                  <Button asChild variant="outline">
+                    <label className="cursor-pointer">
+                      <input type="file" accept="image/png,image/jpeg" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadAssinatura(f); }} />
+                      Enviar Imagem
+                    </label>
+                  </Button>
+                  {previewUrl && (
+                    <Button type="button" variant="outline" onClick={() => window.open(previewUrl!, '_blank')}>Visualizar</Button>
+                  )}
+                </div>
+                {formData.assinatura_path ? (
+                  <div className="text-xs text-muted-foreground">Armazenado em: {formData.assinatura_path}</div>
+                ) : null}
               </div>
 
               <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
@@ -299,8 +404,8 @@ const CadastroBeneficiarios = () => {
                       className={`border-b hover:bg-muted/50 transition-colors ${i % 2 === 0 ? '' : 'bg-muted/25'}`}
                     >
                       <td className="p-4 font-medium">{b.name}</td>
-                      <td className="p-4 text-muted-foreground">{b.documento || '-'}</td>
-                      <td className="p-4 text-muted-foreground">{b.phone || '-'}</td>
+                      <td className="p-4 text-muted-foreground">{b.documento ? formatDoc(b.documento) : '-'}</td>
+                      <td className="p-4 text-muted-foreground">{b.phone ? formatPhone(b.phone) : '-'}</td>
                       <td className="p-4 text-muted-foreground">{b.email || '-'}</td>
                       <td className="p-4 text-muted-foreground max-w-xs truncate">{b.observacoes || '-'}</td>
 

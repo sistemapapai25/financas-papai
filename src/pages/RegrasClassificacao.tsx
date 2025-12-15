@@ -59,7 +59,7 @@ export default function RegrasClassificacao() {
     const loadRules = async () => {
         if (!user) return;
         const { data, error } = await supabase
-            .from("classification_rules" as any)
+            .from("classification_rules")
             .select(`
         id,
         term,
@@ -76,7 +76,15 @@ export default function RegrasClassificacao() {
             return;
         }
 
-        const mapped: Rule[] = (data || []).map((r: any) => ({
+        type RuleRow = {
+            id: string;
+            term: string;
+            category_id: string | null;
+            beneficiary_id: string | null;
+            category?: { name?: string | null } | null;
+            beneficiary?: { name?: string | null } | null;
+        };
+        const mapped: Rule[] = (data || []).map((r: RuleRow) => ({
             id: r.id,
             term: r.term,
             category_id: r.category_id,
@@ -89,12 +97,16 @@ export default function RegrasClassificacao() {
 
     const loadCategories = async () => {
         if (!user) return;
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from("categories")
             .select("id, name")
             .eq("user_id", user.id)
-            .not("parent_id", "is", null)
+            .order("tipo")
             .order("name");
+        if (error) {
+            toast({ title: "Erro", description: error.message, variant: "destructive" });
+            return;
+        }
         setCategories(data || []);
     };
 
@@ -116,7 +128,7 @@ export default function RegrasClassificacao() {
 
         setLoading(true);
         try {
-            const { error } = await supabase.from("classification_rules" as any).insert({
+            const { error } = await supabase.from("classification_rules").insert({
                 user_id: user.id,
                 term: newTerm.trim(),
                 category_id: newCategoryId || null,
@@ -127,11 +139,12 @@ export default function RegrasClassificacao() {
 
             toast({ title: "Sucesso", description: "Regra criada" });
             setNewTerm("");
-            setNewCategoryId("");
+            setNewCategoryId(""
+            );
             setNewBeneficiaryId("");
             loadRules();
-        } catch (error: any) {
-            toast({ title: "Erro", description: error.message, variant: "destructive" });
+        } catch (error: unknown) {
+            toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro desconhecido", variant: "destructive" });
         } finally {
             setLoading(false);
         }
@@ -139,7 +152,7 @@ export default function RegrasClassificacao() {
 
     const deleteRule = async (id: string) => {
         if (!user) return;
-        const { error } = await supabase.from("classification_rules" as any).delete().eq("id", id).eq("user_id", user.id);
+        const { error } = await supabase.from("classification_rules").delete().eq("id", id).eq("user_id", user.id);
         if (error) {
             toast({ title: "Erro", description: error.message, variant: "destructive" });
             return;

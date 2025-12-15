@@ -87,9 +87,10 @@ const Navigation = () => {
                       </div>
 
                       <div>
-                        <div className={groupTitleCls(['/configuracoes/regras-classificacao'])}>Configurações</div>
+                        <div className={groupTitleCls(['/configuracoes/regras-classificacao','/configuracoes/igreja'])}>Configurações</div>
                         <div className="flex flex-col">
                           <Link to="/configuracoes/regras-classificacao" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Regras de Classificação</Link>
+                          <Link to="/configuracoes/igreja" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Configuração da Igreja</Link>
                         </div>
                       </div>
                     </nav>
@@ -182,11 +183,14 @@ const Navigation = () => {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={groupCls(['/configuracoes/regras-classificacao'])}>Configurações</button>
+                <button className={groupCls(['/configuracoes/regras-classificacao','/configuracoes/igreja'])}>Configurações</button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem asChild>
                   <Link to="/configuracoes/regras-classificacao">Regras de Classificação</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/configuracoes/igreja">Configuração da Igreja</Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
