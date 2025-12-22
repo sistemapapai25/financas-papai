@@ -6,9 +6,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { ChevronLeft, ChevronRight, Filter, Rows, Square, Edit3, Search, X, Wand2, FileText, ExternalLink, ScanText, Receipt, MoreVertical, Download, FileSpreadsheet } from "lucide-react";
+import { ChevronLeft, ChevronRight, Filter, Rows, Square, Edit3, Search, X, Wand2, FileText, ExternalLink, ScanText, Receipt, MoreVertical } from "lucide-react";
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import * as XLSX from 'xlsx';
 import { ymdToBr } from "@/utils/date";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -35,6 +34,8 @@ type Mov = {
   origem?: "LANCAMENTO" | "CULTO" | "AJUSTE" | null;
   comprovante_url?: string | null;
 };
+
+const mesesPt = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 
 export default function LancamentosDashboard() {
   const { user } = useAuth();
@@ -223,14 +224,7 @@ export default function LancamentosDashboard() {
 
   useEffect(() => {
     if (!supabase || !user) return;
-
-    // Se "Todas as Contas" estiver selecionado (array vazio), zera o Saldo Inicial
-    if (contasSel.length === 0) {
-      setSaldoInicial(0);
-      return;
-    }
-
-    const contasIds = contasSel;
+    const contasIds = contasSel.length ? contasSel : contas.map(c => c.id);
     const baseInicial = contas
       .filter(c => contasIds.includes(c.id))
       .reduce((s, c) => s + Number(c.saldo_inicial || 0), 0);
@@ -580,23 +574,30 @@ export default function LancamentosDashboard() {
     return rows;
   }, [rows, tipoVisao]);
 
-  const totais = useMemo(() => {
-    if (contasSel.length === 0) return { entradas: 0, saidas: 0 };
-    const base = rows.filter(r => r.categoria_nome !== 'Transferência Interna');
-    const entradas = base.filter(r => r.tipo === 'ENTRADA').reduce((acc, r) => acc + r.valor, 0);
-    const saidas = base.filter(r => r.tipo === 'SAIDA').reduce((acc, r) => acc + r.valor, 0);
-    return { entradas, saidas };
-  }, [rows, contasSel]);
-
-  const saldoAtual = useMemo(() => {
-    const base = tipoVisao === 'TRANSFERENCIAS' ? rowsView : rowsView.filter(r => r.categoria_nome !== 'Transferência Interna');
-    return base.reduce((s, r) => s + (r.tipo === "ENTRADA" ? r.valor : -r.valor), 0);
+  const rowsResumo = useMemo(() => {
+    return tipoVisao === 'TRANSFERENCIAS' ? rowsView : rowsView.filter(r => r.categoria_nome !== 'Transferência Interna');
   }, [rowsView, tipoVisao]);
 
-  const mesesPt = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+  const saldoAtual = useMemo(() => {
+    return rowsResumo.reduce((s, r) => s + (r.tipo === "ENTRADA" ? r.valor : -r.valor), 0);
+  }, [rowsResumo]);
+
+  const totalEntradas = useMemo(() => {
+    return rowsResumo.reduce((s, r) => s + (r.tipo === "ENTRADA" ? r.valor : 0), 0);
+  }, [rowsResumo]);
+
+  const totalSaidas = useMemo(() => {
+    return rowsResumo.reduce((s, r) => s + (r.tipo === "SAIDA" ? r.valor : 0), 0);
+  }, [rowsResumo]);
+
+  const saldoFinal = useMemo(() => {
+    return saldoInicial + saldoAtual;
+  }, [saldoInicial, saldoAtual]);
+
+  const capitalize = (s: string) => (s ? s[0].toLocaleUpperCase('pt-BR') + s.slice(1) : s);
 
   const tituloMes = useMemo(() => {
-    return `${mesesPt[mes]} de ${ano}`;
+    return `${capitalize(mesesPt[mes])} de ${ano}`;
   }, [mes, ano]);
 
   const ultimoIdPorDia = useMemo(() => {
@@ -1065,179 +1066,12 @@ export default function LancamentosDashboard() {
     }
   }
 
-  function exportarCSV() {
-    try {
-      const data = rowsView.map(r => ({
-        Data: ymdToBr(r.data),
-        Descrição: r.descricao,
-        Categoria: r.categoria_nome,
-        Beneficiário: r.beneficiario_nome,
-        Valor: r.valor,
-        Tipo: r.tipo,
-        Conta: r.conta_nome
-      }));
-      const ws = XLSX.utils.json_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Lançamentos");
-      XLSX.writeFile(wb, `extrato-${mes + 1}-${ano}.csv`);
-    } catch (e) {
-      toast({ title: "Erro", description: "Falha ao exportar CSV", variant: "destructive" });
-    }
-  }
-
-  async function exportarPDF() {
-    try {
-      const pdfDoc = await PDFDocument.create();
-      let page = pdfDoc.addPage([595.28, 841.89]); // A4
-      const { width, height } = page.getSize();
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-      
-      let y = height - 50;
-      const margin = 50;
-      
-      page.drawText(`Extrato de Lançamentos - ${tituloMes}`, { x: margin, y, size: 18, font: fontBold });
-      y -= 30;
-      
-      // Headers
-      page.drawText("Data", { x: margin, y, size: 10, font: fontBold });
-      page.drawText("Descrição", { x: margin + 60, y, size: 10, font: fontBold });
-      page.drawText("Valor", { x: width - margin - 80, y, size: 10, font: fontBold });
-      y -= 20;
-      
-      for (const r of rowsView) {
-        if (y < 50) {
-          page = pdfDoc.addPage([595.28, 841.89]);
-          y = height - 50;
-        }
-        
-        page.drawText(ymdToBr(r.data), { x: margin, y, size: 9, font: font });
-        
-        // Truncate description
-        let desc = r.descricao || "";
-        if (desc.length > 45) desc = desc.slice(0, 42) + "...";
-        page.drawText(desc, { x: margin + 60, y, size: 9, font: font });
-        
-        const valorFmt = formatCurrency(r.valor);
-        const color = r.tipo === 'ENTRADA' ? rgb(0, 0.6, 0) : rgb(0.8, 0, 0);
-        
-        page.drawText(valorFmt, { x: width - margin - 80, y, size: 9, font: font, color });
-        
-        y -= 15;
-      }
-      
-      const pdfBytes = await pdfDoc.save();
-      const blob = new Blob([pdfBytes], { type: "application/pdf" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `extrato-${mes + 1}-${ano}.pdf`;
-      link.click();
-      
-    } catch (e) {
-      toast({ title: "Erro", description: "Falha ao exportar PDF", variant: "destructive" });
-    }
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">Extrato de Lançamentos</h1>
-        <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
-                  <Download className="w-4 h-4" />
-                  <span className="hidden sm:inline">Exportar</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={exportarCSV}>
-                  <FileSpreadsheet className="w-4 h-4 mr-2" />
-                  CSV (Excel)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={exportarPDF}>
-                  <FileText className="w-4 h-4 mr-2" />
-                  PDF
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant={modoCard ? "secondary" : "ghost"} onClick={() => setModoCard(false)}><Rows className="w-4 h-4" /></Button>
-            <Button variant={modoCard ? "ghost" : "secondary"} onClick={() => setModoCard(true)}><Square className="w-4 h-4" /></Button>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" onClick={() => setDataRef(new Date(ano, mes - 1, 1))}><ChevronLeft className="w-4 h-4" /></Button>
-            <Popover open={monthPickerOpen} onOpenChange={setMonthPickerOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" className="font-semibold w-40">
-                  {tituloMes}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-64 p-2">
-                <div className="grid grid-cols-3 gap-1">
-                  {mesesPt.map((nomeMes, idx) => (
-                    <Button
-                      key={idx}
-                      variant={idx === mes ? "default" : "ghost"}
-                      size="sm"
-                      className="text-xs"
-                      onClick={() => {
-                        setDataRef(new Date(ano, idx, 1));
-                        setMonthPickerOpen(false);
-                      }}
-                    >
-                      {nomeMes.substring(0, 3)}
-                    </Button>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
-            <Button variant="ghost" onClick={() => setDataRef(new Date(ano, mes + 1, 1))}><ChevronRight className="w-4 h-4" /></Button>
-          </div>
-          <div className="flex-1" />
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={aplicarRegras} disabled={applyingRules}>
-              <Wand2 className="w-4 h-4 mr-2" />
-              {applyingRules ? "Aplicando..." : "Aplicar Regras"}
-            </Button>
-            <Button variant="outline" onClick={ajustarDescricoesLote} disabled={bulkAdjusting}>
-              {bulkAdjusting ? 'Ajustando...' : 'Ajustar Descrições'}
-            </Button>
-            <DropdownMenu open={tipoMenuOpen} onOpenChange={setTipoMenuOpen}>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  {tipoVisao === 'TODOS' ? 'Todos Lançamentos' : tipoVisao === 'DESPESAS' ? 'Despesas' : tipoVisao === 'RECEITAS' ? 'Receitas' : 'Transferências'}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="min-w-[220px]">
-                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('TODOS'); setTipoMenuOpen(false); }}>Todos Lançamentos</DropdownMenuItem>
-                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('DESPESAS'); setTipoMenuOpen(false); }}>Despesas</DropdownMenuItem>
-                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('RECEITAS'); setTipoMenuOpen(false); }}>Receitas</DropdownMenuItem>
-                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('TRANSFERENCIAS'); setTipoMenuOpen(false); }}>Transferências</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <div className="relative">
-              <Input
-                placeholder="Pesquisar"
-                value={busca}
-                onChange={e => setBusca(e.target.value)}
-                className="w-64 pr-8"
-              />
-              {busca && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                  onClick={() => setBusca("")}
-                  aria-label="Limpar pesquisa"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              )}
-            </div>
             <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline">
@@ -1276,42 +1110,113 @@ export default function LancamentosDashboard() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" onClick={aplicarRegras} disabled={applyingRules}>
+              <Wand2 className="w-4 h-4 mr-2" />
+              {applyingRules ? "Aplicando..." : "Aplicar Regras"}
+            </Button>
+            <Button variant="outline" onClick={ajustarDescricoesLote} disabled={bulkAdjusting}>
+              {bulkAdjusting ? 'Ajustando...' : 'Ajustar Descrições'}
+            </Button>
+            <DropdownMenu open={tipoMenuOpen} onOpenChange={setTipoMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  {tipoVisao === 'TODOS' ? 'Todos Lançamentos' : tipoVisao === 'DESPESAS' ? 'Despesas' : tipoVisao === 'RECEITAS' ? 'Receitas' : 'Transferências'}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="min-w-[220px]">
+                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('TODOS'); setTipoMenuOpen(false); }}>Todos Lançamentos</DropdownMenuItem>
+                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('DESPESAS'); setTipoMenuOpen(false); }}>Despesas</DropdownMenuItem>
+                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('RECEITAS'); setTipoMenuOpen(false); }}>Receitas</DropdownMenuItem>
+                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('TRANSFERENCIAS'); setTipoMenuOpen(false); }}>Transferências</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          <div className="relative w-full lg:w-64">
+            <Input
+              placeholder="Pesquisar"
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              className="w-full pr-8"
+            />
+            {busca && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                onClick={() => setBusca("")}
+                aria-label="Limpar pesquisa"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div className="mb-4">
           <Card>
-            <CardContent className="p-4 flex flex-col justify-between h-full">
-              <span className="text-sm text-muted-foreground">Saldo Anterior</span>
-              <div className="text-xl font-semibold mt-1 text-foreground">{formatCurrency(saldoInicial)}</div>
-              <span className="text-xs text-muted-foreground">Saldo acumulado até o início do mês</span>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4 flex flex-col justify-between h-full">
-              <span className="text-sm text-muted-foreground">Entradas</span>
-              <div className="text-xl font-semibold mt-1 text-emerald-600">{formatCurrency(totais.entradas)}</div>
-              <span className="text-xs text-muted-foreground">Total de receitas no mês</span>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4 flex flex-col justify-between h-full">
-              <span className="text-sm text-muted-foreground">Saídas</span>
-              <div className="text-xl font-semibold mt-1 text-red-600">{formatCurrency(totais.saidas)}</div>
-              <span className="text-xs text-muted-foreground">Total de despesas no mês</span>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4 flex flex-col justify-between h-full">
-              <span className="text-sm text-muted-foreground">Saldo Final</span>
-              <div className={`text-xl font-semibold mt-1 ${(saldoInicial + totais.entradas - totais.saidas) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                {formatCurrency(saldoInicial + totais.entradas - totais.saidas)}
+            <CardContent className="p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Saldo Anterior</span>
+                  <span className={`font-semibold ${saldoInicial >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(saldoInicial)}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Entradas</span>
+                  <span className="font-semibold text-emerald-600">{formatCurrency(totalEntradas)}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Saídas</span>
+                  <span className="font-semibold text-red-600">{formatCurrency(totalSaidas)}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Saldo Final</span>
+                  <span className={`font-semibold ${saldoFinal >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(saldoFinal)}</span>
+                </div>
               </div>
-              <span className="text-xs text-muted-foreground">Saldo projetado ao fim do mês</span>
             </CardContent>
           </Card>
+        </div>
+
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 mb-4">
+          <div className="flex items-center gap-2 justify-start">
+            <span className="text-sm text-muted-foreground">Visualização</span>
+            <Button variant={modoCard ? "secondary" : "ghost"} onClick={() => setModoCard(false)}><Rows className="w-4 h-4" /></Button>
+            <Button variant={modoCard ? "ghost" : "secondary"} onClick={() => setModoCard(true)}><Square className="w-4 h-4" /></Button>
+          </div>
+          <div className="flex items-center gap-3 justify-center">
+            <Button variant="ghost" onClick={() => setDataRef(new Date(ano, mes - 1, 1))}><ChevronLeft className="w-4 h-4" /></Button>
+            <Popover open={monthPickerOpen} onOpenChange={setMonthPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" className="font-semibold w-40">
+                  {tituloMes}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-2">
+                <div className="grid grid-cols-3 gap-1">
+                  {mesesPt.map((nomeMes, idx) => (
+                    <Button
+                      key={idx}
+                      variant={idx === mes ? "default" : "ghost"}
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => {
+                        setDataRef(new Date(ano, idx, 1));
+                        setMonthPickerOpen(false);
+                      }}
+                    >
+                      {capitalize(nomeMes).substring(0, 3)}
+                    </Button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Button variant="ghost" onClick={() => setDataRef(new Date(ano, mes + 1, 1))}><ChevronRight className="w-4 h-4" /></Button>
+          </div>
+          <div />
         </div>
 
         {!modoCard ? (

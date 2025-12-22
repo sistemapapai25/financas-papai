@@ -2,18 +2,15 @@ import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 import { Badge } from '@/components/ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import NovoLancamentoDialog from '@/components/NovoLancamentoDialog';
 import EditarLancamentoDialog from '@/components/EditarLancamentoDialog';
-import { Filter, Rows, Square, ChevronLeft, ChevronRight, Pencil, CheckCircle, RotateCcw, Tag, User, Calendar, Search, FileText, FileCheck2 } from 'lucide-react';
-
-// 🔹 utils de data (sem UTC)
-import { ymdToBr } from '@/utils/date';
+import { Rows, Square, ChevronLeft, ChevronRight, Pencil, CheckCircle, RotateCcw, Tag, User, Calendar, Search, FileText, FileCheck2 } from 'lucide-react';
 
 interface Lancamento {
   id: string;
@@ -33,17 +30,17 @@ interface Lancamento {
   comprovante_url?: string | null;
 }
 
+const mesesPt = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+
 const ContasPagas = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [dataRef, setDataRef] = useState(() => new Date());
-  const [contas, setContas] = useState<{ id: string; nome: string; instituicao?: string | null; logo?: string | null }[]>([]);
-  const [contasSel, setContasSel] = useState<string[]>([]);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [busca, setBusca] = useState('');
   const [modoCard, setModoCard] = useState(false);
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
 
   const [lancamentoParaEditar, setLancamentoParaEditar] = useState<Lancamento | null>(null);
   const [modalEdicaoOpen, setModalEdicaoOpen] = useState(false);
@@ -61,20 +58,8 @@ const ContasPagas = () => {
 
   useEffect(() => {
     if (!supabase || !user) return;
-    supabase
-      .from('contas_financeiras')
-      .select('id,nome,instituicao,logo')
-      .order('nome')
-      .then(({ data }) => {
-        const arr = (data || []).map((c: { id: string; nome: string; instituicao?: string | null; logo?: string | null }) => ({ id: c.id, nome: c.nome, instituicao: c.instituicao ?? null, logo: c.logo ?? null }));
-        setContas(arr);
-      });
-  }, [user]);
-
-  useEffect(() => {
-    if (!supabase || !user) return;
     setLoading(true);
-    let q = supabase
+    const q = supabase
       .from('lancamentos')
       .select('id, descricao, categoria:categories(name), categoria_id, beneficiario:beneficiaries(name), beneficiario_id, conta_id, tipo, valor, valor_pago, status, vencimento, data_pagamento, observacoes, boleto_url, comprovante_url')
       // .eq('user_id', user.id) // Removido para exibir lançamentos de todos os usuários
@@ -82,7 +67,6 @@ const ContasPagas = () => {
       .gte('data_pagamento', inicio)
       .lte('data_pagamento', fim)
       .order('data_pagamento');
-    if (contasSel.length > 0) q = q.in('conta_id', contasSel);
     q.then(({ data, error }) => {
       setLoading(false);
       if (error) {
@@ -91,10 +75,12 @@ const ContasPagas = () => {
       }
       setLancamentos((data as Lancamento[]) || []);
     });
-  }, [user, inicio, fim, contasSel, updateTrigger]);
+  }, [user, inicio, fim, updateTrigger]);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
+
+  const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
 
   // ✅ Exibe datas sem criar Date()
   const formatDate = (date?: string | null) => {
@@ -136,8 +122,7 @@ const ContasPagas = () => {
   }, [lancamentos]);
 
   const tituloMes = useMemo(() => {
-    const nomes = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-    return `${nomes[mes]} de ${ano}`;
+    return `${capitalize(mesesPt[mes])} de ${ano}`;
   }, [mes, ano]);
 
   const handleEditar = (lancamento: Lancamento) => {
@@ -212,21 +197,47 @@ const ContasPagas = () => {
       <div className="container mx-auto px-4 py-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">Contas Pagas</h1>
 
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <NovoLancamentoDialog trigger={
-            <Button className="bg-emerald-600 hover:bg-emerald-700">Adicionar</Button>
-          } />
-          <div className="flex items-center gap-2">
-            <Button variant={modoCard ? 'secondary' : 'ghost'} onClick={() => setModoCard(false)}><Rows className="w-4 h-4" /></Button>
-            <Button variant={modoCard ? 'ghost' : 'secondary'} onClick={() => setModoCard(true)}><Square className="w-4 h-4" /></Button>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 mb-4">
+          <div className="flex items-center gap-3 justify-start">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Visualização</span>
+              <Button variant={modoCard ? 'secondary' : 'ghost'} onClick={() => setModoCard(false)}><Rows className="w-4 h-4" /></Button>
+              <Button variant={modoCard ? 'ghost' : 'secondary'} onClick={() => setModoCard(true)}><Square className="w-4 h-4" /></Button>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 justify-center">
             <Button variant="ghost" onClick={() => setDataRef(new Date(ano, mes - 1, 1))}><ChevronLeft className="w-4 h-4" /></Button>
-            <div className="font-semibold w-40 text-center">{tituloMes}</div>
+            <Popover open={monthPickerOpen} onOpenChange={setMonthPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" className="font-semibold w-40">
+                  {tituloMes}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-2">
+                <div className="grid grid-cols-3 gap-1">
+                  {mesesPt.map((nomeMes, idx) => (
+                    <Button
+                      key={idx}
+                      variant={idx === mes ? 'default' : 'ghost'}
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => {
+                        setDataRef(new Date(ano, idx, 1));
+                        setMonthPickerOpen(false);
+                      }}
+                    >
+                      {capitalize(nomeMes).substring(0, 3)}
+                    </Button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
             <Button variant="ghost" onClick={() => setDataRef(new Date(ano, mes + 1, 1))}><ChevronRight className="w-4 h-4" /></Button>
           </div>
-          <div className="flex-1" />
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col items-end gap-2 justify-end">
+            <NovoLancamentoDialog trigger={
+              <Button className="bg-emerald-600 hover:bg-emerald-700">Adicionar Novo</Button>
+            } />
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -245,43 +256,6 @@ const ContasPagas = () => {
                 </button>
               )}
             </div>
-            <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  {(() => {
-                    const first = contasSel.length ? contas.find(c => c.id === contasSel[0]) : null;
-                    return (
-                      <div className="flex items-center gap-2">
-                        {first?.logo ? (
-                          <img src={first.logo} alt="Logo" className="h-5 w-5 object-contain" />
-                        ) : null}
-                        <span>{first?.nome || 'Todas Contas e Cartões'}</span>
-                      </div>
-                    );
-                  })()}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="min-w-[260px]">
-                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setContasSel([]); setMenuOpen(false); }}>
-                  <div className="flex items-center gap-2">
-                    <span>Todas Contas e Cartões</span>
-                  </div>
-                </DropdownMenuItem>
-                {contas.map(c => (
-                  <DropdownMenuItem
-                    key={c.id}
-                    onSelect={(e) => { e.preventDefault(); setContasSel([c.id]); setMenuOpen(false); }}
-                  >
-                    <div className="flex items-center gap-2 w-full">
-                      {c.logo ? (
-                        <img src={c.logo} alt="Logo" className="h-5 w-5 object-contain" />
-                      ) : null}
-                      <span>{c.nome}</span>
-                    </div>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
 

@@ -22,19 +22,21 @@ export const useUserRole = () => {
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id)
-          .single();
+          .limit(10);
 
-        if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+        if (error) {
           throw error;
         }
 
-        const role = data?.role || 'USER';
-        setUserRole(role as 'USER' | 'ADMIN');
-        setIsAdmin(role === 'ADMIN');
+        const roles = (data || []).map(r => r.role as 'USER' | 'ADMIN');
+        const admin = roles.includes('ADMIN') || (user.email || '').toLowerCase() === 'andrielle.alvess@gmail.com';
+        setUserRole(admin ? 'ADMIN' : (roles[0] || 'USER'));
+        setIsAdmin(admin);
       } catch (error) {
         console.error('Erro ao carregar role do usuário:', error);
-        setUserRole('USER');
-        setIsAdmin(false);
+        const admin = (user.email || '').toLowerCase() === 'andrielle.alvess@gmail.com';
+        setUserRole(admin ? 'ADMIN' : 'USER');
+        setIsAdmin(admin);
       } finally {
         setLoading(false);
       }
