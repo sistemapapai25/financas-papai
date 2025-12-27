@@ -51,9 +51,11 @@ export default function LancamentosDashboard() {
   const [editOpen, setEditOpen] = useState(false);
   const [editMov, setEditMov] = useState<Mov | null>(null);
   const [editDesc, setEditDesc] = useState("");
+  const [editData, setEditData] = useState("");
   const [editCategoriaId, setEditCategoriaId] = useState<string>("");
   const [editBenefId, setEditBenefId] = useState<string>("");
   const [editComprovanteUrl, setEditComprovanteUrl] = useState<string>("");
+  const [deleting, setDeleting] = useState(false);
   const [catOpts, setCatOpts] = useState<{ id: string; name: string; tipo: string; parent_id: string | null }[]>([]);
   const [benefOpts, setBenefOpts] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
@@ -972,11 +974,32 @@ export default function LancamentosDashboard() {
   function abrirEdicao(m: Mov) {
     setEditMov(m);
     setEditDesc(m.descricao || "");
+    setEditData(m.data || "");
     setEditCategoriaId(m.categoria_id || "");
     setEditBenefId(m.beneficiario_id || "");
     setEditComprovanteUrl(m.comprovante_url || "");
     // setCatOpts and setBenefOpts will be populated by useEffect
     setEditOpen(true);
+  }
+
+  async function excluirMovimento(m: Mov) {
+    if (!user) return;
+    if (!confirm(`Excluir o lançamento "${m.descricao || 'sem descrição'}" de ${formatCurrency(m.valor)}?`)) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("movimentos_financeiros")
+        .delete()
+        .eq("id", m.id)
+        .eq("user_id", user.id);
+      if (error) throw error;
+      setRows(prev => prev.filter(r => r.id !== m.id));
+      toast({ title: "Excluído", description: "Lançamento removido" });
+    } catch (e) {
+      toast({ title: "Erro", description: e instanceof Error ? e.message : "Falha ao excluir", variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
   }
 
   useEffect(() => {
@@ -1049,7 +1072,8 @@ export default function LancamentosDashboard() {
     if (!editMov || !user) return;
     setSaving(true);
     try {
-      const payload: Partial<{ descricao: string; categoria_id: string | null; beneficiario_id: string | null; comprovante_url: string | null }> = {
+      const payload: Partial<{ data: string; descricao: string; categoria_id: string | null; beneficiario_id: string | null; comprovante_url: string | null }> = {
+        data: editData,
         descricao: editDesc,
         categoria_id: editCategoriaId ? editCategoriaId : null,
         beneficiario_id: editBenefId ? editBenefId : null,
@@ -1066,6 +1090,7 @@ export default function LancamentosDashboard() {
       }
       setRows(prev => prev.map(r => r.id === editMov.id ? {
         ...r,
+        data: editData || r.data,
         descricao: editDesc || null,
         categoria_id: payload.categoria_id || null,
         beneficiario_id: payload.beneficiario_id || null,
@@ -1587,6 +1612,7 @@ export default function LancamentosDashboard() {
                                 <DropdownMenuItem onSelect={() => { gerarReembolsoMov(r); }}>Reembolso</DropdownMenuItem>
                               </>
                             ) : null}
+                            <DropdownMenuItem onSelect={() => { excluirMovimento(r); }} className="text-destructive" disabled={deleting}>Excluir</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </td>
@@ -1641,6 +1667,7 @@ export default function LancamentosDashboard() {
                           <DropdownMenuItem onSelect={() => { gerarReembolsoMov(r); }}>Reembolso</DropdownMenuItem>
                         </>
                       ) : null}
+                      <DropdownMenuItem onSelect={() => { excluirMovimento(r); }} className="text-destructive" disabled={deleting}>Excluir</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </CardContent>
@@ -1756,6 +1783,10 @@ export default function LancamentosDashboard() {
               <DialogTitle>Editar Movimento</DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
+              <div>
+                <Label>Data</Label>
+                <Input type="date" value={editData} onChange={e => setEditData(e.target.value)} />
+              </div>
               <div>
                 <Label>Descrição</Label>
                 <Input value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="Descrição" />
