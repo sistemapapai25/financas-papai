@@ -152,18 +152,36 @@ export default function ImportarExtrato() {
     setFile(f);
     setLinhas([]);
     if (!f) return;
-    const buf = await f.arrayBuffer();
-    const wb = XLSX.read(buf, { type: "array" });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true }) as unknown as unknown[][];
+    let rows: unknown[][] = [];
+    try {
+      const isCsv = f.name.toLowerCase().endsWith(".csv") || (f.type || "").toLowerCase().includes("csv");
+      if (isCsv) {
+        const text = (await f.text()).replace(/^\uFEFF/, "");
+        const wb = XLSX.read(text, { type: "string" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true }) as unknown as unknown[][];
+      } else {
+        const buf = await f.arrayBuffer();
+        const wb = XLSX.read(buf, { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true }) as unknown as unknown[][];
+      }
+    } catch (err) {
+      toast({ title: "Arquivo inválido", description: "Não foi possível ler o arquivo. Envie um .xlsx ou .csv válido.", variant: "destructive" });
+      return;
+    }
 
     // Encontrar linha de cabeçalho real - suporta múltiplos formatos
     let headerRowIdx = -1;
     let formatType: "padrao" | "cora" = "padrao";
     
     for (let i = 0; i < Math.min(rows.length, 30); i++) {
-      const r = rows[i].map((x: unknown) => String(x ?? "").toLowerCase());
-      // Formato padrão: Data, Descrição, Crédito, Débito
+      const r = rows[i].map((x: unknown) =>
+        String(x ?? "")
+          .replace(/^\uFEFF/, "")
+          .trim()
+          .toLowerCase()
+      );
       if (r.some((c: string) => c.includes("data")) && r.some((c: string) => c.includes("descri"))) {
         if (r.some((c: string) => c.includes("crédito")) || r.some((c: string) => c.includes("credito"))) {
           headerRowIdx = i;
@@ -187,7 +205,7 @@ export default function ImportarExtrato() {
       return;
     }
 
-    const header = rows[headerRowIdx].map((x: unknown) => String(x ?? "").trim());
+    const header = rows[headerRowIdx].map((x: unknown) => String(x ?? "").replace(/^\uFEFF/, "").trim());
     const parsed: LinhaPreview[] = [];
     
     if (formatType === "cora") {
