@@ -157,10 +157,10 @@ const Dashboard = () => {
           <Link to="/contas-pagas">
             <Card className="cursor-pointer hover:shadow-lg transition-shadow">
               <CardContent className="p-6 text-center">
-                <FileCheck2 className="w-12 h-12 mx-auto mb-3 text-green-600" />
+                <FileCheck2 className="w-12 h-12 mx-auto mb-3 text-blue-600" />
                 <h3 className="text-lg font-semibold mb-2">Contas Pagas</h3>
                 <p className="text-muted-foreground">Visualize suas contas quitadas</p>
-                <Badge variant="outline" className="mt-2 text-green-600 border-green-600">
+                <Badge variant="outline" className="mt-2 text-blue-600 border-blue-600">
                   Histórico
                 </Badge>
               </CardContent>
@@ -192,7 +192,7 @@ const Dashboard = () => {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">
+              <div className="text-2xl font-bold text-blue-600">
                 {formatCurrency(dashboardData?.totalPagoMes || 0)}
               </div>
             </CardContent>

@@ -407,7 +407,7 @@ export default function EntradasCulto() {
                     }
                   }}
                   className={`h-11 transition-colors ${
-                    !dataCulto ? 'border-red-300 focus:border-red-500' : 'border-green-300 focus:border-green-500'
+                    !dataCulto ? 'border-red-300 focus:border-red-500' : 'border-blue-300 focus:border-blue-500'
                   }`}
                 />
                 {!dataCulto && (
@@ -426,7 +426,7 @@ export default function EntradasCulto() {
                 </Label>
                 <Select value={tipoCultoId} onValueChange={setTipoCultoId}>
                   <SelectTrigger className={`h-11 transition-colors ${
-                    !tipoCultoId ? 'border-red-300 focus:border-red-500' : 'border-green-300 focus:border-green-500'
+                    !tipoCultoId ? 'border-red-300 focus:border-red-500' : 'border-blue-300 focus:border-blue-500'
                   }`}>
                     <SelectValue placeholder="Selecione o tipo" />
                   </SelectTrigger>
@@ -454,7 +454,7 @@ export default function EntradasCulto() {
                 </Label>
                 <Select value={contaId} onValueChange={setContaId}>
                   <SelectTrigger className={`h-11 transition-colors ${
-                    !contaId ? 'border-red-300 focus:border-red-500' : 'border-green-300 focus:border-green-500'
+                    !contaId ? 'border-red-300 focus:border-red-500' : 'border-blue-300 focus:border-blue-500'
                   }`}>
                     <SelectValue placeholder="Selecione a conta" />
                   </SelectTrigger>
@@ -496,7 +496,7 @@ export default function EntradasCulto() {
                   onChange={(e) => setPregador(e.target.value)}
                   placeholder="Nome do pregador"
                   className={`h-11 transition-colors ${
-                    pregador ? 'border-green-300 focus:border-green-500' : ''
+                    pregador ? 'border-blue-300 focus:border-blue-500' : ''
                   }`}
                 />
               </div>
@@ -513,7 +513,7 @@ export default function EntradasCulto() {
                   onChange={(e) => setAdultos(e.target.value)}
                   placeholder="0"
                   className={`h-11 transition-colors ${
-                    adultos ? 'border-green-300 focus:border-green-500' : ''
+                    adultos ? 'border-blue-300 focus:border-blue-500' : ''
                   }`}
                 />
               </div>
@@ -530,7 +530,7 @@ export default function EntradasCulto() {
                   onChange={(e) => setCriancas(e.target.value)}
                   placeholder="0"
                   className={`h-11 transition-colors ${
-                    criancas ? 'border-green-300 focus:border-green-500' : ''
+                    criancas ? 'border-blue-300 focus:border-blue-500' : ''
                   }`}
                 />
               </div>
@@ -578,7 +578,7 @@ export default function EntradasCulto() {
                         onChange={(e) => updateDizimo(d.id, "nome", e.target.value)}
                         placeholder="Nome completo"
                         className={`h-10 bg-white transition-colors ${
-                          d.nome ? 'border-green-300 focus:border-green-500' : ''
+                          d.nome ? 'border-blue-300 focus:border-blue-500' : ''
                         }`}
                       />
                     </div>
@@ -596,7 +596,7 @@ export default function EntradasCulto() {
                         }}
                         placeholder="0,00"
                         className={`h-10 bg-white font-mono transition-colors ${
-                          converterMoedaParaNumero(d.valor) > 0 ? 'border-green-300 focus:border-green-500' : ''
+                          converterMoedaParaNumero(d.valor) > 0 ? 'border-blue-300 focus:border-blue-500' : ''
                         }`}
                       />
                     </div>
@@ -636,10 +636,10 @@ export default function EntradasCulto() {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card className="p-4 bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+              <Card className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
                 <div className="space-y-3">
                   <Label className="text-sm font-medium flex items-center gap-2">
-                    <DollarSign className="w-4 h-4 text-green-600" />
+                    <DollarSign className="w-4 h-4 text-blue-600" />
                     Oferta em Dinheiro
                   </Label>
                   <Input
@@ -647,7 +647,7 @@ export default function EntradasCulto() {
                     onChange={(e) => handleMoedaChange(e.target.value, setOfertaDinheiro)}
                     placeholder="0,00"
                     className={`h-12 text-lg font-mono bg-white transition-colors ${
-                      converterMoedaParaNumero(ofertaDinheiro) > 0 ? 'border-green-300 focus:border-green-500' : ''
+                      converterMoedaParaNumero(ofertaDinheiro) > 0 ? 'border-blue-300 focus:border-blue-500' : ''
                     }`}
                   />
                 </div>
@@ -664,7 +664,7 @@ export default function EntradasCulto() {
                     onChange={(e) => handleMoedaChange(e.target.value, setOfertaMoedas)}
                     placeholder="0,00"
                     className={`h-12 text-lg font-mono bg-white transition-colors ${
-                      converterMoedaParaNumero(ofertaMoedas) > 0 ? 'border-green-300 focus:border-green-500' : ''
+                      converterMoedaParaNumero(ofertaMoedas) > 0 ? 'border-blue-300 focus:border-blue-500' : ''
                     }`}
                   />
                 </div>
@@ -711,13 +711,13 @@ export default function EntradasCulto() {
                 </CardContent>
               </Card>
               
-              <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 shadow-lg">
+              <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 shadow-lg">
                 <CardContent className="p-6 text-center">
                   <div className="flex items-center justify-center mb-2">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
+                    <CheckCircle className="w-6 h-6 text-blue-600" />
                   </div>
-                  <div className="text-sm text-green-700 font-medium mb-1">Total Geral</div>
-                  <div className="text-3xl font-bold text-green-800">{moeda(totalGeral)}</div>
+                  <div className="text-sm text-blue-700 font-medium mb-1">Total Geral</div>
+                  <div className="text-3xl font-bold text-blue-800">{moeda(totalGeral)}</div>
                 </CardContent>
               </Card>
             </div>

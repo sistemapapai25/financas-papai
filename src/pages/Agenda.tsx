@@ -131,7 +131,7 @@ export default function Agenda() {
               }}>
                 <CardContent className="p-3 h-24 flex flex-col">
                   <div className="text-xs text-muted-foreground">{dayNum ?? ""}</div>
-                  <div className="mt-1 text-[11px]">Receitas: <span className="font-semibold text-emerald-600">R$ {(totals?.receitas ?? 0).toFixed(2)}</span></div>
+                  <div className="mt-1 text-[11px]">Receitas: <span className="font-semibold text-blue-600">R$ {(totals?.receitas ?? 0).toFixed(2)}</span></div>
                   <div className="text-[11px]">Despesas: <span className="font-semibold text-red-600">R$ {(totals?.despesas ?? 0).toFixed(2)}</span></div>
                   {!cell.date && <div className="flex-1" />}
                 </CardContent>

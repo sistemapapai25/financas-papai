@@ -500,7 +500,7 @@ export default function ListaCultos() {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-green-600" />
+                    <Users className="h-4 w-4 text-blue-600" />
                     <div>
                       <p className="text-sm font-medium">Presença</p>
                       <p className="text-sm text-muted-foreground">
@@ -527,10 +527,10 @@ export default function ListaCultos() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-green-600" />
+                    <DollarSign className="h-4 w-4 text-blue-600" />
                     <div>
                       <p className="text-sm font-medium">Total Geral</p>
-                      <p className="text-lg font-bold text-green-600">
+                      <p className="text-lg font-bold text-blue-600">
                         {moeda(culto.total_geral || 0)}
                       </p>
                     </div>

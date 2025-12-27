@@ -215,6 +215,7 @@ export type Database = {
           nome: string
           numero: string | null
           saldo_inicial: number
+          saldo_inicial_em: string | null
           tipo: string
           user_id: string
         }
@@ -227,6 +228,7 @@ export type Database = {
           nome: string
           numero?: string | null
           saldo_inicial?: number
+          saldo_inicial_em?: string | null
           tipo: string
           user_id: string
         }
@@ -239,6 +241,7 @@ export type Database = {
           nome?: string
           numero?: string | null
           saldo_inicial?: number
+          saldo_inicial_em?: string | null
           tipo?: string
           user_id?: string
         }
@@ -284,6 +287,137 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      desafio_parcelas: {
+        Row: {
+          competencia: string
+          created_at: string
+          id: string
+          pago_em: string | null
+          pago_obs: string | null
+          pago_valor: number | null
+          participante_id: string
+          status: string
+          valor: number
+          vencimento: string
+        }
+        Insert: {
+          competencia: string
+          created_at?: string
+          id?: string
+          pago_em?: string | null
+          pago_obs?: string | null
+          pago_valor?: number | null
+          participante_id: string
+          status?: string
+          valor: number
+          vencimento: string
+        }
+        Update: {
+          competencia?: string
+          created_at?: string
+          id?: string
+          pago_em?: string | null
+          pago_obs?: string | null
+          pago_valor?: number | null
+          participante_id?: string
+          status?: string
+          valor?: number
+          vencimento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "desafio_parcelas_participante_id_fkey"
+            columns: ["participante_id"]
+            isOneToOne: false
+            referencedRelation: "desafio_participantes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      desafio_participantes: {
+        Row: {
+          created_at: string
+          desafio_id: string
+          id: string
+          participant_user_id: string | null
+          pessoa_id: string
+          status: string
+          token_expires_at: string | null
+          token_link: string
+        }
+        Insert: {
+          created_at?: string
+          desafio_id: string
+          id?: string
+          participant_user_id?: string | null
+          pessoa_id: string
+          status?: string
+          token_expires_at?: string | null
+          token_link?: string
+        }
+        Update: {
+          created_at?: string
+          desafio_id?: string
+          id?: string
+          participant_user_id?: string | null
+          pessoa_id?: string
+          status?: string
+          token_expires_at?: string | null
+          token_link?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "desafio_participantes_desafio_id_fkey"
+            columns: ["desafio_id"]
+            isOneToOne: false
+            referencedRelation: "desafios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "desafio_participantes_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "pessoas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      desafios: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          data_inicio: string
+          descricao: string | null
+          dia_vencimento: number
+          id: string
+          qtd_parcelas: number
+          titulo: string
+          valor_mensal: number
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          data_inicio: string
+          descricao?: string | null
+          dia_vencimento?: number
+          id?: string
+          qtd_parcelas?: number
+          titulo: string
+          valor_mensal?: number
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          data_inicio?: string
+          descricao?: string | null
+          dia_vencimento?: number
+          id?: string
+          qtd_parcelas?: number
+          titulo?: string
+          valor_mensal?: number
+        }
+        Relationships: []
       }
       dizimos: {
         Row: {
@@ -564,6 +698,36 @@ export type Database = {
           email?: string
           name?: string | null
           phone?: string | null
+        }
+        Relationships: []
+      }
+      pessoas: {
+        Row: {
+          ativo: boolean
+          auth_user_id: string | null
+          created_at: string
+          email: string | null
+          id: string
+          nome: string
+          telefone: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          auth_user_id?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          nome: string
+          telefone?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          auth_user_id?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          nome?: string
+          telefone?: string | null
         }
         Relationships: []
       }

@@ -26,6 +26,11 @@ import LancamentosDashboard from "./pages/LancamentosDashboard";
 import Agenda from "@/pages/Agenda";
 import RegrasClassificacao from "./pages/RegrasClassificacao";
 import ConfiguracaoIgreja from "./pages/ConfiguracaoIgreja";
+import ResumoAnual from "./pages/ResumoAnual";
+import Pessoas from "./pages/Pessoas";
+import Desafios from "./pages/Desafios";
+import Carne from "./pages/Carne";
+import CarnePublico from "./pages/CarnePublico";
 
 // (opcionais p/ diagnóstico)
 import TesteSupabase from "./pages/TesteSupabase";
@@ -73,6 +78,7 @@ export default function App() {
               <Route path="/auth" element={<Auth />} />
               <Route path="/env" element={<EnvCheck />} />
               <Route path="/teste-supabase" element={<TesteSupabase />} />
+              <Route path="/carne/:token" element={<CarnePublico />} />
 
               {/* Privadas (com menu fixo via PrivateLayout) */}
               <Route
@@ -96,6 +102,7 @@ export default function App() {
                 {/* Financeiro */}
                 <Route path="/financeiro/lancamentos" element={<LancamentosDashboard />} />
                 <Route path="/financeiro/agenda" element={<Agenda />} />
+                <Route path="/financeiro/resumo-anual" element={<ResumoAnual />} />
 
                 {/* Cadastros */}
                 <Route path="/cadastros/beneficiarios" element={<CadastroBeneficiarios />} />
@@ -103,6 +110,10 @@ export default function App() {
                 <Route path="/cadastros/usuarios" element={<CadastroUsuarios />} />
                 <Route path="/cadastros/tipos-culto" element={<CadastroTiposCulto />} />
                 <Route path="/cadastros/contas-financeiras" element={<CadastroContasFinanceiras />} />
+                <Route path="/cadastros/pessoas" element={<Pessoas />} />
+                <Route path="/cadastros/desafios" element={<Desafios />} />
+
+                <Route path="/meu-carne" element={<Carne />} />
 
                 {/* Configurações */}
                 <Route path="/configuracoes/regras-classificacao" element={<RegrasClassificacao />} />

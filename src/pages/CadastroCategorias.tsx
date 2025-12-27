@@ -363,7 +363,7 @@ const CadastroCategorias = () => {
           {/* Indentation based on depth */}
           <div style={{ paddingLeft: depth * 20 }} className="flex items-center gap-2">
             <span className="text-muted-foreground font-mono text-sm min-w-[30px]">{numberPrefix}.</span>
-            <FolderOpen className={`w-4 h-4 ${n.tipo === 'RECEITA' ? 'text-emerald-700' : n.tipo === 'DESPESA' ? 'text-red-600' : 'text-sky-700'}`} />
+            <FolderOpen className={`w-4 h-4 ${n.tipo === 'RECEITA' ? 'text-blue-700' : n.tipo === 'DESPESA' ? 'text-red-600' : 'text-sky-700'}`} />
             <span className="font-medium">{n.name}</span>
           </div>
         </button>
@@ -394,9 +394,9 @@ const CadastroCategorias = () => {
 
       <div className="container mx-auto px-4 py-6 max-w-6xl">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold text-emerald-700">Categorias</h1>
+          <h1 className="text-2xl font-bold text-blue-700">Categorias</h1>
           <div className="flex items-center gap-2">
-            <NovaCategoriaModal trigger={<Button className="bg-emerald-700 hover:bg-emerald-800"><Plus className="w-4 h-4 mr-2" />Adicionar</Button>} onSuccess={() => loadCategorias()} />
+            <NovaCategoriaModal trigger={<Button className="bg-blue-700 hover:bg-blue-800"><Plus className="w-4 h-4 mr-2" />Adicionar</Button>} onSuccess={() => loadCategorias()} />
             <Button variant="outline"><Printer className="w-4 h-4" /></Button>
             <Button variant="outline"><Download className="w-4 h-4" /></Button>
           </div>
@@ -426,9 +426,9 @@ const CadastroCategorias = () => {
           </Select>
         </div>
         <div className="mb-4 overflow-x-auto">
-          <Tabs value={chipFiltro} onValueChange={setChipFiltro} className="min-w-max">
-            <TabsList className="flex gap-1 h-auto flex-wrap justify-start">
-              <TabsTrigger value="todas" className="data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-800">
+            <Tabs value={chipFiltro} onValueChange={setChipFiltro} className="min-w-max">
+              <TabsList className="flex gap-1 h-auto flex-wrap justify-start">
+              <TabsTrigger value="todas" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800">
                 {`Todas ${categorias.length}`}
               </TabsTrigger>
               {(() => {
@@ -446,7 +446,7 @@ const CadastroCategorias = () => {
                     <TabsTrigger
                       key={root.id}
                       value={root.id}
-                      className="data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-800"
+                      className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800"
                     >
                       {`${root.name} ${total}`}
                     </TabsTrigger>
@@ -461,14 +461,14 @@ const CadastroCategorias = () => {
           <div className="text-center py-12">Carregando...</div>
         ) : filteredCategorias.length === 0 ? (
           <Card>
-            <CardContent className="p-8 text-center">
-              <Tag className="w-16 h-16 mx-auto mb-4 opacity-50" />
-              <div className="text-lg font-semibold mb-2">Nenhuma categoria encontrada</div>
-              <div className="text-muted-foreground mb-4">Ajuste a busca ou filtros</div>
-              <NovaCategoriaModal trigger={<Button className="bg-emerald-700 hover:bg-emerald-800"><Plus className="w-4 h-4 mr-2" />Nova Categoria</Button>} onSuccess={() => loadCategorias()} />
-            </CardContent>
-          </Card>
-        ) : (
+              <CardContent className="p-8 text-center">
+                <Tag className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                <div className="text-lg font-semibold mb-2">Nenhuma categoria encontrada</div>
+                <div className="text-muted-foreground mb-4">Ajuste a busca ou filtros</div>
+              <NovaCategoriaModal trigger={<Button className="bg-blue-700 hover:bg-blue-800"><Plus className="w-4 h-4 mr-2" />Nova Categoria</Button>} onSuccess={() => loadCategorias()} />
+              </CardContent>
+            </Card>
+          ) : (
           <Card>
             <CardContent className="p-0">
               <div className="divide-y">
@@ -476,9 +476,9 @@ const CadastroCategorias = () => {
                   <>
                     {/* Only show header if mixed view or if we want to distinguish */}
                     {chipFiltro === 'todas' && (
-                      <div className="bg-emerald-50/50 px-4 py-3 flex items-center gap-2 border-b border-emerald-100">
-                        <FolderOpen className="w-4 h-4 text-emerald-700" />
-                        <span className="font-semibold text-emerald-900">Receitas</span>
+                      <div className="bg-blue-50/50 px-4 py-3 flex items-center gap-2 border-b border-blue-100">
+                        <FolderOpen className="w-4 h-4 text-blue-700" />
+                        <span className="font-semibold text-blue-900">Receitas</span>
                       </div>
                     )}
                     {treeReceitas.map((root, idx) => renderNode(root, 0, `${idx + 1}`))}
@@ -523,7 +523,7 @@ const CadastroCategorias = () => {
               </TabsList>
               <TabsContent value="resumo">
                 <div className="grid grid-cols-3 gap-3 mb-4">
-                  <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Receitas</div><div className="text-lg font-semibold text-emerald-700">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumo.receita)}</div></CardContent></Card>
+                  <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Receitas</div><div className="text-lg font-semibold text-blue-700">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumo.receita)}</div></CardContent></Card>
                   <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Despesas</div><div className="text-lg font-semibold text-red-600">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumo.despesa)}</div></CardContent></Card>
                   <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Total</div><div className="text-lg font-semibold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumo.total)}</div></CardContent></Card>
                 </div>
@@ -534,7 +534,7 @@ const CadastroCategorias = () => {
                       <YAxis />
                       <Tooltip />
                       <Legend />
-                      <Bar dataKey="receita" fill="#2E7D32" name="Receitas" />
+                      <Bar dataKey="receita" fill="#2563eb" name="Receitas" />
                       <Bar dataKey="despesa" fill="#dc2626" name="Despesas" />
                     </BarChart>
                   </ResponsiveContainer>

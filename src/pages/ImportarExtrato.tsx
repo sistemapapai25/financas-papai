@@ -34,11 +34,41 @@ function normalizarValor(v: unknown): number | null {
 
 function normalizarDataPT(s: unknown): string | null {
   if (!s) return null;
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  const mkYmd = (ano: number, mes: number, dia: number) => {
+    if (!Number.isFinite(ano) || !Number.isFinite(mes) || !Number.isFinite(dia)) return null;
+    if (ano < 1900 || ano > 2100) return null;
+    if (mes < 1 || mes > 12) return null;
+    if (dia < 1 || dia > 31) return null;
+    return `${ano}-${pad2(mes)}-${pad2(dia)}`;
+  };
   if (s instanceof Date) {
     const d = s as Date;
     return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())).toISOString().slice(0, 10);
   }
   const txt = String(s).trim();
+  const isoWithOptionalTime = txt.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);
+  if (isoWithOptionalTime) {
+    return mkYmd(Number(isoWithOptionalTime[1]), Number(isoWithOptionalTime[2]), Number(isoWithOptionalTime[3]));
+  }
+  const brWithOptionalTime = txt.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s.*)?$/);
+  if (brWithOptionalTime) {
+    return mkYmd(Number(brWithOptionalTime[3]), Number(brWithOptionalTime[2]), Number(brWithOptionalTime[1]));
+  }
+  const brShortYear = txt.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})(?:\s.*)?$/);
+  if (brShortYear) {
+    const yy = Number(brShortYear[3]);
+    const ano = yy >= 70 ? 1900 + yy : 2000 + yy;
+    return mkYmd(ano, Number(brShortYear[2]), Number(brShortYear[1]));
+  }
+  const dashDMY = txt.match(/^(\d{1,2})-(\d{1,2})-(\d{4})(?:\s.*)?$/);
+  if (dashDMY) {
+    return mkYmd(Number(dashDMY[3]), Number(dashDMY[2]), Number(dashDMY[1]));
+  }
+  const slashYMD = txt.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})(?:\s.*)?$/);
+  if (slashYMD) {
+    return mkYmd(Number(slashYMD[1]), Number(slashYMD[2]), Number(slashYMD[3]));
+  }
   // Ex.: "Sexta, 28 de fevereiro de 2025"
   const m = txt.match(/(\d{1,2})\s+de\s+([a-zç]+)\s+de\s+(\d{4})/i);
   if (m) {

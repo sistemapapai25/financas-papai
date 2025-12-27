@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { ChevronLeft, ChevronRight, Filter, Rows, Square, Edit3, Search, X, Wand2, FileText, ExternalLink, ScanText, Receipt, MoreVertical } from "lucide-react";
+import { Calculator, ChevronLeft, ChevronRight, Filter, Rows, Square, Edit3, Search, X, Wand2, FileText, ExternalLink, ScanText, Receipt, MoreVertical } from "lucide-react";
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { ymdToBr } from "@/utils/date";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -41,7 +41,7 @@ export default function LancamentosDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [dataRef, setDataRef] = useState(() => new Date());
-  const [contas, setContas] = useState<{ id: string; nome: string; logo?: string | null; saldo_inicial?: number }[]>([]);
+  const [contas, setContas] = useState<{ id: string; nome: string; logo?: string | null; saldo_inicial?: number; saldo_inicial_em?: string | null }[]>([]);
   const [contasSel, setContasSel] = useState<string[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [busca, setBusca] = useState("");
@@ -82,6 +82,15 @@ export default function LancamentosDashboard() {
   const [reembBenefAssUrlMov, setReembBenefAssUrlMov] = useState<string | null>(null);
   const [openBenefReembMov, setOpenBenefReembMov] = useState(false);
   const [rbSearchMov, setRbSearchMov] = useState("");
+  const [calcOpen, setCalcOpen] = useState(false);
+  const [calcDisplay, setCalcDisplay] = useState("0");
+  const [calcStored, setCalcStored] = useState<number | null>(null);
+  const [calcOp, setCalcOp] = useState<"+" | "-" | "*" | "/" | null>(null);
+  const [calcOverwrite, setCalcOverwrite] = useState(true);
+  const [extratoPdfOpen, setExtratoPdfOpen] = useState(false);
+  const [extratoPdfBusy, setExtratoPdfBusy] = useState(false);
+  const [extratoPdfExists, setExtratoPdfExists] = useState(false);
+  const [extratoPdfUrl, setExtratoPdfUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -104,17 +113,140 @@ export default function LancamentosDashboard() {
     const dd = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${dd}`;
   };
-  const inicio = toYmd(new Date(ano, mes, 1));
-  const fim = toYmd(new Date(ano, mes + 1, 0));
+  const toYmdNoPad = (d: Date) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  const inicioDate = new Date(ano, mes, 1);
+  const fimDate = new Date(ano, mes + 1, 0);
+  const fimExclusivoDate = new Date(ano, mes + 1, 1);
+  const inicio = toYmd(inicioDate);
+  const fim = toYmd(fimDate);
+  const fimExclusivo = toYmd(fimExclusivoDate);
+  const inicioNoPad = toYmdNoPad(inicioDate);
+  const fimExclusivoNoPad = toYmdNoPad(fimExclusivoDate);
+  const filtroPeriodoMovimentos = `and(data.gte.${inicio},data.lt.${fimExclusivo}),and(data.gte.${inicioNoPad},data.lt.${fimExclusivoNoPad})`;
+
+  const contaExtrato = useMemo(() => {
+    if (contasSel.length !== 1) return null;
+    return contas.find(c => c.id === contasSel[0]) || null;
+  }, [contas, contasSel]);
+
+  const extratoPdfName = useMemo(() => `${ano}-${String(mes + 1).padStart(2, "0")}.pdf`, [ano, mes]);
+  const extratoPdfFolder = useMemo(() => {
+    if (!user || !contaExtrato) return null;
+    return `extratos_bancarios/${user.id}/${contaExtrato.id}`;
+  }, [user, contaExtrato]);
+  const extratoPdfPath = useMemo(() => {
+    if (!extratoPdfFolder) return null;
+    return `${extratoPdfFolder}/${extratoPdfName}`;
+  }, [extratoPdfFolder, extratoPdfName]);
+
+  async function refreshExtratoPdfExists() {
+    if (!user) return;
+    if (!extratoPdfFolder) { setExtratoPdfExists(false); return; }
+    setExtratoPdfBusy(true);
+    try {
+      const { data, error } = await supabase.storage.from("Comprovantes").list(extratoPdfFolder, { limit: 200 });
+      if (error) throw error;
+      const ok = (data || []).some(f => f.name === extratoPdfName);
+      setExtratoPdfExists(ok);
+    } catch {
+      setExtratoPdfExists(false);
+    } finally {
+      setExtratoPdfBusy(false);
+    }
+  }
+
+  async function abrirExtratoPdf() {
+    if (!user) return;
+    if (!contaExtrato || !extratoPdfPath) {
+      toast({ title: "Extrato PDF", description: "Selecione uma conta (não 'Todas') para abrir o PDF.", variant: "destructive" });
+      return;
+    }
+    setExtratoPdfBusy(true);
+    try {
+      const { data, error } = await supabase.storage.from("Comprovantes").createSignedUrl(extratoPdfPath, 3600);
+      if (error) throw error;
+      if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+      else throw new Error("Não foi possível gerar link do PDF");
+    } catch (e: unknown) {
+      toast({ title: "Extrato PDF", description: e instanceof Error ? e.message : "Falha ao abrir PDF", variant: "destructive" });
+    } finally {
+      setExtratoPdfBusy(false);
+    }
+  }
+
+  async function uploadExtratoPdf(file: File) {
+    if (!user) return;
+    if (!contaExtrato || !extratoPdfPath) {
+      toast({ title: "Extrato PDF", description: "Selecione uma conta (não 'Todas') para enviar o PDF.", variant: "destructive" });
+      return;
+    }
+    if (!file || (!file.name.toLowerCase().endsWith(".pdf") && file.type !== "application/pdf")) {
+      toast({ title: "Extrato PDF", description: "Selecione um arquivo PDF.", variant: "destructive" });
+      return;
+    }
+    setExtratoPdfBusy(true);
+    try {
+      const { error } = await supabase.storage.from("Comprovantes").upload(extratoPdfPath, file, { upsert: true, cacheControl: "3600", contentType: "application/pdf" });
+      if (error) throw error;
+      setExtratoPdfExists(true);
+      toast({ title: "Extrato PDF", description: "PDF enviado com sucesso." });
+    } catch (e: unknown) {
+      toast({ title: "Extrato PDF", description: e instanceof Error ? e.message : "Falha ao enviar PDF", variant: "destructive" });
+    } finally {
+      setExtratoPdfBusy(false);
+    }
+  }
+
+  async function removerExtratoPdf() {
+    if (!user) return;
+    if (!contaExtrato || !extratoPdfPath) return;
+    setExtratoPdfBusy(true);
+    try {
+      const { error } = await supabase.storage.from("Comprovantes").remove([extratoPdfPath]);
+      if (error) throw error;
+      setExtratoPdfExists(false);
+      setExtratoPdfUrl(null);
+      toast({ title: "Extrato PDF", description: "PDF removido." });
+    } catch (e: unknown) {
+      toast({ title: "Extrato PDF", description: e instanceof Error ? e.message : "Falha ao remover PDF", variant: "destructive" });
+    } finally {
+      setExtratoPdfBusy(false);
+    }
+  }
+
+  async function carregarExtratoPdfUrl() {
+    if (!user) return;
+    if (!contaExtrato || !extratoPdfPath) { setExtratoPdfUrl(null); return; }
+    setExtratoPdfBusy(true);
+    try {
+      const { data, error } = await supabase.storage.from("Comprovantes").createSignedUrl(extratoPdfPath, 3600);
+      if (error) throw error;
+      setExtratoPdfUrl(data?.signedUrl ?? null);
+    } catch {
+      setExtratoPdfUrl(null);
+    } finally {
+      setExtratoPdfBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    refreshExtratoPdfExists();
+    setExtratoPdfUrl(null);
+  }, [user, extratoPdfFolder, extratoPdfName]);
+
+  useEffect(() => {
+    if (!extratoPdfOpen) return;
+    refreshExtratoPdfExists().then(() => carregarExtratoPdfUrl());
+  }, [extratoPdfOpen, extratoPdfPath]);
 
   useEffect(() => {
     if (!supabase || !user) return;
     supabase
       .from("contas_financeiras")
-      .select("id,nome,logo,saldo_inicial")
+      .select("id,nome,logo,saldo_inicial,saldo_inicial_em")
       .order("nome")
       .then(({ data }) => {
-        const arr = (data || []).map((c: { id: string; nome: string; logo?: string | null; saldo_inicial?: number }) => ({ id: c.id, nome: c.nome, logo: c.logo ?? null, saldo_inicial: Number(c.saldo_inicial || 0) }));
+        const arr = (data || []).map((c: { id: string; nome: string; logo?: string | null; saldo_inicial?: number; saldo_inicial_em?: string | null }) => ({ id: c.id, nome: c.nome, logo: c.logo ?? null, saldo_inicial: Number(c.saldo_inicial || 0), saldo_inicial_em: c.saldo_inicial_em ?? null }));
         setContas(arr);
 
         // Ensure "Transferência Interna" categories exist
@@ -169,6 +301,173 @@ export default function LancamentosDashboard() {
     window.scrollTo(0, 0);
   }, []);
 
+  const calcReset = () => {
+    setCalcDisplay("0");
+    setCalcStored(null);
+    setCalcOp(null);
+    setCalcOverwrite(true);
+  };
+
+  const calcParseDisplay = () => {
+    const n = Number(calcDisplay);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const calcSetDisplayFromNumber = (n: number) => {
+    if (!Number.isFinite(n)) {
+      setCalcDisplay("Erro");
+      setCalcStored(null);
+      setCalcOp(null);
+      setCalcOverwrite(true);
+      return;
+    }
+    if (Object.is(n, -0)) n = 0;
+    setCalcDisplay(String(n));
+    setCalcOverwrite(true);
+  };
+
+  const calcCompute = (a: number, b: number, op: "+" | "-" | "*" | "/") => {
+    if (op === "+") return a + b;
+    if (op === "-") return a - b;
+    if (op === "*") return a * b;
+    if (op === "/") return b === 0 ? Number.NaN : a / b;
+    return Number.NaN;
+  };
+
+  const calcPressDigit = (d: string) => {
+    if (calcDisplay === "Erro") calcReset();
+    setCalcDisplay((prev) => {
+      if (calcOverwrite) {
+        setCalcOverwrite(false);
+        return d;
+      }
+      if (prev === "0") return d;
+      return prev + d;
+    });
+  };
+
+  const calcPressDecimal = () => {
+    if (calcDisplay === "Erro") calcReset();
+    setCalcDisplay((prev) => {
+      if (calcOverwrite) {
+        setCalcOverwrite(false);
+        return "0.";
+      }
+      if (prev.includes(".")) return prev;
+      return prev + ".";
+    });
+  };
+
+  const calcBackspace = () => {
+    if (calcDisplay === "Erro") {
+      calcReset();
+      return;
+    }
+    setCalcDisplay((prev) => {
+      if (calcOverwrite) return prev;
+      if (prev.length <= 1) {
+        setCalcOverwrite(true);
+        return "0";
+      }
+      const next = prev.slice(0, -1);
+      if (next === "-" || next === "") {
+        setCalcOverwrite(true);
+        return "0";
+      }
+      return next;
+    });
+  };
+
+  const calcToggleSign = () => {
+    if (calcDisplay === "Erro") {
+      calcReset();
+      return;
+    }
+    setCalcDisplay((prev) => {
+      if (prev === "0") return prev;
+      if (prev.startsWith("-")) return prev.slice(1);
+      return "-" + prev;
+    });
+  };
+
+  const calcPressOp = (op: "+" | "-" | "*" | "/") => {
+    if (calcDisplay === "Erro") return;
+    const current = calcParseDisplay();
+    if (calcStored === null || calcOp === null) {
+      setCalcStored(current);
+      setCalcOp(op);
+      setCalcOverwrite(true);
+      return;
+    }
+    if (calcOverwrite) {
+      setCalcOp(op);
+      return;
+    }
+    const next = calcCompute(calcStored, current, calcOp);
+    setCalcStored(next);
+    setCalcOp(op);
+    calcSetDisplayFromNumber(next);
+  };
+
+  const calcPressEquals = () => {
+    if (calcDisplay === "Erro") return;
+    if (calcStored === null || calcOp === null) return;
+    if (calcOverwrite) return;
+    const current = calcParseDisplay();
+    const next = calcCompute(calcStored, current, calcOp);
+    setCalcStored(null);
+    setCalcOp(null);
+    calcSetDisplayFromNumber(next);
+  };
+
+  const onCalcKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const k = e.key;
+    if (k >= "0" && k <= "9") {
+      e.preventDefault();
+      calcPressDigit(k);
+      return;
+    }
+    if (k === "." || k === ",") {
+      e.preventDefault();
+      calcPressDecimal();
+      return;
+    }
+    if (k === "Backspace") {
+      e.preventDefault();
+      calcBackspace();
+      return;
+    }
+    if (k === "Escape") {
+      setCalcOpen(false);
+      return;
+    }
+    if (k === "Enter" || k === "=") {
+      e.preventDefault();
+      calcPressEquals();
+      return;
+    }
+    if (k === "+") {
+      e.preventDefault();
+      calcPressOp("+");
+      return;
+    }
+    if (k === "-") {
+      e.preventDefault();
+      calcPressOp("-");
+      return;
+    }
+    if (k === "*" || k === "x" || k === "X") {
+      e.preventDefault();
+      calcPressOp("*");
+      return;
+    }
+    if (k === "/") {
+      e.preventDefault();
+      calcPressOp("/");
+      return;
+    }
+  };
+
   const ensureTransferCategories = async () => {
     if (!user) return;
     const { data: existing } = await supabase
@@ -188,17 +487,19 @@ export default function LancamentosDashboard() {
 
   useEffect(() => {
     if (!supabase || !user) return;
-    let q = supabase
-      .from("movimentos_financeiros")
-      .select("id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, contas:contas_financeiras(nome), categoria:categories(name), beneficiario:beneficiaries(name)")
-      .eq("user_id", user.id)
-      .gte("data", inicio)
-      .lte("data", fim)
-      .order("data");
-    if (contasSel.length > 0) {
-      q = q.in("conta_id", contasSel);
-    }
-    q.then(({ data, error }) => {
+    let cancelled = false;
+    (async () => {
+      let q = supabase
+        .from("movimentos_financeiros")
+        .select("id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, contas:contas_financeiras(nome), categoria:categories(name), beneficiario:beneficiaries(name)")
+        .eq("user_id", user.id)
+        .or(filtroPeriodoMovimentos)
+        .order("data");
+      if (contasSel.length > 0) {
+        q = q.in("conta_id", contasSel);
+      }
+      const { data, error } = await q;
+      if (cancelled) return;
       if (error) {
         toast({ title: "Erro", description: error.message, variant: "destructive" });
         return;
@@ -219,67 +520,57 @@ export default function LancamentosDashboard() {
         comprovante_url: r.comprovante_url ?? null,
       }));
       setRows(arr);
-    });
-  }, [user, inicio, fim, contasSel]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, inicio, fimExclusivo, contasSel, toast]);
 
   useEffect(() => {
     if (!supabase || !user) return;
-    const contasIds = contasSel.length ? contasSel : contas.map(c => c.id);
-    const baseInicial = contas
-      .filter(c => contasIds.includes(c.id))
-      .reduce((s, c) => s + Number(c.saldo_inicial || 0), 0);
-    let q = supabase
-      .from("movimentos_financeiros")
-      .select("valor,tipo,conta_id")
-      .eq("user_id", user.id)
-      .lt("data", inicio);
-    if (contasIds.length > 0) {
-      q = q.in("conta_id", contasIds);
-    }
-    q.then(({ data, error }) => {
-      if (error) return;
-      const net = (data || []).reduce((s: number, r) => {
-        // If it's a transfer, ignore for "Gain/Loss" but here we are calculating Initial Balance based on past transactions.
-        // Wait, balance MUST include transfers because money actually moved.
-        // The user asked to not appear in "Reports of Expense/Revenue", implying "Earnings vs Spendings".
-        // But for ACCOUNT BALANCE (Saldo Inicial + Net), transfers MUST be included to match the bank.
-        // So, this calculation here (which affects Saldo Inicial displayed) SHOULD include everything.
-        // However, `saldoAtual` above is "Saldo atual no período" which is often used as a performance metric.
-        // Actually, the card says "Saldo atual no período". If this is "Cash Flow", it should be real balance change.
-        // If I receive a Transfer, my balance increases.
-        // If I send a Transfer, my balance decreases.
-        // So for "Saldo", it MUST include.
-
-        // LIMITATION: The user said "nao aparecer em relatorios de despesa ou receita".
-        // Usually this means "Don't tell me I spent 10k when I just moved 10k to savings".
-        // `saldoAtual` card typically shows "How much money I have/gained".
-        // If I move 10k checking -> savings. 
-        // Checking view: -10k. Savings view: +10k. Total view: 0.
-        // If `saldoAtual` is summing ALL selected accounts.
-        // If I select "All Accounts", transfer out (-10k) and transfer in (+10k) sum to 0. Correct.
-        // If I select ONLY Checking, I see -10k. Correct, money left.
-
-        // SO WHERE TO FILTER?
-        // The user likely means "Don't show in Pie Charts or 'Total Spent' summaries".
-        // In THIS file `LancamentosDashboard`, `saldoAtual` is "Saldo atual no período".
-        // If I filter `Transferência Interna` here, and I select All Accounts, it is 0 anyway.
-        // But if I select just one... 
-
-        // Let's stick to strict interpretation: "nao aparecer em relatorios".
-        // This screen is a Dashboard/Statement.
-        // Maybe I shouldn't touch `saldoAtual` here if it reflects the Bank Statement Balance.
-        // BUT the user said "essa informação ja vem na tela" (from bank import) and "acho melhor ... nao aparecer em relatorios".
-
-        // Let's look at `Dashboard.tsx` tiles (Total Em Aberto, Total Pago, Receitas). THAT is a report.
-        // This `saldoAtual` here seems to be "Balance variation".
-        // I will revert the change to `saldoAtual` in this file because this is the Statement View.
-        // Changing it here would make the Statement Balance wrong vs the Bank.
-
-        return s + (r.tipo === "ENTRADA" ? Number(r.valor || 0) : -Number(r.valor || 0));
+    let cancelled = false;
+    (async () => {
+      const contasConsideradas = contasSel.length ? contas.filter(c => contasSel.includes(c.id)) : contas;
+      const anchors = new Map<string, string>();
+      for (const c of contasConsideradas) {
+        if (c.saldo_inicial_em) anchors.set(c.id, c.saldo_inicial_em);
+      }
+      const baseInicial = contasConsideradas.reduce((s, c) => {
+        const anchor = c.saldo_inicial_em ?? null;
+        if (anchor && anchor > inicio) return s;
+        return s + Number(c.saldo_inicial || 0);
+      }, 0);
+      let q = supabase
+        .from("movimentos_financeiros")
+        .select("data,valor,tipo,conta_id")
+        .eq("user_id", user.id)
+        .lt("data", inicio);
+      if (contasSel.length > 0) {
+        q = q.in("conta_id", contasSel);
+      }
+      const { data, error } = await q;
+      if (cancelled) return;
+      if (error) {
+        toast({ title: "Erro", description: error.message, variant: "destructive" });
+        return;
+      }
+      const dataComAncora = (data || []).filter((r: { data: string; conta_id?: string | null }) => {
+        const contaId = (r as { conta_id?: string | null }).conta_id ?? null;
+        if (!contaId) return true;
+        const anchor = anchors.get(contaId);
+        if (!anchor) return true;
+        if (anchor > inicio) return false;
+        return (r as { data: string }).data >= anchor;
+      });
+      const net = dataComAncora.reduce((s: number, r) => {
+        return s + (r.tipo === "ENTRADA" ? Number((r as { valor?: number | string }).valor || 0) : -Number((r as { valor?: number | string }).valor || 0));
       }, 0);
       setSaldoInicial(baseInicial + net);
-    });
-  }, [user, inicio, contasSel, contas]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, inicio, contasSel, contas, toast]);
 
   const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
   function onlyDigits(s: string | null | undefined) { return String(s ?? '').replace(/\D+/g, ''); }
@@ -575,12 +866,15 @@ export default function LancamentosDashboard() {
   }, [rows, tipoVisao]);
 
   const rowsResumo = useMemo(() => {
-    return tipoVisao === 'TRANSFERENCIAS' ? rowsView : rowsView.filter(r => r.categoria_nome !== 'Transferência Interna');
-  }, [rowsView, tipoVisao]);
+    const incluirTransferenciasNoResumo = tipoVisao === 'TODOS' && contasSel.length === 1;
+    if (tipoVisao === 'TRANSFERENCIAS') return rowsView;
+    if (incluirTransferenciasNoResumo) return rowsView;
+    return rowsView.filter(r => r.categoria_nome !== 'Transferência Interna');
+  }, [rowsView, tipoVisao, contasSel.length]);
 
   const saldoAtual = useMemo(() => {
-    return rowsResumo.reduce((s, r) => s + (r.tipo === "ENTRADA" ? r.valor : -r.valor), 0);
-  }, [rowsResumo]);
+    return rows.reduce((s, r) => s + (r.tipo === "ENTRADA" ? r.valor : -r.valor), 0);
+  }, [rows]);
 
   const totalEntradas = useMemo(() => {
     return rowsResumo.reduce((s, r) => s + (r.tipo === "ENTRADA" ? r.valor : 0), 0);
@@ -909,8 +1203,7 @@ export default function LancamentosDashboard() {
           .from("movimentos_financeiros")
           .select("id")
           .eq("user_id", user.id)
-          .gte("data", inicio)
-          .lte("data", fim)
+          .or(filtroPeriodoMovimentos)
           .ilike("descricao", `%${rule.term}%`);
 
         if (movs && movs.length > 0) {
@@ -940,8 +1233,7 @@ export default function LancamentosDashboard() {
         .from("movimentos_financeiros")
         .select("id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, contas:contas_financeiras(nome), categoria:categories(name), beneficiario:beneficiaries(name)")
         .eq("user_id", user.id)
-        .gte("data", inicio)
-        .lte("data", fim)
+        .or(filtroPeriodoMovimentos)
         .order("data");
       if (contasSel.length > 0) {
         q = q.in("conta_id", contasSel);
@@ -1119,6 +1411,17 @@ export default function LancamentosDashboard() {
             <Button variant="outline" onClick={ajustarDescricoesLote} disabled={bulkAdjusting}>
               {bulkAdjusting ? 'Ajustando...' : 'Ajustar Descrições'}
             </Button>
+            <Button variant="outline" onClick={() => setExtratoPdfOpen(true)} disabled={extratoPdfBusy}>
+              <FileText className="w-4 h-4 mr-2" />
+              Extrato PDF
+              {contaExtrato && extratoPdfExists ? (
+                <span className="ml-2 inline-flex items-center rounded border px-2 py-0.5 text-xs">OK</span>
+              ) : null}
+            </Button>
+            <Button variant="outline" onClick={() => setCalcOpen(true)} aria-label="Abrir calculadora">
+              <Calculator className="w-4 h-4 mr-2" />
+              Calculadora
+            </Button>
             <DropdownMenu open={tipoMenuOpen} onOpenChange={setTipoMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline">
@@ -1162,11 +1465,11 @@ export default function LancamentosDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span>Saldo Anterior</span>
-                  <span className={`font-semibold ${saldoInicial >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(saldoInicial)}</span>
+                  <span className={`font-semibold ${saldoInicial >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{formatCurrency(saldoInicial)}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span>Entradas</span>
-                  <span className="font-semibold text-emerald-600">{formatCurrency(totalEntradas)}</span>
+                  <span className="font-semibold text-blue-600">{formatCurrency(totalEntradas)}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span>Saídas</span>
@@ -1174,7 +1477,7 @@ export default function LancamentosDashboard() {
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span>Saldo Final</span>
-                  <span className={`font-semibold ${saldoFinal >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(saldoFinal)}</span>
+                  <span className={`font-semibold ${saldoFinal >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{formatCurrency(saldoFinal)}</span>
                 </div>
               </div>
             </CardContent>
@@ -1269,8 +1572,8 @@ export default function LancamentosDashboard() {
                           </div>
                         ) : null}
                       </td>
-                      <td className="p-2 text-right"><span className={r.tipo === 'ENTRADA' ? 'text-emerald-600' : 'text-red-600'}>{formatCurrency(r.valor)}</span></td>
-                      <td className={`p-2 text-right ${isLast ? (sd >= 0 ? 'text-emerald-600' : 'text-red-600') : ''}`}>{isLast ? formatCurrency(sd) : ''}</td>
+                      <td className="p-2 text-right"><span className={r.tipo === 'ENTRADA' ? 'text-blue-600' : 'text-red-600'}>{formatCurrency(r.valor)}</span></td>
+                      <td className={`p-2 text-right ${isLast ? (sd >= 0 ? 'text-blue-600' : 'text-red-600') : ''}`}>{isLast ? formatCurrency(sd) : ''}</td>
                       <td className="p-2 text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -1308,7 +1611,7 @@ export default function LancamentosDashboard() {
                   <div className="text-sm">{r.conta_nome || ''}</div>
                   <div className="text-xs text-muted-foreground">{r.categoria_nome || ''}</div>
                   <div className="text-xs text-muted-foreground">{r.beneficiario_nome || ''}</div>
-                  <div className={`mt-2 text-lg font-semibold ${r.tipo === 'ENTRADA' ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(r.valor)}</div>
+                  <div className={`mt-2 text-lg font-semibold ${r.tipo === 'ENTRADA' ? 'text-blue-600' : 'text-red-600'}`}>{formatCurrency(r.valor)}</div>
                   <div className="text-xs text-muted-foreground">{r.tipo}</div>
                   {r.comprovante_url ? (
                     <div className="mt-2 flex items-center gap-2">
@@ -1348,6 +1651,105 @@ export default function LancamentosDashboard() {
             )}
           </div>
         )}
+        <Dialog open={extratoPdfOpen} onOpenChange={setExtratoPdfOpen}>
+          <DialogContent className="sm:max-w-[900px]" onOpenAutoFocus={(e) => e.preventDefault()}>
+            <DialogHeader>
+              <DialogTitle>Extrato Bancário - {mesesPt[mes]} {ano}</DialogTitle>
+            </DialogHeader>
+            {!contaExtrato ? (
+              <div className="text-sm text-muted-foreground">Selecione uma conta (não &quot;Todas&quot;) para vincular o PDF ao mês.</div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    <span className="font-medium text-foreground">{contaExtrato.nome}</span>
+                    <span className="mx-2">•</span>
+                    <span>{extratoPdfName}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button type="button" variant="outline" onClick={carregarExtratoPdfUrl} disabled={extratoPdfBusy}>
+                      Atualizar
+                    </Button>
+                    {extratoPdfExists ? (
+                      <>
+                        <Button type="button" variant="outline" onClick={abrirExtratoPdf} disabled={extratoPdfBusy}>
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Abrir
+                        </Button>
+                        <Button type="button" variant="outline" onClick={removerExtratoPdf} disabled={extratoPdfBusy}>
+                          Remover
+                        </Button>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Enviar / Substituir PDF</Label>
+                  <Input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    disabled={extratoPdfBusy}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (!file) return;
+                      await uploadExtratoPdf(file);
+                      await refreshExtratoPdfExists();
+                      await carregarExtratoPdfUrl();
+                    }}
+                  />
+                </div>
+
+                {extratoPdfUrl ? (
+                  <iframe src={extratoPdfUrl} className="w-full h-[70vh] rounded-md border bg-white" />
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    {extratoPdfBusy ? "Carregando PDF..." : (extratoPdfExists ? "Clique em Atualizar para carregar a pré-visualização." : "Nenhum PDF encontrado para este mês.")}
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+        <Dialog open={calcOpen} onOpenChange={setCalcOpen}>
+          <DialogContent className="sm:max-w-[360px]" onKeyDownCapture={onCalcKeyDown}>
+            <DialogHeader>
+              <DialogTitle>Calculadora</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="text-xs text-muted-foreground text-right">
+                {calcStored !== null && calcOp ? `${calcStored} ${calcOp}` : ""}
+              </div>
+              <Input value={calcDisplay} readOnly className="text-right font-mono text-lg" />
+              <div className="grid grid-cols-4 gap-2">
+                <Button variant="outline" onClick={calcReset}>C</Button>
+                <Button variant="outline" onClick={calcBackspace}>⌫</Button>
+                <Button variant="outline" onClick={calcToggleSign}>±</Button>
+                <Button variant="outline" onClick={() => calcPressOp("/")}>÷</Button>
+
+                <Button variant="outline" onClick={() => calcPressDigit("7")}>7</Button>
+                <Button variant="outline" onClick={() => calcPressDigit("8")}>8</Button>
+                <Button variant="outline" onClick={() => calcPressDigit("9")}>9</Button>
+                <Button variant="outline" onClick={() => calcPressOp("*")}>×</Button>
+
+                <Button variant="outline" onClick={() => calcPressDigit("4")}>4</Button>
+                <Button variant="outline" onClick={() => calcPressDigit("5")}>5</Button>
+                <Button variant="outline" onClick={() => calcPressDigit("6")}>6</Button>
+                <Button variant="outline" onClick={() => calcPressOp("-")}>−</Button>
+
+                <Button variant="outline" onClick={() => calcPressDigit("1")}>1</Button>
+                <Button variant="outline" onClick={() => calcPressDigit("2")}>2</Button>
+                <Button variant="outline" onClick={() => calcPressDigit("3")}>3</Button>
+                <Button variant="outline" onClick={() => calcPressOp("+")}>+</Button>
+
+                <Button variant="outline" className="col-span-2" onClick={() => calcPressDigit("0")}>0</Button>
+                <Button variant="outline" onClick={calcPressDecimal}>.</Button>
+                <Button onClick={calcPressEquals}>=</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
           <DialogContent onOpenAutoFocus={(e) => e.preventDefault()}>
             <DialogHeader>

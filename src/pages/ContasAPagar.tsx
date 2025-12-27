@@ -258,7 +258,7 @@ export default function ContasAPagar() {
           </div>
           <div className="flex flex-col items-end gap-2 justify-end">
             <NovoLancamentoDialog trigger={
-              <Button className="bg-emerald-600 hover:bg-emerald-700">Adicionar Novo</Button>
+              <Button className="bg-blue-600 hover:bg-blue-700">Adicionar Novo</Button>
             } />
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -285,7 +285,7 @@ export default function ContasAPagar() {
           <Card>
             <CardContent className="p-4 flex items-center justify-between">
               <div className="text-sm text-muted-foreground">Total de Contas a Pagar</div>
-              <div className={`text-xl font-semibold ${saldoAtual >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(Math.abs(saldoAtual))}</div>
+              <div className={`text-xl font-semibold ${saldoAtual >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{formatCurrency(Math.abs(saldoAtual))}</div>
             </CardContent>
           </Card>
         </div>
@@ -310,11 +310,11 @@ export default function ContasAPagar() {
                       {r.descricao}
                       <span className="ml-2 inline-flex items-center gap-1 align-middle">
                         {r.boleto_url && <FileText className="h-3 w-3 text-slate-400" />}
-                        {r.comprovante_url && <FileCheck2 className="h-3 w-3 text-emerald-600" />}
+                        {r.comprovante_url && <FileCheck2 className="h-3 w-3 text-blue-600" />}
                       </span>
                     </td>
                     <td className="p-2">{r.categoria?.name || ''}</td>
-                    <td className="p-2 text-right"><span className={r.tipo === 'RECEITA' ? 'text-emerald-600' : 'text-red-600'}>R$ {r.valor.toFixed(2)}</span></td>
+                    <td className="p-2 text-right"><span className={r.tipo === 'RECEITA' ? 'text-blue-600' : 'text-red-600'}>R$ {r.valor.toFixed(2)}</span></td>
                     <td className="p-2 text-center">
                       {r.boleto_url && (
                         <Button variant="ghost" size="icon" onClick={() => window.open(r.boleto_url || '', '_blank')}>
@@ -366,12 +366,12 @@ export default function ContasAPagar() {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                        <div className={`text-xl font-bold ${r.tipo === 'RECEITA' ? 'text-emerald-700' : 'text-slate-900'}`}>
+                        <div className={`text-xl font-bold ${r.tipo === 'RECEITA' ? 'text-blue-700' : 'text-slate-900'}`}>
                           {formatCurrency(r.valor)}
                         </div>
                         <div className="flex items-center gap-1">
                           {r.boleto_url && <FileText className="h-4 w-4 text-slate-400" />}
-                          {r.comprovante_url && <FileCheck2 className="h-4 w-4 text-emerald-600" />}
+                          {r.comprovante_url && <FileCheck2 className="h-4 w-4 text-blue-600" />}
                         </div>
                       </div>
                     </div>

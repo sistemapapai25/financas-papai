@@ -236,7 +236,7 @@ const ContasPagas = () => {
           </div>
           <div className="flex flex-col items-end gap-2 justify-end">
             <NovoLancamentoDialog trigger={
-              <Button className="bg-emerald-600 hover:bg-emerald-700">Adicionar Novo</Button>
+              <Button className="bg-blue-600 hover:bg-blue-700">Adicionar Novo</Button>
             } />
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -263,7 +263,7 @@ const ContasPagas = () => {
           <Card>
             <CardContent className="p-4 flex items-center justify-between">
               <div className="text-sm text-muted-foreground">Total de Pagamentos</div>
-              <div className="text-xl font-semibold text-emerald-600">{formatCurrency(Math.abs(saldoAtual))}</div>
+              <div className="text-xl font-semibold text-blue-600">{formatCurrency(Math.abs(saldoAtual))}</div>
             </CardContent>
           </Card>
         </div>
@@ -288,11 +288,11 @@ const ContasPagas = () => {
                       {r.descricao}
                       <span className="ml-2 inline-flex items-center gap-1 align-middle">
                         {r.boleto_url && <FileText className="h-3 w-3 text-slate-400" />}
-                        {r.comprovante_url && <FileCheck2 className="h-3 w-3 text-emerald-600" />}
+                        {r.comprovante_url && <FileCheck2 className="h-3 w-3 text-blue-600" />}
                       </span>
                     </td>
                     <td className="p-2">{r.categoria?.name || ''}</td>
-                    <td className="p-2 text-right"><span className={r.tipo === 'RECEITA' ? 'text-emerald-600' : 'text-red-600'}>{formatCurrency(Number(r.valor_pago ?? r.valor ?? 0))}</span></td>
+                    <td className="p-2 text-right"><span className={r.tipo === 'RECEITA' ? 'text-blue-600' : 'text-red-600'}>{formatCurrency(Number(r.valor_pago ?? r.valor ?? 0))}</span></td>
                     <td className="p-2 text-center">
                       {r.boleto_url && (
                         <Button variant="ghost" size="icon" onClick={() => window.open(r.boleto_url || '', '_blank')}>
@@ -321,24 +321,24 @@ const ContasPagas = () => {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtradas.map(r => (
-              <Card key={r.id} className="border-emerald-200 shadow-sm relative overflow-hidden">
+              <Card key={r.id} className="border-blue-200 shadow-sm relative overflow-hidden">
                 <CardContent className="p-5 space-y-4">
 
                   {/* Header: Check, Desc, Original Value, Paid Value */}
                   <div className="flex justify-between items-start">
                     <div className="flex items-start gap-3">
-                      <CheckCircle className="h-6 w-6 text-emerald-600 mt-0.5" />
+                      <CheckCircle className="h-6 w-6 text-blue-600 mt-0.5" />
                       <div>
                         <div className="font-bold text-lg text-slate-900 leading-tight">{r.descricao}</div>
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="text-xs text-slate-500">Valor Original: {formatCurrency(r.valor)}</div>
-                      <div className="text-xl font-bold text-emerald-600">{formatCurrency(Number(r.valor_pago ?? r.valor ?? 0))}</div>
+                      <div className="text-xl font-bold text-blue-600">{formatCurrency(Number(r.valor_pago ?? r.valor ?? 0))}</div>
                     </div>
                     <div className="flex items-center gap-1">
                       {r.boleto_url && <FileText className="h-4 w-4 text-slate-400" />}
-                      {r.comprovante_url && <FileCheck2 className="h-4 w-4 text-emerald-600" />}
+                      {r.comprovante_url && <FileCheck2 className="h-4 w-4 text-blue-600" />}
                     </div>
                   </div>
 
@@ -360,7 +360,7 @@ const ContasPagas = () => {
                       <Badge variant="secondary" className="bg-slate-100 text-slate-700 hover:bg-slate-200 font-normal">
                         {r.tipo === 'DESPESA' ? 'Despesa' : 'Receita'}
                       </Badge>
-                      <Badge variant="outline" className="border-emerald-500 text-emerald-600 font-normal">
+                      <Badge variant="outline" className="border-blue-500 text-blue-600 font-normal">
                         Pago
                       </Badge>
                     </div>

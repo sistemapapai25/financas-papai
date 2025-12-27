@@ -52,6 +52,7 @@ export default function CadastroContasFinanceiras() {
     agencia: string;
     numero: string;
     saldo_inicial: string; // como string para o input
+    saldo_inicial_em: string;
     logo?: string;
   }>({
     nome: "",
@@ -60,6 +61,7 @@ export default function CadastroContasFinanceiras() {
     agencia: "",
     numero: "",
     saldo_inicial: "",
+    saldo_inicial_em: "",
     logo: "",
   });
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -121,7 +123,7 @@ export default function CadastroContasFinanceiras() {
       setLoading(true);
       const { data, error } = await supabase
         .from("contas_financeiras")
-        .select("id, user_id, nome, tipo, instituicao, agencia, numero, saldo_inicial, logo, created_at")
+        .select("id, user_id, nome, tipo, instituicao, agencia, numero, saldo_inicial, saldo_inicial_em, logo, created_at")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -143,13 +145,29 @@ export default function CadastroContasFinanceiras() {
       agencia: "",
       numero: "",
       saldo_inicial: "",
+      saldo_inicial_em: "",
       logo: "",
     });
     setLogoFile(null);
   };
 
+  const toYmd = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${dd}`;
+  };
+
+  const formatYmdBr = (ymd: string | null | undefined) => {
+    if (!ymd) return "-";
+    const [y, m, d] = ymd.split("-");
+    if (!y || !m || !d) return ymd;
+    return `${d}/${m}/${y}`;
+  };
+
   const abrirNovo = () => {
     resetForm();
+    setForm((s) => ({ ...s, saldo_inicial_em: toYmd(new Date()) }));
     setOpen(true);
   };
 
@@ -162,6 +180,7 @@ export default function CadastroContasFinanceiras() {
       agencia: c.agencia ?? "",
       numero: c.numero ?? "",
       saldo_inicial: (c.saldo_inicial ?? 0).toString(),
+      saldo_inicial_em: c.saldo_inicial_em ?? "",
       logo: c.logo ?? "",
     });
     setOpen(true);
@@ -182,6 +201,13 @@ export default function CadastroContasFinanceiras() {
     const saldo = Number(form.saldo_inicial || 0);
     if (Number.isNaN(saldo) || saldo < 0) {
       toast({ title: "Atenção", description: "Saldo inicial inválido.", variant: "destructive" });
+      return;
+    }
+
+    const saldoEm = form.saldo_inicial_em.trim();
+    const saldoInicialEm = saldoEm ? saldoEm : null;
+    if (saldoInicialEm && !/^\d{4}-\d{2}-\d{2}$/.test(saldoInicialEm)) {
+      toast({ title: "Atenção", description: "Data do saldo inicial inválida.", variant: "destructive" });
       return;
     }
 
@@ -220,6 +246,7 @@ export default function CadastroContasFinanceiras() {
             agencia: form.tipo === "BANCO" ? form.agencia.trim() || null : null,
             numero: form.tipo === "BANCO" ? form.numero.trim() || null : null,
             saldo_inicial: saldo,
+            saldo_inicial_em: saldoInicialEm,
             logo: logoUrl,
           })
           .eq("id", editing.id);
@@ -235,6 +262,7 @@ export default function CadastroContasFinanceiras() {
           agencia: form.tipo === "BANCO" ? form.agencia.trim() || null : null,
           numero: form.tipo === "BANCO" ? form.numero.trim() || null : null,
           saldo_inicial: saldo,
+          saldo_inicial_em: saldoInicialEm,
         }).select("id").single();
 
         if (error) throw error;
@@ -411,6 +439,14 @@ export default function CadastroContasFinanceiras() {
                     onChange={(e) => setForm((s) => ({ ...s, saldo_inicial: e.target.value }))}
                   />
                 </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Data do saldo inicial</Label>
+                  <Input
+                    type="date"
+                    value={form.saldo_inicial_em}
+                    onChange={(e) => setForm((s) => ({ ...s, saldo_inicial_em: e.target.value }))}
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
@@ -488,6 +524,7 @@ export default function CadastroContasFinanceiras() {
                     <th className="text-left p-3 font-medium">Agência</th>
                     <th className="text-left p-3 font-medium">Número</th>
                     <th className="text-right p-3 font-medium">Saldo inicial</th>
+                    <th className="text-left p-3 font-medium">Data saldo inicial</th>
                     <th className="text-center p-3 font-medium">Ações</th>
                   </tr>
                 </thead>
@@ -525,6 +562,7 @@ export default function CadastroContasFinanceiras() {
                       <td className="p-3">{c.agencia ?? "-"}</td>
                       <td className="p-3">{c.numero ?? "-"}</td>
                       <td className="p-3 text-right">{formatMoney(c.saldo_inicial || 0)}</td>
+                      <td className="p-3">{formatYmdBr(c.saldo_inicial_em)}</td>
                       <td className="p-3">
                         <div className="flex items-center justify-center">
                           <DropdownMenu>

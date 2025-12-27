@@ -12,13 +12,13 @@ const Navigation = () => {
   const location = useLocation();
 
   const isActive = (path: string) => location.pathname === path;
-  const subLinkCls = (path: string) => `py-3 border-b-2 ${isActive(path) ? 'border-emerald-700 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`;
-  const groupCls = (paths: string[]) => `py-3 border-b-2 ${paths.some(p => isActive(p)) ? 'border-emerald-700 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`;
-  const groupTitleCls = (paths: string[]) => `px-3 py-1 text-xs font-semibold ${paths.some(p => isActive(p)) ? 'text-emerald-700' : 'text-muted-foreground'}`;
+  const subLinkCls = (path: string) => `py-3 border-b-2 ${isActive(path) ? 'border-blue-700 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`;
+  const groupCls = (paths: string[]) => `py-3 border-b-2 ${paths.some(p => isActive(p)) ? 'border-blue-700 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`;
+  const groupTitleCls = (paths: string[]) => `px-3 py-1 text-xs font-semibold ${paths.some(p => isActive(p)) ? 'text-blue-700' : 'text-muted-foreground'}`;
 
   return (
     <header className="sticky top-0 z-50 w-full">
-      <div className="bg-emerald-700 text-white">
+      <div className="bg-blue-700 text-white">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 text-white">
             <img src="/lovable-uploads/ddde374a-4e76-43e2-88da-fbfaa022f04c.png" alt="Logo" className="w-6 h-6 object-contain" />
@@ -26,7 +26,7 @@ const Navigation = () => {
           </Link>
           <div className="flex items-center gap-4">
             <span className="hidden sm:inline text-sm opacity-90">{user?.email}</span>
-            <Button variant="outline" size="sm" onClick={signOut} className="hidden sm:flex bg-white text-emerald-700 hover:bg-white/90">
+            <Button variant="outline" size="sm" onClick={signOut} className="hidden sm:flex bg-white text-blue-700 hover:bg-white/90">
               <LogOut className="w-4 h-4 mr-2" />
               Sair
             </Button>
@@ -48,14 +48,16 @@ const Navigation = () => {
                   <div className="flex-1 py-4">
                     <nav className="flex flex-col space-y-4">
                       <Link to="/" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Dashboard</Link>
+                      <Link to="/meu-carne" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Meu Carnê</Link>
 
                       <div>
-                        <div className={groupTitleCls(['/financeiro/agenda', '/contas-a-pagar', '/contas-pagas', '/relatorio-pagamentos'])}>Movimentações</div>
+                        <div className={groupTitleCls(['/financeiro/agenda', '/contas-a-pagar', '/contas-pagas', '/relatorio-pagamentos', '/financeiro/resumo-anual'])}>Movimentações</div>
                         <div className="flex flex-col">
                           <Link to="/financeiro/agenda" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Agenda Financeira</Link>
                           <Link to="/contas-a-pagar" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Contas a Pagar</Link>
                           <Link to="/contas-pagas" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Contas Pagas</Link>
                           <Link to="/relatorio-pagamentos" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Relatório de Pagamentos</Link>
+                          <Link to="/financeiro/resumo-anual" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Resumo Anual</Link>
                         </div>
                       </div>
 
@@ -68,20 +70,23 @@ const Navigation = () => {
                       </div>
 
                       <div>
-                        <div className={groupTitleCls(['/financeiro/lancamentos', '/movimentacoes/importar-extrato'])}>Conciliação</div>
+                        <div className={groupTitleCls(['/financeiro/lancamentos', '/movimentacoes/importar-extrato', '/financeiro/resumo-anual'])}>Conciliação</div>
                         <div className="flex flex-col">
                           <Link to="/financeiro/lancamentos" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Lançamentos</Link>
                           <Link to="/movimentacoes/importar-extrato" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Importar Extrato</Link>
+                          <Link to="/financeiro/resumo-anual" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Resumo Anual</Link>
                         </div>
                       </div>
 
                       <div>
-                        <div className={groupTitleCls(['/cadastros/beneficiarios', '/cadastros/categorias', '/cadastros/usuarios', '/cadastros/contas-financeiras', '/cadastros/tipos-culto'])}>Cadastros</div>
+                        <div className={groupTitleCls(['/cadastros/beneficiarios', '/cadastros/categorias', '/cadastros/contas-financeiras', '/cadastros/tipos-culto', '/cadastros/pessoas', '/cadastros/desafios', '/cadastros/usuarios'])}>Cadastros</div>
                         <div className="flex flex-col">
                           <Link to="/cadastros/beneficiarios" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Beneficiários</Link>
                           <Link to="/cadastros/categorias" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Categorias</Link>
                           <Link to="/cadastros/contas-financeiras" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Contas Financeiras</Link>
                           <Link to="/cadastros/tipos-culto" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Tipos de Culto</Link>
+                          <Link to="/cadastros/pessoas" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Pessoas</Link>
+                          <Link to="/cadastros/desafios" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Desafios</Link>
                           <Link to="/cadastros/usuarios" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Usuários</Link>
                         </div>
                       </div>
@@ -110,9 +115,12 @@ const Navigation = () => {
       <div className="bg-background border-b">
         <div className="container mx-auto px-4">
           <div className="flex items-center gap-6 overflow-x-auto">
+            <Link to="/meu-carne" className={subLinkCls("/meu-carne")}>
+              Meu Carnê
+            </Link>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={groupCls(['/financeiro/agenda', '/contas-a-pagar', '/contas-pagas', '/relatorio-pagamentos'])}>Movimentações</button>
+                <button className={groupCls(['/financeiro/agenda', '/contas-a-pagar', '/contas-pagas', '/relatorio-pagamentos', '/financeiro/resumo-anual'])}>Movimentações</button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem asChild>
@@ -126,6 +134,9 @@ const Navigation = () => {
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/relatorio-pagamentos">Relatório de Pagamentos</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/financeiro/resumo-anual">Resumo Anual</Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -146,7 +157,7 @@ const Navigation = () => {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={groupCls(['/financeiro/lancamentos', '/movimentacoes/importar-extrato'])}>Conciliação</button>
+                <button className={groupCls(['/financeiro/lancamentos', '/movimentacoes/importar-extrato', '/financeiro/resumo-anual'])}>Conciliação</button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem asChild>
@@ -155,12 +166,15 @@ const Navigation = () => {
                 <DropdownMenuItem asChild>
                   <Link to="/movimentacoes/importar-extrato">Importar Extrato</Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/financeiro/resumo-anual">Resumo Anual</Link>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={groupCls(['/cadastros/beneficiarios', '/cadastros/categorias', '/cadastros/usuarios', '/cadastros/contas-financeiras', '/cadastros/tipos-culto'])}>Cadastros</button>
+                <button className={groupCls(['/cadastros/beneficiarios', '/cadastros/categorias', '/cadastros/contas-financeiras', '/cadastros/tipos-culto', '/cadastros/pessoas', '/cadastros/desafios', '/cadastros/usuarios'])}>Cadastros</button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem asChild>
@@ -174,6 +188,12 @@ const Navigation = () => {
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/cadastros/tipos-culto">Tipos de Culto</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/cadastros/pessoas">Pessoas</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/cadastros/desafios">Desafios</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/cadastros/usuarios">Usuários</Link>
