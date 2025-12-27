@@ -136,7 +136,12 @@ export default function ImportarExtrato() {
       .order('name')
       .then(({ data }) => {
         if (Array.isArray(data)) {
-          const arr = data as { id: string; name: string; documento: string | null; assinatura_path: string | null }[];
+          const arr = (data as unknown as { id: string; name: string; documento: string | null; assinatura_path?: string | null }[]).map(b => ({
+            id: b.id,
+            name: b.name,
+            documento: b.documento,
+            assinatura_path: b.assinatura_path ?? null
+          }));
           setBeneficiarios(arr);
         }
       });
@@ -434,13 +439,13 @@ export default function ImportarExtrato() {
       <div className="container mx-auto px-4 py-6 max-w-5xl">
         <Card>
           <CardHeader>
-            <CardTitle>Importar Extrato (.xlsx)</CardTitle>
+            <CardTitle>Importar Extrato</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
           <div className="grid sm:grid-cols-2 gap-4 items-end">
             <div>
-              <Label>Arquivo Excel (.xlsx)</Label>
-              <Input type="file" accept=".xlsx" onChange={onFileChange} />
+              <Label>Arquivo Excel ou CSV (.xlsx, .csv)</Label>
+              <Input type="file" accept=".xlsx,.csv" onChange={onFileChange} />
             </div>
             <div>
               <Label>Conta financeira</Label>
