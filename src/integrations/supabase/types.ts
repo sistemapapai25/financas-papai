@@ -60,7 +60,6 @@ export type Database = {
           name: string
           observacoes: string | null
           phone: string | null
-          assinatura_path: string | null
           user_id: string
         }
         Insert: {
@@ -72,7 +71,6 @@ export type Database = {
           name: string
           observacoes?: string | null
           phone?: string | null
-          assinatura_path?: string | null
           user_id: string
         }
         Update: {
@@ -84,7 +82,6 @@ export type Database = {
           name?: string
           observacoes?: string | null
           phone?: string | null
-          assinatura_path?: string | null
           user_id?: string
         }
         Relationships: []
@@ -162,6 +159,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      church_settings: {
+        Row: {
+          assinatura_path: string | null
+          created_at: string | null
+          igreja_cnpj: string
+          igreja_nome: string
+          responsavel_cpf: string
+          responsavel_nome: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          assinatura_path?: string | null
+          created_at?: string | null
+          igreja_cnpj: string
+          igreja_nome: string
+          responsavel_cpf: string
+          responsavel_nome: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          assinatura_path?: string | null
+          created_at?: string | null
+          igreja_cnpj?: string
+          igreja_nome?: string
+          responsavel_cpf?: string
+          responsavel_nome?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       classification_rules: {
         Row: {
@@ -472,10 +502,10 @@ export type Database = {
           forma_pagamento: Database["public"]["Enums"]["forma_pagamento"] | null
           id: string
           observacoes: string | null
-          recibo_numero: number | null
           recibo_ano: number | null
-          recibo_pdf_path: string | null
           recibo_gerado_em: string | null
+          recibo_numero: number | null
+          recibo_pdf_path: string | null
           status: Database["public"]["Enums"]["status_lancamento"] | null
           tipo: Database["public"]["Enums"]["tipo_lancamento"]
           updated_at: string | null
@@ -499,10 +529,10 @@ export type Database = {
             | null
           id?: string
           observacoes?: string | null
-          recibo_numero?: number | null
           recibo_ano?: number | null
-          recibo_pdf_path?: string | null
           recibo_gerado_em?: string | null
+          recibo_numero?: number | null
+          recibo_pdf_path?: string | null
           status?: Database["public"]["Enums"]["status_lancamento"] | null
           tipo: Database["public"]["Enums"]["tipo_lancamento"]
           updated_at?: string | null
@@ -526,10 +556,10 @@ export type Database = {
             | null
           id?: string
           observacoes?: string | null
-          recibo_numero?: number | null
           recibo_ano?: number | null
-          recibo_pdf_path?: string | null
           recibo_gerado_em?: string | null
+          recibo_numero?: number | null
+          recibo_pdf_path?: string | null
           status?: Database["public"]["Enums"]["status_lancamento"] | null
           tipo?: Database["public"]["Enums"]["tipo_lancamento"]
           updated_at?: string | null
@@ -674,33 +704,6 @@ export type Database = {
           },
         ]
       }
-      profiles: {
-        Row: {
-          active: boolean | null
-          auth_user_id: string | null
-          created_at: string | null
-          email: string
-          name: string | null
-          phone: string | null
-        }
-        Insert: {
-          active?: boolean | null
-          auth_user_id?: string | null
-          created_at?: string | null
-          email: string
-          name?: string | null
-          phone?: string | null
-        }
-        Update: {
-          active?: boolean | null
-          auth_user_id?: string | null
-          created_at?: string | null
-          email?: string
-          name?: string | null
-          phone?: string | null
-        }
-        Relationships: []
-      }
       pessoas: {
         Row: {
           ativo: boolean
@@ -731,36 +734,48 @@ export type Database = {
         }
         Relationships: []
       }
-      church_settings: {
+      profiles: {
         Row: {
-          user_id: string
-          igreja_nome: string
-          igreja_cnpj: string
-          responsavel_nome: string
-          responsavel_cpf: string
-          assinatura_path: string | null
+          active: boolean | null
+          auth_user_id: string | null
           created_at: string | null
-          updated_at: string | null
+          email: string
+          name: string | null
+          phone: string | null
         }
         Insert: {
-          user_id: string
-          igreja_nome: string
-          igreja_cnpj: string
-          responsavel_nome: string
-          responsavel_cpf: string
-          assinatura_path?: string | null
+          active?: boolean | null
+          auth_user_id?: string | null
           created_at?: string | null
-          updated_at?: string | null
+          email: string
+          name?: string | null
+          phone?: string | null
         }
         Update: {
-          user_id?: string
-          igreja_nome?: string
-          igreja_cnpj?: string
-          responsavel_nome?: string
-          responsavel_cpf?: string
-          assinatura_path?: string | null
+          active?: boolean | null
+          auth_user_id?: string | null
           created_at?: string | null
-          updated_at?: string | null
+          email?: string
+          name?: string | null
+          phone?: string | null
+        }
+        Relationships: []
+      }
+      recibos_sequencia: {
+        Row: {
+          ano: number
+          ultimo_numero: number
+          user_id: string
+        }
+        Insert: {
+          ano: number
+          ultimo_numero?: number
+          user_id: string
+        }
+        Update: {
+          ano?: number
+          ultimo_numero?: number
+          user_id?: string
         }
         Relationships: []
       }
@@ -949,6 +964,10 @@ export type Database = {
     }
     Functions: {
       ensure_default_categories: { Args: never; Returns: undefined }
+      gerar_carne_para_participante: {
+        Args: { _participante_id: string }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -957,7 +976,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
-      next_recibo_num: { Args: { _user_id: string; _ano: number }; Returns: number }
+      next_recibo_num: {
+        Args: { _ano: number; _user_id: string }
+        Returns: number
+      }
       registrar_transferencia: {
         Args: {
           _data: string
