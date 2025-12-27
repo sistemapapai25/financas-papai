@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { ymdToBr } from "@/utils/date";
+import { makePublicUrl } from "@/lib/utils";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -106,8 +107,31 @@ export default function Carne() {
 
   const copyMyLink = async () => {
     if (!current) return;
-    const url = `${window.location.origin}/carne/${current.token_link}`;
+    const url = makePublicUrl(`/carne/${current.token_link}`);
     try {
+      await navigator.clipboard.writeText(url);
+      toast({ title: "Copiado", description: "Link copiado." });
+    } catch {
+      toast({ title: "Atenção", description: url });
+    }
+  };
+
+  const openMyLink = () => {
+    if (!current) return;
+    const url = makePublicUrl(`/carne/${current.token_link}`);
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const shareMyLink = async () => {
+    if (!current) return;
+    const url = makePublicUrl(`/carne/${current.token_link}`);
+    try {
+      const nav = navigator as unknown as { share?: (data: { title?: string; text?: string; url?: string }) => Promise<void> };
+      if (typeof nav.share === "function") {
+        await nav.share({ title: "Carnê", text: url, url });
+        toast({ title: "Compartilhado", description: "Link compartilhado." });
+        return;
+      }
       await navigator.clipboard.writeText(url);
       toast({ title: "Copiado", description: "Link copiado." });
     } catch {
@@ -122,9 +146,17 @@ export default function Carne() {
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">Meu carnê</h1>
         {current ? (
-          <Button variant="outline" onClick={copyMyLink}>
-            Copiar link
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={openMyLink}>
+              Abrir
+            </Button>
+            <Button variant="outline" onClick={shareMyLink}>
+              Compartilhar
+            </Button>
+            <Button variant="outline" onClick={copyMyLink}>
+              Copiar
+            </Button>
+          </div>
         ) : null}
       </div>
 
@@ -198,4 +230,3 @@ export default function Carne() {
     </div>
   );
 }
-

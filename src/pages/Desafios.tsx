@@ -32,6 +32,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
+import { makePublicUrl } from "@/lib/utils";
 
 type DesafioRow = {
   id: string;
@@ -268,8 +269,29 @@ export default function Desafios() {
   };
 
   const copyLink = async (token: string) => {
-    const url = `${window.location.origin}/carne/${token}`;
+    const url = makePublicUrl(`/carne/${token}`);
     try {
+      await navigator.clipboard.writeText(url);
+      toast({ title: "Copiado", description: "Link copiado." });
+    } catch {
+      toast({ title: "Atenção", description: url });
+    }
+  };
+
+  const openLink = (token: string) => {
+    const url = makePublicUrl(`/carne/${token}`);
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const shareLink = async (token: string) => {
+    const url = makePublicUrl(`/carne/${token}`);
+    try {
+      const nav = navigator as unknown as { share?: (data: { title?: string; text?: string; url?: string }) => Promise<void> };
+      if (typeof nav.share === "function") {
+        await nav.share({ title: "Carnê", text: url, url });
+        toast({ title: "Compartilhado", description: "Link compartilhado." });
+        return;
+      }
       await navigator.clipboard.writeText(url);
       toast({ title: "Copiado", description: "Link copiado." });
     } catch {
@@ -447,9 +469,14 @@ export default function Desafios() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Button variant="outline" size="sm" onClick={() => copyLink(p.token_link)}>
-                                Copiar link
-                              </Button>
+                              <div className="flex flex-wrap gap-2">
+                                <Button variant="outline" size="sm" onClick={() => openLink(p.token_link)}>
+                                  Abrir
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={() => shareLink(p.token_link)}>
+                                  Compartilhar
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}

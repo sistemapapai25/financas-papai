@@ -61,7 +61,11 @@ export default function CarnePublico() {
       setLoading(false);
 
       if (error) {
-        setError(error.message);
+        if (error.message === "Failed to send a request to the Edge Function") {
+          setError("Não foi possível acessar a Edge Function. Verifique se a função 'carne-por-token' está implantada no Supabase.")
+        } else {
+          setError(error.message);
+        }
         return;
       }
       setPayload(data as ApiPayload);
@@ -139,4 +143,3 @@ export default function CarnePublico() {
     </div>
   );
 }
-
