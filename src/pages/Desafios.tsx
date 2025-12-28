@@ -451,7 +451,7 @@ export default function Desafios() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Lista</CardTitle>
+            <CardTitle>Desafios</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
