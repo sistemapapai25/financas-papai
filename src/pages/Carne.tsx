@@ -3,10 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
-import { makePublicUrl } from "@/lib/utils";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -22,7 +20,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ExternalLink, Copy, Share2 } from "lucide-react";
 
 type Desafio = {
   id: string;
@@ -34,7 +31,6 @@ type Desafio = {
 
 type Participante = {
   id: string;
-  token_link: string;
   status: string;
   pessoa: { id: string; nome: string; telefone: string | null } | null;
 };
@@ -77,7 +73,7 @@ export default function Carne() {
     setLoadingParticipantes(true);
     const { data, error } = await supabase
       .from("desafio_participantes")
-      .select("id,token_link,status,pessoa:pessoas(id,nome,telefone)")
+      .select("id,status,pessoa:pessoas(id,nome,telefone)")
       .eq("desafio_id", dId)
       .order("created_at", { ascending: false });
     setLoadingParticipantes(false);
@@ -103,37 +99,6 @@ export default function Carne() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [desafioId]);
-
-  const copyLink = async (token: string) => {
-    const url = makePublicUrl(`/carne/${token}`);
-    try {
-      await navigator.clipboard.writeText(url);
-      toast({ title: "Copiado", description: "Link copiado para a área de transferência." });
-    } catch {
-      toast({ title: "Atenção", description: url });
-    }
-  };
-
-  const openLink = (token: string) => {
-    const url = makePublicUrl(`/carne/${token}`);
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
-
-  const shareLink = async (token: string, nome: string) => {
-    const url = makePublicUrl(`/carne/${token}`);
-    try {
-      const nav = navigator as unknown as { share?: (data: { title?: string; text?: string; url?: string }) => Promise<void> };
-      if (typeof nav.share === "function") {
-        await nav.share({ title: `Carnê - ${nome}`, text: url, url });
-        toast({ title: "Compartilhado", description: "Link compartilhado." });
-        return;
-      }
-      await navigator.clipboard.writeText(url);
-      toast({ title: "Copiado", description: "Link copiado." });
-    } catch {
-      toast({ title: "Atenção", description: url });
-    }
-  };
 
   if (!user) return null;
 
@@ -207,7 +172,6 @@ export default function Carne() {
                     <TableHead>Nome</TableHead>
                     <TableHead>Telefone</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="w-32 text-center">Carnê</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -216,37 +180,6 @@ export default function Carne() {
                       <TableCell className="font-medium">{p.pessoa?.nome ?? "-"}</TableCell>
                       <TableCell>{p.pessoa?.telefone ?? "-"}</TableCell>
                       <TableCell>{p.status}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => openLink(p.token_link)}
-                            title="Abrir carnê"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => copyLink(p.token_link)}
-                            title="Copiar link"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => shareLink(p.token_link, p.pessoa?.nome ?? "")}
-                            title="Compartilhar"
-                          >
-                            <Share2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
