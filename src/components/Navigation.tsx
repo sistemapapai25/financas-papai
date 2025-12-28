@@ -48,7 +48,14 @@ const Navigation = () => {
                   <div className="flex-1 py-4">
                     <nav className="flex flex-col space-y-4">
                       <Link to="/" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Dashboard</Link>
-                      <Link to="/meu-carne" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Meu Carnê</Link>
+
+                      <div>
+                        <div className={groupTitleCls(['/meus-desafios', '/meus-desafios/meu-carne'])}>Meus Desafios</div>
+                        <div className="flex flex-col">
+                          <Link to="/meus-desafios" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Desafios</Link>
+                          <Link to="/meus-desafios/meu-carne" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Meu Carnê</Link>
+                        </div>
+                      </div>
 
                       <div>
                         <div className={groupTitleCls(['/financeiro/agenda', '/contas-a-pagar', '/contas-pagas', '/relatorio-pagamentos', '/financeiro/resumo-anual'])}>Movimentações</div>
@@ -79,14 +86,13 @@ const Navigation = () => {
                       </div>
 
                       <div>
-                        <div className={groupTitleCls(['/cadastros/beneficiarios', '/cadastros/categorias', '/cadastros/contas-financeiras', '/cadastros/tipos-culto', '/cadastros/pessoas', '/cadastros/desafios', '/cadastros/usuarios'])}>Cadastros</div>
+                        <div className={groupTitleCls(['/cadastros/beneficiarios', '/cadastros/categorias', '/cadastros/contas-financeiras', '/cadastros/tipos-culto', '/cadastros/pessoas', '/cadastros/usuarios'])}>Cadastros</div>
                         <div className="flex flex-col">
                           <Link to="/cadastros/beneficiarios" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Beneficiários</Link>
                           <Link to="/cadastros/categorias" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Categorias</Link>
                           <Link to="/cadastros/contas-financeiras" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Contas Financeiras</Link>
                           <Link to="/cadastros/tipos-culto" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Tipos de Culto</Link>
-                          <Link to="/cadastros/pessoas" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Pessoas</Link>
-                          <Link to="/cadastros/desafios" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Desafios</Link>
+                          <Link to="/cadastros/pessoas" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Participantes</Link>
                           <Link to="/cadastros/usuarios" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Usuários</Link>
                         </div>
                       </div>
@@ -115,9 +121,20 @@ const Navigation = () => {
       <div className="bg-background border-b">
         <div className="container mx-auto px-4">
           <div className="flex items-center gap-6 overflow-x-auto">
-            <Link to="/meu-carne" className={subLinkCls("/meu-carne")}>
-              Meu Carnê
-            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className={groupCls(['/meus-desafios', '/meus-desafios/meu-carne'])}>Meus Desafios</button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem asChild>
+                  <Link to="/meus-desafios">Desafios</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/meus-desafios/meu-carne">Meu Carnê</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className={groupCls(['/financeiro/agenda', '/contas-a-pagar', '/contas-pagas', '/relatorio-pagamentos', '/financeiro/resumo-anual'])}>Movimentações</button>
@@ -174,7 +191,7 @@ const Navigation = () => {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={groupCls(['/cadastros/beneficiarios', '/cadastros/categorias', '/cadastros/contas-financeiras', '/cadastros/tipos-culto', '/cadastros/pessoas', '/cadastros/desafios', '/cadastros/usuarios'])}>Cadastros</button>
+                <button className={groupCls(['/cadastros/beneficiarios', '/cadastros/categorias', '/cadastros/contas-financeiras', '/cadastros/tipos-culto', '/cadastros/pessoas', '/cadastros/usuarios'])}>Cadastros</button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem asChild>
@@ -190,10 +207,7 @@ const Navigation = () => {
                   <Link to="/cadastros/tipos-culto">Tipos de Culto</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link to="/cadastros/pessoas">Pessoas</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/cadastros/desafios">Desafios</Link>
+                  <Link to="/cadastros/pessoas">Participantes</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/cadastros/usuarios">Usuários</Link>

@@ -111,9 +111,10 @@ export default function App() {
                 <Route path="/cadastros/tipos-culto" element={<CadastroTiposCulto />} />
                 <Route path="/cadastros/contas-financeiras" element={<CadastroContasFinanceiras />} />
                 <Route path="/cadastros/pessoas" element={<Pessoas />} />
-                <Route path="/cadastros/desafios" element={<Desafios />} />
 
-                <Route path="/meu-carne" element={<Carne />} />
+                {/* Meus Desafios */}
+                <Route path="/meus-desafios" element={<Desafios />} />
+                <Route path="/meus-desafios/meu-carne" element={<Carne />} />
 
                 {/* Configurações */}
                 <Route path="/configuracoes/regras-classificacao" element={<RegrasClassificacao />} />
