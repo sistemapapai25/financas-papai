@@ -489,7 +489,7 @@ export default function Desafios() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Participantes</CardTitle>
+            <CardTitle>Participantes do desafio: {selected?.titulo ?? "Nenhum selecionado"}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {!selected ? (
