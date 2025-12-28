@@ -284,8 +284,7 @@ export default function Desafios() {
 
     // Enviar mensagem WhatsApp se a pessoa tiver telefone
     if (pessoa?.telefone && selected) {
-      const link = makePublicUrl(`/carne/${insertData?.token_link}`);
-      const mensagem = `Olá ${pessoa.nome}! 🎉\n\nVocê foi adicionado ao desafio *${selected.titulo}*.\n\n💰 Valor mensal: ${formatCurrency(selected.valor_mensal)}\n📅 Parcelas: ${selected.qtd_parcelas}x\n📆 Vencimento: dia ${selected.dia_vencimento}\n\nAcesse seu carnê pelo link:\n${link}\n\nDeus abençoe!`;
+      const mensagem = `Olá ${pessoa.nome}! 🎉\n\nVocê foi adicionado ao desafio *${selected.titulo}*.\n\n💰 Valor mensal: ${formatCurrency(selected.valor_mensal)}\n🔢 Parcelas: ${selected.qtd_parcelas}x\n📆 Vencimento: dia ${selected.dia_vencimento}\n\nDeus abençoe!`;
 
       const enviado = await enviarWhatsApp(pessoa.telefone, mensagem);
       if (enviado) {
