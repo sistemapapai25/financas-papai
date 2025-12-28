@@ -47,9 +47,24 @@ serve(async (req: Request) => {
       })
     }
 
-    const supabase = createClient(url, anonKey)
+    // In Edge Functions, supabase-js does NOT automatically read the request Authorization header.
+    // We must pass it via `global.headers` (and we keep a fallback of passing the JWT directly).
+    const supabaseAuth = createClient(url, anonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    })
 
-    const { data: userData, error: userErr } = await supabase.auth.getUser(token)
+    // Prefer header-based validation (works across versions)
+    let { data: userData, error: userErr } = await supabaseAuth.auth.getUser()
+
+    // Fallback for versions that accept a token param
+    if (userErr || !userData?.user) {
+      ;({ data: userData, error: userErr } = await supabaseAuth.auth.getUser(token))
+    }
+
     if (userErr || !userData?.user) {
       return new Response(
         JSON.stringify({ error: "Invalid authentication", details: (userErr as any)?.message ?? null }),
