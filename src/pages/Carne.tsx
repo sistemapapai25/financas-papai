@@ -237,21 +237,22 @@ export default function Carne() {
       return;
     }
 
-    toast({ title: "Sucesso", description: "Pagamento registrado!" });
+    toast({ title: "Sucesso", description: "Pagamento registrado!", duration: 3000 });
 
     // Enviar mensagem de agradecimento no WhatsApp
     const telefone = selectedParticipante.pessoa?.telefone;
     const nome = selectedParticipante.pessoa?.nome || "Irmão(ã)";
     const desafioAtual = desafios.find((d) => d.id === desafioId);
+    const numeroParcela = `${parcelaIndex + 1}/${desafioAtual?.qtd_parcelas || "?"}`;
 
     if (telefone) {
-      const mensagem = `Olá ${nome}! 🙏\n\nAgradecemos de coração pelo seu pagamento de ${formatCurrency(valor)} referente ao desafio *${desafioAtual?.titulo}*.\n\nSua fidelidade na aliança feita com Deus é inspiradora e abençoa a todos nós!\n\n"O Senhor é fiel em todas as suas promessas e bondoso em tudo o que faz." - Salmos 145:13\n\nQue Deus continue abençoando sua vida abundantemente! 🙌`;
+      const mensagem = `Olá ${nome}! 🙏\n\nAgradecemos de coração pelo seu pagamento da *parcela ${numeroParcela}* no valor de ${formatCurrency(valor)} referente ao desafio *${desafioAtual?.titulo}*.\n\nSua fidelidade na aliança feita com Deus é inspiradora e abençoa a todos nós!\n\n"O Senhor é fiel em todas as suas promessas e bondoso em tudo o que faz." - Salmos 145:13\n\nQue Deus continue abençoando sua vida abundantemente! 🙌`;
 
       const enviado = await enviarWhatsApp(telefone, mensagem);
       if (enviado) {
-        toast({ title: "WhatsApp enviado", description: `Mensagem de agradecimento enviada para ${nome}` });
+        toast({ title: "WhatsApp enviado", description: `Mensagem de agradecimento enviada para ${nome}`, duration: 3000 });
       } else {
-        toast({ title: "Aviso", description: "Pagamento registrado, mas não foi possível enviar WhatsApp.", variant: "destructive" });
+        toast({ title: "Aviso", description: "Pagamento registrado, mas não foi possível enviar WhatsApp.", variant: "destructive", duration: 4000 });
       }
     }
 
