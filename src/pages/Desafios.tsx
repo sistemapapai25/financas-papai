@@ -543,23 +543,15 @@ export default function Desafios() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <div className="flex flex-wrap gap-2">
-                                <Button variant="outline" size="sm" onClick={() => openLink(p.token_link)}>
-                                  Abrir
-                                </Button>
-                                <Button variant="outline" size="sm" onClick={() => shareLink(p.token_link)}>
-                                  Compartilhar
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-destructive hover:text-destructive"
-                                  onClick={() => excluirParticipante(p)}
-                                  disabled={deleting === p.id}
-                                >
-                                  {deleting === p.id ? "..." : "Excluir"}
-                                </Button>
-                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => excluirParticipante(p)}
+                                disabled={deleting === p.id}
+                              >
+                                {deleting === p.id ? "..." : "Excluir"}
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
