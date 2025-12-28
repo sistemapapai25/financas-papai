@@ -81,7 +81,8 @@ export default function App() {
               <Route path="/carne/:token" element={<CarnePublico />} />
               
               {/* Redirect de rotas antigas */}
-              <Route path="/meu-carne" element={<Navigate to="/meus-desafios/meu-carne" replace />} />
+              <Route path="/meu-carne" element={<Navigate to="/meus-desafios/gestao-carnes" replace />} />
+              <Route path="/meus-desafios/meu-carne" element={<Navigate to="/meus-desafios/gestao-carnes" replace />} />
 
               {/* Privadas (com menu fixo via PrivateLayout) */}
               <Route
@@ -117,7 +118,7 @@ export default function App() {
 
                 {/* Meus Desafios */}
                 <Route path="/meus-desafios" element={<Desafios />} />
-                <Route path="/meus-desafios/meu-carne" element={<Carne />} />
+                <Route path="/meus-desafios/gestao-carnes" element={<Carne />} />
 
                 {/* Configurações */}
                 <Route path="/configuracoes/regras-classificacao" element={<RegrasClassificacao />} />

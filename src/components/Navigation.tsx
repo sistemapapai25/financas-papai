@@ -50,10 +50,10 @@ const Navigation = () => {
                       <Link to="/" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Dashboard</Link>
 
                       <div>
-                        <div className={groupTitleCls(['/meus-desafios', '/meus-desafios/meu-carne'])}>Meus Desafios</div>
+                        <div className={groupTitleCls(['/meus-desafios', '/meus-desafios/gestao-carnes'])}>Meus Desafios</div>
                         <div className="flex flex-col">
                           <Link to="/meus-desafios" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Desafios</Link>
-                          <Link to="/meus-desafios/meu-carne" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Meu Carnê</Link>
+                          <Link to="/meus-desafios/gestao-carnes" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Gestão de Carnês</Link>
                         </div>
                       </div>
 
@@ -123,14 +123,14 @@ const Navigation = () => {
           <div className="flex items-center gap-6 overflow-x-auto">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={groupCls(['/meus-desafios', '/meus-desafios/meu-carne'])}>Meus Desafios</button>
+                <button className={groupCls(['/meus-desafios', '/meus-desafios/gestao-carnes'])}>Meus Desafios</button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem asChild>
                   <Link to="/meus-desafios">Desafios</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link to="/meus-desafios/meu-carne">Meu Carnê</Link>
+                  <Link to="/meus-desafios/gestao-carnes">Gestão de Carnês</Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
-import { ymdToBr } from "@/utils/date";
 import { makePublicUrl } from "@/lib/utils";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,113 +22,109 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ExternalLink, Copy, Share2 } from "lucide-react";
 
-type Participacao = {
+type Desafio = {
   id: string;
-  desafio_id: string;
-  token_link: string;
-  desafio: { id: string; titulo: string; valor_mensal: number; qtd_parcelas: number; data_inicio: string; dia_vencimento: number } | null;
+  titulo: string;
+  valor_mensal: number;
+  qtd_parcelas: number;
+  ativo: boolean;
 };
 
-type Parcela = {
+type Participante = {
   id: string;
-  competencia: string;
-  vencimento: string;
-  valor: number;
+  token_link: string;
   status: string;
-  pago_em: string | null;
-  pago_valor: number | null;
-  pago_obs: string | null;
+  pessoa: { id: string; nome: string; telefone: string | null } | null;
 };
 
 export default function Carne() {
   const { user } = useAuth();
+  const { isAdmin, loading: roleLoading } = useUserRole();
   const { toast } = useToast();
 
-  const [loading, setLoading] = useState(true);
-  const [participacoes, setParticipacoes] = useState<Participacao[]>([]);
-  const [participacaoId, setParticipacaoId] = useState<string>("");
-  const current = useMemo(() => participacoes.find((p) => p.id === participacaoId) ?? null, [participacoes, participacaoId]);
+  const [desafios, setDesafios] = useState<Desafio[]>([]);
+  const [desafioId, setDesafioId] = useState<string>("");
+  const [loadingDesafios, setLoadingDesafios] = useState(true);
 
-  const [parcelas, setParcelas] = useState<Parcela[]>([]);
-  const [loadingParcelas, setLoadingParcelas] = useState(false);
+  const [participantes, setParticipantes] = useState<Participante[]>([]);
+  const [loadingParticipantes, setLoadingParticipantes] = useState(false);
 
-  const loadParticipacoes = async () => {
-    if (!user) return;
-    setLoading(true);
+  const loadDesafios = async () => {
+    setLoadingDesafios(true);
+    const { data, error } = await supabase
+      .from("desafios")
+      .select("id,titulo,valor_mensal,qtd_parcelas,ativo")
+      .order("created_at", { ascending: false });
+    setLoadingDesafios(false);
+
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    const list = (data as Desafio[]) ?? [];
+    setDesafios(list);
+    if (!desafioId && list.length > 0) setDesafioId(list[0].id);
+  };
+
+  const loadParticipantes = async (dId: string) => {
+    if (!dId) {
+      setParticipantes([]);
+      return;
+    }
+    setLoadingParticipantes(true);
     const { data, error } = await supabase
       .from("desafio_participantes")
-      .select("id,desafio_id,token_link,desafio:desafios(id,titulo,valor_mensal,qtd_parcelas,data_inicio,dia_vencimento)")
-      .eq("participant_user_id", user.id)
+      .select("id,token_link,status,pessoa:pessoas(id,nome,telefone)")
+      .eq("desafio_id", dId)
       .order("created_at", { ascending: false });
-    setLoading(false);
+    setLoadingParticipantes(false);
 
     if (error) {
       toast({ title: "Erro", description: error.message, variant: "destructive" });
       return;
     }
 
-    const list = (data as unknown as Participacao[]) ?? [];
-    setParticipacoes(list);
-    if (!participacaoId && list.length > 0) setParticipacaoId(list[0].id);
-    if (participacaoId && !list.some((p) => p.id === participacaoId)) setParticipacaoId(list[0]?.id ?? "");
-  };
-
-  const loadParcelas = async (pid: string) => {
-    setLoadingParcelas(true);
-    const { data, error } = await supabase
-      .from("desafio_parcelas")
-      .select("id,competencia,vencimento,valor,status,pago_em,pago_valor,pago_obs")
-      .eq("participante_id", pid)
-      .order("competencia", { ascending: true });
-    setLoadingParcelas(false);
-
-    if (error) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-      return;
-    }
-
-    setParcelas((data as unknown as Parcela[]) ?? []);
+    setParticipantes((data as unknown as Participante[]) ?? []);
   };
 
   useEffect(() => {
-    loadParticipacoes();
+    if (user && isAdmin) {
+      loadDesafios();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, isAdmin]);
 
   useEffect(() => {
-    if (!participacaoId) {
-      setParcelas([]);
-      return;
+    if (desafioId) {
+      loadParticipantes(desafioId);
     }
-    loadParcelas(participacaoId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [participacaoId]);
+  }, [desafioId]);
 
-  const copyMyLink = async () => {
-    if (!current) return;
-    const url = makePublicUrl(`/carne/${current.token_link}`);
+  const copyLink = async (token: string) => {
+    const url = makePublicUrl(`/carne/${token}`);
     try {
       await navigator.clipboard.writeText(url);
-      toast({ title: "Copiado", description: "Link copiado." });
+      toast({ title: "Copiado", description: "Link copiado para a área de transferência." });
     } catch {
       toast({ title: "Atenção", description: url });
     }
   };
 
-  const openMyLink = () => {
-    if (!current) return;
-    const url = makePublicUrl(`/carne/${current.token_link}`);
+  const openLink = (token: string) => {
+    const url = makePublicUrl(`/carne/${token}`);
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const shareMyLink = async () => {
-    if (!current) return;
-    const url = makePublicUrl(`/carne/${current.token_link}`);
+  const shareLink = async (token: string, nome: string) => {
+    const url = makePublicUrl(`/carne/${token}`);
     try {
       const nav = navigator as unknown as { share?: (data: { title?: string; text?: string; url?: string }) => Promise<void> };
       if (typeof nav.share === "function") {
-        await nav.share({ title: "Carnê", text: url, url });
+        await nav.share({ title: `Carnê - ${nome}`, text: url, url });
         toast({ title: "Compartilhado", description: "Link compartilhado." });
         return;
       }
@@ -141,50 +137,54 @@ export default function Carne() {
 
   if (!user) return null;
 
+  if (!roleLoading && !isAdmin) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Gestão de Carnês</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Acesso restrito para administradores.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const desafioAtual = desafios.find((d) => d.id === desafioId);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">Meu carnê</h1>
-        {current ? (
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={openMyLink}>
-              Abrir
-            </Button>
-            <Button variant="outline" onClick={shareMyLink}>
-              Compartilhar
-            </Button>
-            <Button variant="outline" onClick={copyMyLink}>
-              Copiar
-            </Button>
-          </div>
-        ) : null}
-      </div>
+      <h1 className="text-2xl font-bold">Gestão de Carnês</h1>
 
       <Card>
         <CardHeader>
-          <CardTitle>Desafio</CardTitle>
+          <CardTitle>Selecione o Desafio</CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {loadingDesafios ? (
             <div className="text-sm text-muted-foreground">Carregando...</div>
-          ) : participacoes.length === 0 ? (
-            <div className="text-sm text-muted-foreground">
-              Nenhum carnê vinculado ao seu usuário ainda.
-            </div>
+          ) : desafios.length === 0 ? (
+            <div className="text-sm text-muted-foreground">Nenhum desafio cadastrado.</div>
           ) : (
-            <div className="max-w-md">
-              <Select value={participacaoId} onValueChange={setParticipacaoId}>
+            <div className="max-w-md space-y-4">
+              <Select value={desafioId} onValueChange={setDesafioId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
+                  <SelectValue placeholder="Selecione um desafio" />
                 </SelectTrigger>
                 <SelectContent>
-                  {participacoes.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.desafio?.titulo ?? p.desafio_id}
+                  {desafios.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.titulo} {!d.ativo && "(Inativo)"}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {desafioAtual && (
+                <div className="text-sm text-muted-foreground">
+                  Valor mensal: {Number(desafioAtual.valor_mensal).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} | 
+                  Parcelas: {desafioAtual.qtd_parcelas}
+                </div>
+              )}
             </div>
           )}
         </CardContent>
@@ -192,33 +192,61 @@ export default function Carne() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Parcelas</CardTitle>
+          <CardTitle>Participantes ({participantes.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          {loadingParcelas ? (
+          {loadingParticipantes ? (
             <div className="text-sm text-muted-foreground">Carregando...</div>
-          ) : parcelas.length === 0 ? (
-            <div className="text-sm text-muted-foreground">Sem parcelas.</div>
+          ) : participantes.length === 0 ? (
+            <div className="text-sm text-muted-foreground">Nenhum participante neste desafio.</div>
           ) : (
             <div className="overflow-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Competência</TableHead>
-                    <TableHead>Vencimento</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Telefone</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="w-32 text-center">Carnê</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {parcelas.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell>{ymdToBr(r.competencia)}</TableCell>
-                      <TableCell>{ymdToBr(r.vencimento)}</TableCell>
-                      <TableCell className="text-right">
-                        {Number(r.valor).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  {participantes.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium">{p.pessoa?.nome ?? "-"}</TableCell>
+                      <TableCell>{p.pessoa?.telefone ?? "-"}</TableCell>
+                      <TableCell>{p.status}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => openLink(p.token_link)}
+                            title="Abrir carnê"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => copyLink(p.token_link)}
+                            title="Copiar link"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => shareLink(p.token_link, p.pessoa?.nome ?? "")}
+                            title="Compartilhar"
+                          >
+                            <Share2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
-                      <TableCell>{r.status}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
