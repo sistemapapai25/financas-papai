@@ -59,6 +59,14 @@ type Parcela = {
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value || 0));
 
+const formatCurrencyInput = (value: number) =>
+  new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value || 0));
+
+const parseCurrencyInput = (value: string): number => {
+  const cleaned = value.replace(/[^\d,]/g, "").replace(",", ".");
+  return parseFloat(cleaned) || 0;
+};
+
 const formatDate = (dateStr: string) => {
   const [year, month, day] = dateStr.split("-");
   return `${day}/${month}/${year}`;
@@ -96,6 +104,7 @@ export default function Carne() {
 
   // Modal de pagamento
   const [parcelaPagamento, setParcelaPagamento] = useState<Parcela | null>(null);
+  const [parcelaIndex, setParcelaIndex] = useState<number>(0);
   const [valorPago, setValorPago] = useState("");
   const [dataPagamento, setDataPagamento] = useState("");
   const [salvandoPagamento, setSalvandoPagamento] = useState(false);
@@ -167,9 +176,10 @@ export default function Carne() {
     setParcelas([]);
   };
 
-  const abrirModalPagamento = (parcela: Parcela) => {
+  const abrirModalPagamento = (parcela: Parcela, index: number) => {
     setParcelaPagamento(parcela);
-    setValorPago(String(parcela.valor));
+    setParcelaIndex(index);
+    setValorPago(formatCurrencyInput(parcela.valor));
     setDataPagamento(new Date().toISOString().split("T")[0]);
   };
 
@@ -199,7 +209,7 @@ export default function Carne() {
   const confirmarPagamento = async () => {
     if (!parcelaPagamento || !selectedParticipante) return;
 
-    const valor = Number(valorPago);
+    const valor = parseCurrencyInput(valorPago);
     if (!Number.isFinite(valor) || valor <= 0) {
       toast({ title: "Atenção", description: "Informe um valor válido.", variant: "destructive" });
       return;
@@ -403,7 +413,7 @@ export default function Carne() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Competência</TableHead>
+                      <TableHead>Parcela</TableHead>
                       <TableHead>Vencimento</TableHead>
                       <TableHead>Valor</TableHead>
                       <TableHead>Status</TableHead>
@@ -413,9 +423,9 @@ export default function Carne() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {parcelas.map((parcela) => (
+                    {parcelas.map((parcela, index) => (
                       <TableRow key={parcela.id}>
-                        <TableCell>{formatDate(parcela.competencia)}</TableCell>
+                        <TableCell className="font-medium">{index + 1}/{desafioAtual?.qtd_parcelas}</TableCell>
                         <TableCell>{formatDate(parcela.vencimento)}</TableCell>
                         <TableCell>{formatCurrency(parcela.valor)}</TableCell>
                         <TableCell>{getStatusBadge(parcela.status)}</TableCell>
@@ -423,7 +433,7 @@ export default function Carne() {
                         <TableCell>{parcela.pago_valor ? formatCurrency(parcela.pago_valor) : "-"}</TableCell>
                         <TableCell>
                           {parcela.status !== "PAGO" && (
-                            <Button size="sm" onClick={() => abrirModalPagamento(parcela)}>
+                            <Button size="sm" onClick={() => abrirModalPagamento(parcela, index)}>
                               Pagar
                             </Button>
                           )}
@@ -448,10 +458,10 @@ export default function Carne() {
           <div className="space-y-4">
             <div className="bg-muted/50 rounded-lg p-4">
               <div className="text-sm text-muted-foreground">Parcela</div>
-              <div className="font-medium">
-                Competência: {parcelaPagamento ? formatDate(parcelaPagamento.competencia) : "-"}
+              <div className="text-xl font-bold">
+                {parcelaIndex + 1}/{desafioAtual?.qtd_parcelas}
               </div>
-              <div className="font-medium">
+              <div className="font-medium mt-2">
                 Vencimento: {parcelaPagamento ? formatDate(parcelaPagamento.vencimento) : "-"}
               </div>
               <div className="font-medium">
@@ -462,10 +472,14 @@ export default function Carne() {
             <div className="space-y-2">
               <Label>Valor Pago</Label>
               <Input
-                type="number"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={valorPago}
-                onChange={(e) => setValorPago(e.target.value)}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/[^\d]/g, "");
+                  const num = parseInt(raw || "0", 10) / 100;
+                  setValorPago(formatCurrencyInput(num));
+                }}
                 placeholder="0,00"
               />
             </div>
