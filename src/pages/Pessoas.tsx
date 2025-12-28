@@ -60,6 +60,8 @@ export default function Pessoas() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Estados para criar/editar
+  const [editId, setEditId] = useState<string | null>(null);
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [email, setEmail] = useState("");
@@ -69,6 +71,7 @@ export default function Pessoas() {
   const canManage = useMemo(() => !!user && !roleLoading && isAdmin, [user, roleLoading, isAdmin]);
 
   const resetForm = () => {
+    setEditId(null);
     setNome("");
     setTelefone("");
     setEmail("");
@@ -122,7 +125,7 @@ export default function Pessoas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, canManage]);
 
-  const handleCreate = async () => {
+  const handleSave = async () => {
     if (!canManage) return;
     if (!nome.trim()) {
       toast({ title: "Atenção", description: "Informe o nome.", variant: "destructive" });
@@ -130,13 +133,26 @@ export default function Pessoas() {
     }
 
     setSaving(true);
-    const { error } = await supabase.from("pessoas").insert({
+
+    const payload = {
       nome: nome.trim(),
       telefone: telefone.trim() ? telefone.trim() : null,
       email: email.trim() ? email.trim() : null,
       ativo,
       auth_user_id: authUserId === "__none__" ? null : authUserId,
-    });
+    };
+
+    let error;
+    if (editId) {
+      // Editar
+      const result = await supabase.from("pessoas").update(payload).eq("id", editId);
+      error = result.error;
+    } else {
+      // Criar
+      const result = await supabase.from("pessoas").insert(payload);
+      error = result.error;
+    }
+
     setSaving(false);
 
     if (error) {
@@ -144,10 +160,20 @@ export default function Pessoas() {
       return;
     }
 
-    toast({ title: "Sucesso", description: "Pessoa cadastrada." });
+    toast({ title: "Sucesso", description: editId ? "Participante atualizado." : "Participante cadastrado." });
     resetForm();
     setOpen(false);
     load();
+  };
+
+  const openEdit = (row: PessoaRow) => {
+    setEditId(row.id);
+    setNome(row.nome);
+    setTelefone(row.telefone ?? "");
+    setEmail(row.email ?? "");
+    setAtivo(row.ativo);
+    setAuthUserId(row.auth_user_id ?? "__none__");
+    setOpen(true);
   };
 
   const updateAuthUserId = async (row: PessoaRow, next: string) => {
@@ -177,7 +203,7 @@ export default function Pessoas() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Pessoas</CardTitle>
+          <CardTitle>Participantes</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">Acesso restrito para administradores.</p>
@@ -189,14 +215,14 @@ export default function Pessoas() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">Pessoas</h1>
+        <h1 className="text-2xl font-bold">Participantes</h1>
         <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
           <DialogTrigger asChild>
             <Button>Novo</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Nova pessoa</DialogTitle>
+              <DialogTitle>{editId ? "Editar participante" : "Novo participante"}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
@@ -235,8 +261,8 @@ export default function Pessoas() {
               </div>
             </div>
             <DialogFooter>
-              <Button onClick={handleCreate} disabled={saving}>
-                Salvar
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? "Salvando..." : "Salvar"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -251,7 +277,7 @@ export default function Pessoas() {
           {loading ? (
             <div className="text-sm text-muted-foreground">Carregando...</div>
           ) : rows.length === 0 ? (
-            <div className="text-sm text-muted-foreground">Nenhuma pessoa cadastrada.</div>
+            <div className="text-sm text-muted-foreground">Nenhum participante cadastrado.</div>
           ) : (
             <div className="overflow-auto">
               <Table>
@@ -262,6 +288,7 @@ export default function Pessoas() {
                     <TableHead>Email</TableHead>
                     <TableHead>Login</TableHead>
                     <TableHead className="w-28">Ativo</TableHead>
+                    <TableHead className="w-24">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -292,6 +319,11 @@ export default function Pessoas() {
                       </TableCell>
                       <TableCell>
                         <Switch checked={r.ativo} onCheckedChange={() => toggleAtivo(r)} />
+                      </TableCell>
+                      <TableCell>
+                        <Button variant="outline" size="sm" onClick={() => openEdit(r)}>
+                          Editar
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
