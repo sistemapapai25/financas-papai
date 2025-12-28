@@ -92,7 +92,7 @@ const Navigation = () => {
                           <Link to="/cadastros/categorias" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Categorias</Link>
                           <Link to="/cadastros/contas-financeiras" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Contas Financeiras</Link>
                           <Link to="/cadastros/tipos-culto" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Tipos de Culto</Link>
-                          <Link to="/cadastros/pessoas" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Participantes</Link>
+                          <Link to="/cadastros/pessoas" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Participantes Desafios</Link>
                           <Link to="/cadastros/usuarios" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Usuários</Link>
                         </div>
                       </div>
@@ -207,7 +207,7 @@ const Navigation = () => {
                   <Link to="/cadastros/tipos-culto">Tipos de Culto</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link to="/cadastros/pessoas">Participantes</Link>
+                  <Link to="/cadastros/pessoas">Participantes Desafios</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/cadastros/usuarios">Usuários</Link>
