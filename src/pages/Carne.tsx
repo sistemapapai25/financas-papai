@@ -7,6 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -27,6 +29,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 
 type Desafio = {
@@ -90,6 +93,12 @@ export default function Carne() {
   const [selectedParticipante, setSelectedParticipante] = useState<Participante | null>(null);
   const [parcelas, setParcelas] = useState<Parcela[]>([]);
   const [loadingParcelas, setLoadingParcelas] = useState(false);
+
+  // Modal de pagamento
+  const [parcelaPagamento, setParcelaPagamento] = useState<Parcela | null>(null);
+  const [valorPago, setValorPago] = useState("");
+  const [dataPagamento, setDataPagamento] = useState("");
+  const [salvandoPagamento, setSalvandoPagamento] = useState(false);
 
   const loadDesafios = async () => {
     setLoadingDesafios(true);
@@ -156,6 +165,93 @@ export default function Carne() {
   const closeModal = () => {
     setSelectedParticipante(null);
     setParcelas([]);
+  };
+
+  const abrirModalPagamento = (parcela: Parcela) => {
+    setParcelaPagamento(parcela);
+    setValorPago(String(parcela.valor));
+    setDataPagamento(new Date().toISOString().split("T")[0]);
+  };
+
+  const fecharModalPagamento = () => {
+    setParcelaPagamento(null);
+    setValorPago("");
+    setDataPagamento("");
+  };
+
+  const enviarWhatsApp = async (numero: string, mensagem: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("whatsapp-send-message", {
+        body: { numero, mensagem },
+      });
+      if (error) {
+        console.error("Erro ao enviar WhatsApp:", error);
+        return false;
+      }
+      console.log("WhatsApp enviado:", data);
+      return true;
+    } catch (e) {
+      console.error("Erro ao enviar WhatsApp:", e);
+      return false;
+    }
+  };
+
+  const confirmarPagamento = async () => {
+    if (!parcelaPagamento || !selectedParticipante) return;
+
+    const valor = Number(valorPago);
+    if (!Number.isFinite(valor) || valor <= 0) {
+      toast({ title: "Atenção", description: "Informe um valor válido.", variant: "destructive" });
+      return;
+    }
+
+    if (!dataPagamento) {
+      toast({ title: "Atenção", description: "Informe a data de pagamento.", variant: "destructive" });
+      return;
+    }
+
+    setSalvandoPagamento(true);
+
+    const { error } = await supabase
+      .from("desafio_parcelas")
+      .update({
+        status: "PAGO",
+        pago_valor: valor,
+        pago_em: new Date(dataPagamento + "T12:00:00").toISOString(),
+      })
+      .eq("id", parcelaPagamento.id);
+
+    if (error) {
+      setSalvandoPagamento(false);
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Sucesso", description: "Pagamento registrado!" });
+
+    // Enviar mensagem de agradecimento no WhatsApp
+    const telefone = selectedParticipante.pessoa?.telefone;
+    const nome = selectedParticipante.pessoa?.nome || "Irmão(ã)";
+    const desafioAtual = desafios.find((d) => d.id === desafioId);
+
+    if (telefone) {
+      const mensagem = `Olá ${nome}! 🙏\n\nAgradecemos de coração pelo seu pagamento de ${formatCurrency(valor)} referente ao desafio *${desafioAtual?.titulo}*.\n\nSua fidelidade na aliança feita com Deus é inspiradora e abençoa a todos nós!\n\n"O Senhor é fiel em todas as suas promessas e bondoso em tudo o que faz." - Salmos 145:13\n\nQue Deus continue abençoando sua vida abundantemente! 🙌`;
+
+      const enviado = await enviarWhatsApp(telefone, mensagem);
+      if (enviado) {
+        toast({ title: "WhatsApp enviado", description: `Mensagem de agradecimento enviada para ${nome}` });
+      } else {
+        toast({ title: "Aviso", description: "Pagamento registrado, mas não foi possível enviar WhatsApp.", variant: "destructive" });
+      }
+    }
+
+    setSalvandoPagamento(false);
+    fecharModalPagamento();
+
+    // Recarregar parcelas
+    if (selectedParticipante) {
+      loadParcelas(selectedParticipante.id);
+    }
   };
 
   useEffect(() => {
@@ -268,7 +364,7 @@ export default function Carne() {
       </Card>
 
       {/* Modal de Parcelas */}
-      <Dialog open={!!selectedParticipante} onOpenChange={(open) => !open && closeModal()}>
+      <Dialog open={!!selectedParticipante && !parcelaPagamento} onOpenChange={(open) => !open && closeModal()}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
           <DialogHeader>
             <DialogTitle>
@@ -313,6 +409,7 @@ export default function Carne() {
                       <TableHead>Status</TableHead>
                       <TableHead>Pago em</TableHead>
                       <TableHead>Valor Pago</TableHead>
+                      <TableHead>Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -324,6 +421,13 @@ export default function Carne() {
                         <TableCell>{getStatusBadge(parcela.status)}</TableCell>
                         <TableCell>{parcela.pago_em ? new Date(parcela.pago_em).toLocaleDateString("pt-BR") : "-"}</TableCell>
                         <TableCell>{parcela.pago_valor ? formatCurrency(parcela.pago_valor) : "-"}</TableCell>
+                        <TableCell>
+                          {parcela.status !== "PAGO" && (
+                            <Button size="sm" onClick={() => abrirModalPagamento(parcela)}>
+                              Pagar
+                            </Button>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -331,6 +435,59 @@ export default function Carne() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Pagamento */}
+      <Dialog open={!!parcelaPagamento} onOpenChange={(open) => !open && fecharModalPagamento()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Registrar Pagamento</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="bg-muted/50 rounded-lg p-4">
+              <div className="text-sm text-muted-foreground">Parcela</div>
+              <div className="font-medium">
+                Competência: {parcelaPagamento ? formatDate(parcelaPagamento.competencia) : "-"}
+              </div>
+              <div className="font-medium">
+                Vencimento: {parcelaPagamento ? formatDate(parcelaPagamento.vencimento) : "-"}
+              </div>
+              <div className="font-medium">
+                Valor: {parcelaPagamento ? formatCurrency(parcelaPagamento.valor) : "-"}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Valor Pago</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={valorPago}
+                onChange={(e) => setValorPago(e.target.value)}
+                placeholder="0,00"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Data do Pagamento</Label>
+              <Input
+                type="date"
+                value={dataPagamento}
+                onChange={(e) => setDataPagamento(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={fecharModalPagamento} disabled={salvandoPagamento}>
+              Cancelar
+            </Button>
+            <Button onClick={confirmarPagamento} disabled={salvandoPagamento}>
+              {salvandoPagamento ? "Salvando..." : "Confirmar Pagamento"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
