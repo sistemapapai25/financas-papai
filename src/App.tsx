@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import Navigation from "@/components/Navigation";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Páginas
 import Dashboard from "./pages/Dashboard";
@@ -67,70 +68,72 @@ function PrivateLayout() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <Routes>
-              {/* Públicas */}
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/env" element={<EnvCheck />} />
-              <Route path="/teste-supabase" element={<TesteSupabase />} />
-              <Route path="/carne/:token" element={<CarnePublico />} />
-              
-              {/* Redirect de rotas antigas */}
-              <Route path="/meu-carne" element={<Navigate to="/meus-desafios/gestao-carnes" replace />} />
-              <Route path="/meus-desafios/meu-carne" element={<Navigate to="/meus-desafios/gestao-carnes" replace />} />
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AuthProvider>
+              <Routes>
+                {/* Públicas */}
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/env" element={<EnvCheck />} />
+                <Route path="/teste-supabase" element={<TesteSupabase />} />
+                <Route path="/carne/:token" element={<CarnePublico />} />
+                
+                {/* Redirect de rotas antigas */}
+                <Route path="/meu-carne" element={<Navigate to="/meus-desafios/gestao-carnes" replace />} />
+                <Route path="/meus-desafios/meu-carne" element={<Navigate to="/meus-desafios/gestao-carnes" replace />} />
 
-              {/* Privadas (com menu fixo via PrivateLayout) */}
-              <Route
-                element={
-                  <ProtectedRoute>
-                    <PrivateLayout />
-                  </ProtectedRoute>
-                }
-              >
-                {/* Home */}
-                <Route path="/" element={<Dashboard />} />
+                {/* Privadas (com menu fixo via PrivateLayout) */}
+                <Route
+                  element={
+                    <ProtectedRoute>
+                      <PrivateLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  {/* Home */}
+                  <Route path="/" element={<Dashboard />} />
 
-                {/* Movimentações */}
-                <Route path="/movimentacoes/entradas-culto" element={<EntradasCulto />} />
-                <Route path="/lista-cultos" element={<ListaCultos />} />
-                <Route path="/contas-a-pagar" element={<ContasAPagar />} />
-                <Route path="/contas-pagas" element={<ContasPagas />} />
-                <Route path="/relatorio-pagamentos" element={<RelatorioPagamentos />} />
-                <Route path="/movimentacoes/importar-extrato" element={<ImportarExtrato />} />
+                  {/* Movimentações */}
+                  <Route path="/movimentacoes/entradas-culto" element={<EntradasCulto />} />
+                  <Route path="/lista-cultos" element={<ListaCultos />} />
+                  <Route path="/contas-a-pagar" element={<ContasAPagar />} />
+                  <Route path="/contas-pagas" element={<ContasPagas />} />
+                  <Route path="/relatorio-pagamentos" element={<RelatorioPagamentos />} />
+                  <Route path="/movimentacoes/importar-extrato" element={<ImportarExtrato />} />
 
-                {/* Financeiro */}
-                <Route path="/financeiro/lancamentos" element={<LancamentosDashboard />} />
-                <Route path="/financeiro/agenda" element={<Agenda />} />
-                <Route path="/financeiro/resumo-anual" element={<ResumoAnual />} />
+                  {/* Financeiro */}
+                  <Route path="/financeiro/lancamentos" element={<LancamentosDashboard />} />
+                  <Route path="/financeiro/agenda" element={<Agenda />} />
+                  <Route path="/financeiro/resumo-anual" element={<ResumoAnual />} />
 
-                {/* Cadastros */}
-                <Route path="/cadastros/beneficiarios" element={<CadastroBeneficiarios />} />
-                <Route path="/cadastros/categorias" element={<CadastroCategorias />} />
-                <Route path="/cadastros/usuarios" element={<CadastroUsuarios />} />
-                <Route path="/cadastros/tipos-culto" element={<CadastroTiposCulto />} />
-                <Route path="/cadastros/contas-financeiras" element={<CadastroContasFinanceiras />} />
-                <Route path="/cadastros/pessoas" element={<Pessoas />} />
+                  {/* Cadastros */}
+                  <Route path="/cadastros/beneficiarios" element={<CadastroBeneficiarios />} />
+                  <Route path="/cadastros/categorias" element={<CadastroCategorias />} />
+                  <Route path="/cadastros/usuarios" element={<CadastroUsuarios />} />
+                  <Route path="/cadastros/tipos-culto" element={<CadastroTiposCulto />} />
+                  <Route path="/cadastros/contas-financeiras" element={<CadastroContasFinanceiras />} />
+                  <Route path="/cadastros/pessoas" element={<Pessoas />} />
 
-                {/* Meus Desafios */}
-                <Route path="/meus-desafios" element={<Desafios />} />
-                <Route path="/meus-desafios/gestao-carnes" element={<Carne />} />
+                  {/* Meus Desafios */}
+                  <Route path="/meus-desafios" element={<Desafios />} />
+                  <Route path="/meus-desafios/gestao-carnes" element={<Carne />} />
 
-                {/* Configurações */}
-                <Route path="/configuracoes/regras-classificacao" element={<RegrasClassificacao />} />
-                <Route path="/configuracoes/igreja" element={<ConfiguracaoIgreja />} />
-              </Route>
+                  {/* Configurações */}
+                  <Route path="/configuracoes/regras-classificacao" element={<RegrasClassificacao />} />
+                  <Route path="/configuracoes/igreja" element={<ConfiguracaoIgreja />} />
+                </Route>
 
-              {/* 404 */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+                {/* 404 */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </AuthProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
