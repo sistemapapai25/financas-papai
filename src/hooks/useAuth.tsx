@@ -59,9 +59,26 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+
+      // If the stored session was invalidated server-side (e.g. global logout), clear it locally.
+      if (session?.access_token) {
+        const { error } = await supabase.auth.getUser(session.access_token);
+        const msg = String((error as any)?.message ?? "").toLowerCase();
+        const code = String((error as any)?.code ?? "").toLowerCase();
+        const status = Number((error as any)?.status ?? 0);
+
+        if (error && (code === "session_not_found" || status === 403 || msg.includes("auth session missing") || msg.includes("session from session_id"))) {
+          await supabase.auth.signOut({ scope: 'local' } as any);
+          setSession(null);
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+      }
+
       setLoading(false);
       if (session?.user) ensureAdminIfNeeded(session.user);
     });
@@ -165,26 +182,43 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       setLoading(true);
       const { error } = await supabase.auth.signOut();
-      
-      if (error) {
+
+      const msg = String((error as any)?.message ?? "");
+      const isSessionMissing =
+        !error ||
+        String((error as any)?.code ?? "") === "session_not_found" ||
+        msg.toLowerCase().includes("auth session missing") ||
+        msg.toLowerCase().includes("session_not_found") ||
+        msg.toLowerCase().includes("session from session_id");
+
+      if (error && !isSessionMissing) {
         toast({
           title: "Erro ao sair",
           description: error.message,
-          variant: "destructive"
+          variant: "destructive",
         });
-      } else {
-        toast({
-          title: "Logout realizado",
-          description: "Até logo!"
-        });
+        return { error };
       }
 
-      return { error };
+      // Treat missing/invalid sessions as already logged out and force local cleanup
+      if (error && isSessionMissing) {
+        await supabase.auth.signOut({ scope: 'local' } as any);
+      }
+
+      setSession(null);
+      setUser(null);
+
+      toast({
+        title: "Logout realizado",
+        description: "Até logo!",
+      });
+
+      return { error: null };
     } catch (err: any) {
       toast({
         title: "Erro ao sair",
         description: "Ocorreu um erro inesperado.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return { error: err };
     } finally {
