@@ -424,16 +424,16 @@ export default function EntradasCulto() {
                   Tipo de Culto
                   <span className="text-red-500">*</span>
                 </Label>
-                <Select value={tipoCultoId} onValueChange={setTipoCultoId}>
+                <Select value={tipoCultoId} onValueChange={(val) => setTipoCultoId(val ?? "")}>
                   <SelectTrigger className={`h-11 transition-colors ${
                     !tipoCultoId ? 'border-red-300 focus:border-red-500' : 'border-blue-300 focus:border-blue-500'
                   }`}>
                     <SelectValue placeholder="Selecione o tipo" />
                   </SelectTrigger>
                   <SelectContent>
-                    {tiposCulto.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.nome}
+                    {(tiposCulto ?? []).filter((t) => t.id).map((t) => (
+                      <SelectItem key={`tipo-${t.id}`} value={t.id}>
+                        {t.nome ?? "(sem nome)"}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -452,16 +452,16 @@ export default function EntradasCulto() {
                   Conta de Destino
                   <span className="text-red-500">*</span>
                 </Label>
-                <Select value={contaId} onValueChange={setContaId}>
+                <Select value={contaId} onValueChange={(val) => setContaId(val ?? "")}>
                   <SelectTrigger className={`h-11 transition-colors ${
                     !contaId ? 'border-red-300 focus:border-red-500' : 'border-blue-300 focus:border-blue-500'
                   }`}>
                     <SelectValue placeholder="Selecione a conta" />
                   </SelectTrigger>
                   <SelectContent>
-                    {contasCaixa.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.nome}
+                    {(contasCaixa ?? []).filter((c) => c.id).map((c) => (
+                      <SelectItem key={`conta-${c.id}`} value={c.id}>
+                        {c.nome ?? "(sem nome)"}
                       </SelectItem>
                     ))}
                   </SelectContent>
