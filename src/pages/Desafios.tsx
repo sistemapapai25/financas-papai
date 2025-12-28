@@ -34,6 +34,9 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { makePublicUrl } from "@/lib/utils";
 
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value || 0));
+
 type DesafioRow = {
   id: string;
   titulo: string;
@@ -230,6 +233,23 @@ export default function Desafios() {
     if (data?.id) setSelectedId(data.id);
   };
 
+  const enviarWhatsApp = async (numero: string, mensagem: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("whatsapp-send-message", {
+        body: { numero, mensagem },
+      });
+      if (error) {
+        console.error("Erro ao enviar WhatsApp:", error);
+        return false;
+      }
+      console.log("WhatsApp enviado:", data);
+      return true;
+    } catch (e) {
+      console.error("Erro ao enviar WhatsApp:", e);
+      return false;
+    }
+  };
+
   const addParticipante = async () => {
     if (!canManage) return;
     if (!selectedId) return;
@@ -240,20 +260,41 @@ export default function Desafios() {
 
     const pessoa = pessoas.find((p) => p.id === pessoaSel) ?? null;
     setAdding(true);
-    const { error } = await supabase.from("desafio_participantes").insert({
-      desafio_id: selectedId,
-      pessoa_id: pessoaSel,
-      status: "ATIVO",
-      participant_user_id: pessoa?.auth_user_id ?? null,
-    });
-    setAdding(false);
+
+    // Inserir participante
+    const { data: insertData, error } = await supabase
+      .from("desafio_participantes")
+      .insert({
+        desafio_id: selectedId,
+        pessoa_id: pessoaSel,
+        status: "ATIVO",
+        participant_user_id: pessoa?.auth_user_id ?? null,
+      })
+      .select("token_link")
+      .maybeSingle();
 
     if (error) {
+      setAdding(false);
       toast({ title: "Erro", description: error.message, variant: "destructive" });
       return;
     }
 
     toast({ title: "Sucesso", description: "Participante adicionado e carnê gerado." });
+
+    // Enviar mensagem WhatsApp se a pessoa tiver telefone
+    if (pessoa?.telefone && selected) {
+      const link = makePublicUrl(`/carne/${insertData?.token_link}`);
+      const mensagem = `Olá ${pessoa.nome}! 🎉\n\nVocê foi adicionado ao desafio *${selected.titulo}*.\n\n💰 Valor mensal: ${formatCurrency(selected.valor_mensal)}\n📅 Parcelas: ${selected.qtd_parcelas}x\n📆 Vencimento: dia ${selected.dia_vencimento}\n\nAcesse seu carnê pelo link:\n${link}\n\nDeus abençoe!`;
+
+      const enviado = await enviarWhatsApp(pessoa.telefone, mensagem);
+      if (enviado) {
+        toast({ title: "WhatsApp enviado", description: `Mensagem enviada para ${pessoa.nome}` });
+      } else {
+        toast({ title: "Aviso", description: "Não foi possível enviar WhatsApp, mas o participante foi adicionado.", variant: "destructive" });
+      }
+    }
+
+    setAdding(false);
     setPessoaSel("");
     loadParticipantes(selectedId);
   };
