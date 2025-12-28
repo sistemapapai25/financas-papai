@@ -50,7 +50,7 @@ const Navigation = () => {
                       <Link to="/" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Dashboard</Link>
 
                       <div>
-                        <div className={groupTitleCls(['/meus-desafios', '/meus-desafios/gestao-carnes'])}>Meus Desafios</div>
+                        <div className={groupTitleCls(['/meus-desafios', '/meus-desafios/gestao-carnes'])}>Desafios Financeiros</div>
                         <div className="flex flex-col">
                           <Link to="/meus-desafios" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Desafios</Link>
                           <Link to="/meus-desafios/gestao-carnes" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Gestão de Carnês</Link>
@@ -123,7 +123,7 @@ const Navigation = () => {
           <div className="flex items-center gap-6 overflow-x-auto">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={groupCls(['/meus-desafios', '/meus-desafios/gestao-carnes'])}>Meus Desafios</button>
+                <button className={groupCls(['/meus-desafios', '/meus-desafios/gestao-carnes'])}>Desafios Financeiros</button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem asChild>
