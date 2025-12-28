@@ -52,6 +52,7 @@ export default function Carne() {
     const { data, error } = await supabase
       .from("desafios")
       .select("id,titulo,valor_mensal,qtd_parcelas,ativo")
+      .eq("ativo", true)
       .order("created_at", { ascending: false });
     setLoadingDesafios(false);
 
