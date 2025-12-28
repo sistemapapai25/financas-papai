@@ -60,9 +60,14 @@ serve(async (req) => {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Buscar parcelas que vencem hoje e estão em aberto
-    const hoje = new Date().toISOString().split("T")[0];
-    console.log(`Buscando parcelas com vencimento em: ${hoje}`);
+    // Calcular a data de amanhã (vencimento em 1 dia)
+    const hoje = new Date();
+    const amanha = new Date(hoje);
+    amanha.setDate(amanha.getDate() + 1);
+    const dataAmanha = amanha.toISOString().split("T")[0];
+    
+    console.log(`Data de hoje: ${hoje.toISOString().split("T")[0]}`);
+    console.log(`Buscando parcelas com vencimento em: ${dataAmanha} (amanhã)`);
 
     const { data: parcelas, error: parcelasError } = await supabase
       .from("desafio_parcelas")
@@ -88,7 +93,7 @@ serve(async (req) => {
           )
         )
       `)
-      .eq("vencimento", hoje)
+      .eq("vencimento", dataAmanha)
       .eq("status", "ABERTO");
 
     if (parcelasError) {
@@ -99,7 +104,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Encontradas ${parcelas?.length || 0} parcelas vencendo hoje`);
+    console.log(`Encontradas ${parcelas?.length || 0} parcelas vencendo amanhã`);
 
     let enviados = 0;
     let falhas = 0;
@@ -117,7 +122,7 @@ serve(async (req) => {
       const baseUrl = Deno.env.get("PUBLIC_URL") || "https://ghzwyigouhvljubitowt.lovable.app";
       const link = `${baseUrl}/carne/${participante.token_link}`;
 
-      const mensagem = `Olá ${pessoa.nome}! 📅\n\nLembrete: hoje é dia de pagamento do desafio *${desafio?.titulo}*!\n\n💰 Valor: ${formatCurrency(parcela.valor)}\n📆 Vencimento: ${new Date(parcela.vencimento).toLocaleDateString("pt-BR")}\n\nAcesse seu carnê:\n${link}\n\nDeus abençoe! 🙏`;
+      const mensagem = `Olá ${pessoa.nome}! 📅\n\nLembrete: *amanhã* vence sua parcela do desafio *${desafio?.titulo}*!\n\n💰 Valor: ${formatCurrency(parcela.valor)}\n📆 Vencimento: ${new Date(parcela.vencimento).toLocaleDateString("pt-BR")}\n\nAcesse seu carnê:\n${link}\n\nDeus abençoe! 🙏`;
 
       const enviado = await enviarWhatsApp(pessoa.telefone, mensagem);
       if (enviado) {
