@@ -79,6 +79,9 @@ export default function App() {
               <Route path="/env" element={<EnvCheck />} />
               <Route path="/teste-supabase" element={<TesteSupabase />} />
               <Route path="/carne/:token" element={<CarnePublico />} />
+              
+              {/* Redirect de rotas antigas */}
+              <Route path="/meu-carne" element={<Navigate to="/meus-desafios/meu-carne" replace />} />
 
               {/* Privadas (com menu fixo via PrivateLayout) */}
               <Route
