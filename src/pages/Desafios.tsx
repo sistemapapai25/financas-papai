@@ -93,6 +93,7 @@ export default function Desafios() {
   const [participantes, setParticipantes] = useState<ParticipanteRow[]>([]);
   const [pessoaSel, setPessoaSel] = useState<string>("");
   const [adding, setAdding] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const resetForm = () => {
     setTitulo("");
@@ -340,6 +341,38 @@ export default function Desafios() {
     }
   };
 
+  const excluirParticipante = async (p: ParticipanteRow) => {
+    if (!canManage || !selectedId) return;
+    const nome = p.pessoas?.nome || "participante";
+    if (!confirm(`Excluir ${nome} deste desafio? As parcelas também serão removidas.`)) return;
+
+    setDeleting(p.id);
+    try {
+      // Primeiro excluir as parcelas
+      const { error: parcelasError } = await supabase
+        .from("desafio_parcelas")
+        .delete()
+        .eq("participante_id", p.id);
+
+      if (parcelasError) throw parcelasError;
+
+      // Depois excluir o participante
+      const { error } = await supabase
+        .from("desafio_participantes")
+        .delete()
+        .eq("id", p.id);
+
+      if (error) throw error;
+
+      toast({ title: "Excluído", description: `${nome} removido do desafio.` });
+      loadParticipantes(selectedId);
+    } catch (e) {
+      toast({ title: "Erro", description: e instanceof Error ? e.message : "Falha ao excluir", variant: "destructive" });
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   if (!user) return null;
 
   if (!roleLoading && !isAdmin) {
@@ -516,6 +549,15 @@ export default function Desafios() {
                                 </Button>
                                 <Button variant="outline" size="sm" onClick={() => shareLink(p.token_link)}>
                                   Compartilhar
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => excluirParticipante(p)}
+                                  disabled={deleting === p.id}
+                                >
+                                  {deleting === p.id ? "..." : "Excluir"}
                                 </Button>
                               </div>
                             </TableCell>
