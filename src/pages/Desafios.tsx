@@ -418,7 +418,7 @@ export default function Desafios() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Desafios</CardTitle>
+            <CardTitle>Desafios Cadastrados</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">Acesso restrito para administradores.</p>
@@ -540,7 +540,7 @@ export default function Desafios() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Participantes do desafio: {selected?.titulo ?? "Nenhum selecionado"}</CardTitle>
+            <CardTitle>Participantes do Desafio: {selected?.titulo ?? "Nenhum selecionado"}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {!selected ? (
