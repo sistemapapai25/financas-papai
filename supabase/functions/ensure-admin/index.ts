@@ -23,6 +23,16 @@ serve(async (req: Request) => {
       })
     }
 
+    // supabase-js auth.getUser() in Edge does not automatically read global Authorization headers.
+    // We must pass the JWT explicitly.
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim()
+    if (!token) {
+      return new Response(JSON.stringify({ error: "Invalid authentication", details: "Missing bearer token" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      })
+    }
+
     const url = Deno.env.get("SUPABASE_URL") ?? ""
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     const serviceKeyCandidates = [
@@ -37,13 +47,9 @@ serve(async (req: Request) => {
       })
     }
 
-    const supabase = createClient(url, anonKey, {
-      global: {
-        headers: { Authorization: authHeader },
-      },
-    })
+    const supabase = createClient(url, anonKey)
 
-    const { data: userData, error: userErr } = await supabase.auth.getUser()
+    const { data: userData, error: userErr } = await supabase.auth.getUser(token)
     if (userErr || !userData?.user) {
       return new Response(
         JSON.stringify({ error: "Invalid authentication", details: (userErr as any)?.message ?? null }),
