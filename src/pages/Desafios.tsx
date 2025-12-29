@@ -47,6 +47,7 @@ type DesafioRow = {
   dia_vencimento: number;
   ativo: boolean;
   created_at: string;
+  participantes_count?: number;
 };
 
 type PessoaOpt = {
@@ -117,7 +118,7 @@ export default function Desafios() {
     setLoading(true);
     const { data, error } = await supabase
       .from("desafios")
-      .select("id,titulo,descricao,valor_mensal,qtd_parcelas,data_inicio,dia_vencimento,ativo,created_at")
+      .select("id,titulo,descricao,valor_mensal,qtd_parcelas,data_inicio,dia_vencimento,ativo,created_at,desafio_participantes(count)")
       .order("created_at", { ascending: false });
     setLoading(false);
 
@@ -126,7 +127,10 @@ export default function Desafios() {
       return;
     }
 
-    const list = (data as unknown as DesafioRow[]) ?? [];
+    const list = ((data ?? []) as unknown as (DesafioRow & { desafio_participantes: { count: number }[] })[]).map((d) => ({
+      ...d,
+      participantes_count: d.desafio_participantes?.[0]?.count ?? 0,
+    }));
     setRows(list);
     if (!selectedId && list.length > 0) setSelectedId(list[0].id);
     if (selectedId && !list.some((d) => d.id === selectedId)) setSelectedId(list[0]?.id ?? null);
@@ -504,6 +508,7 @@ export default function Desafios() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Título</TableHead>
+                      <TableHead className="w-28 text-center">Participantes</TableHead>
                       <TableHead className="w-24">Ativo</TableHead>
                       <TableHead className="w-20">Ações</TableHead>
                     </TableRow>
@@ -516,6 +521,7 @@ export default function Desafios() {
                         onClick={() => setSelectedId(r.id)}
                       >
                         <TableCell className="font-medium">{r.titulo}</TableCell>
+                        <TableCell className="text-center">{r.participantes_count ?? 0}</TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <Switch checked={r.ativo} onCheckedChange={() => toggleDesafioAtivo(r)} />
                         </TableCell>
