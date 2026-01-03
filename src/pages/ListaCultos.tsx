@@ -1,5 +1,5 @@
 // src/pages/ListaCultos.tsx
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Trash2, Edit, Calendar, Users, DollarSign, Church, Plus, X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Trash2, Edit, Calendar, Users, DollarSign, Church, Plus, X, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -69,12 +70,19 @@ interface OfertaItem {
   valor: number;
 }
 
+const mesesPt = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+
 export default function ListaCultos() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [cultos, setCultos] = useState<Culto[]>([]);
   const [loading, setLoading] = useState(true);
   const [excluindo, setExcluindo] = useState<string | null>(null);
+  const [mes, setMes] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
   
   // Estados para edição
   const [editandoCulto, setEditandoCulto] = useState<Culto | null>(null);
@@ -108,6 +116,37 @@ export default function ListaCultos() {
     const diaSemana = diasSemana[date.getDay()];
     const dataFormatada = date.toLocaleDateString("pt-BR");
     return `${dataFormatada} - ${diaSemana}`;
+  };
+
+  const capitalize = (s: string) => (s ? s[0].toLocaleUpperCase("pt-BR") + s.slice(1) : s);
+
+  const anoMes = mes.split("-");
+  const anoMesAno = Number(anoMes[0]);
+  const anoMesMesIdx = Number(anoMes[1]) - 1;
+  const setMesFromDate = (d: Date) => setMes(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  const tituloMes = Number.isFinite(anoMesAno) && Number.isFinite(anoMesMesIdx) && anoMesMesIdx >= 0 && anoMesMesIdx <= 11
+    ? `${capitalize(mesesPt[anoMesMesIdx])} de ${anoMesAno}`
+    : mes;
+
+  const totaisMes = useMemo(() => {
+    return cultos.reduce(
+      (acc, c) => {
+        acc.dizimos += Number(c.total_dizimos || 0);
+        acc.ofertas += Number(c.total_ofertas || 0);
+        return acc;
+      },
+      { dizimos: 0, ofertas: 0 }
+    );
+  }, [cultos]);
+
+  const monthRange = (month: string) => {
+    const [yStr, mStr] = month.split("-");
+    const y = Number(yStr);
+    const m = Number(mStr);
+    const start = `${yStr}-${mStr}-01`;
+    const endDate = new Date(y, m, 1);
+    const end = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, "0")}-01`;
+    return { start, end };
   };
 
   // Carregar tipos de culto
@@ -180,6 +219,7 @@ export default function ListaCultos() {
 
     try {
       setLoading(true);
+      const { start, end } = monthRange(mes);
 
       // Buscar cultos com tipos de culto
       const { data: cultosData, error: cultosError } = await supabase
@@ -189,6 +229,8 @@ export default function ListaCultos() {
           tipo_culto:tipos_culto(id, nome)
         `)
         .eq("user_id", user.id)
+        .gte("data", start)
+        .lt("data", end)
         .order("data", { ascending: false });
 
       if (cultosError) throw cultosError;
@@ -396,7 +438,7 @@ export default function ListaCultos() {
   useEffect(() => {
     carregarCultos();
     carregarTiposCulto();
-  }, [user]);
+  }, [user, mes]);
 
   if (loading) {
     return (
@@ -417,7 +459,85 @@ export default function ListaCultos() {
             Visualize, edite e exclua os lançamentos de cultos
           </p>
         </div>
+        <div className="space-y-2">
+          <Label>Mês</Label>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => {
+                const base = Number.isFinite(anoMesAno) && Number.isFinite(anoMesMesIdx) ? new Date(anoMesAno, anoMesMesIdx, 1) : new Date();
+                setMesFromDate(new Date(base.getFullYear(), base.getMonth() - 1, 1));
+              }}
+              aria-label="Mês anterior"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Popover open={monthPickerOpen} onOpenChange={setMonthPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button type="button" variant="outline" className="font-semibold w-44">
+                  {tituloMes}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-2">
+                <div className="grid grid-cols-3 gap-1">
+                  {mesesPt.map((nomeMes, idx) => (
+                    <Button
+                      key={idx}
+                      type="button"
+                      variant={idx === anoMesMesIdx ? "default" : "ghost"}
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => {
+                        const y = Number.isFinite(anoMesAno) ? anoMesAno : new Date().getFullYear();
+                        setMes(`${y}-${String(idx + 1).padStart(2, "0")}`);
+                        setMonthPickerOpen(false);
+                      }}
+                    >
+                      {capitalize(nomeMes).substring(0, 3)}
+                    </Button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => {
+                const base = Number.isFinite(anoMesAno) && Number.isFinite(anoMesMesIdx) ? new Date(anoMesAno, anoMesMesIdx, 1) : new Date();
+                setMesFromDate(new Date(base.getFullYear(), base.getMonth() + 1, 1));
+              }}
+              aria-label="Próximo mês"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
       </div>
+
+      <Card className="mb-6">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Totais do mês</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+            <div className="flex items-center justify-between rounded border p-3">
+              <span className="text-muted-foreground">Dízimos</span>
+              <span className="font-semibold">{moeda(totaisMes.dizimos)}</span>
+            </div>
+            <div className="flex items-center justify-between rounded border p-3">
+              <span className="text-muted-foreground">Ofertas</span>
+              <span className="font-semibold">{moeda(totaisMes.ofertas)}</span>
+            </div>
+            <div className="flex items-center justify-between rounded border p-3">
+              <span className="text-muted-foreground">Total geral</span>
+              <span className="font-semibold">{moeda(totaisMes.dizimos + totaisMes.ofertas)}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {cultos.length === 0 ? (
         <Card>

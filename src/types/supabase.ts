@@ -492,6 +492,7 @@ export type Database = {
         Row: {
           id: string
           culto_id: string
+          importado: boolean
           nome: string
           valor: number
           created_at: string
@@ -499,6 +500,7 @@ export type Database = {
         Insert: {
           id?: string
           culto_id: string
+          importado?: boolean
           nome: string
           valor: number
           created_at?: string
@@ -506,6 +508,7 @@ export type Database = {
         Update: {
           id?: string
           culto_id?: string
+          importado?: boolean
           nome?: string
           valor?: number
           created_at?: string
@@ -525,6 +528,7 @@ export type Database = {
         Row: {
           id: string
           culto_id: string
+          importado: boolean
           valor: number
           valor_dinheiro: number
           valor_moedas: number
@@ -533,6 +537,7 @@ export type Database = {
         Insert: {
           id?: string
           culto_id: string
+          importado?: boolean
           valor: number
           valor_dinheiro?: number
           valor_moedas?: number
@@ -541,6 +546,7 @@ export type Database = {
         Update: {
           id?: string
           culto_id?: string
+          importado?: boolean
           valor?: number
           valor_dinheiro?: number
           valor_moedas?: number

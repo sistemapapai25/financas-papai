@@ -3,13 +3,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 import { supabase } from '@/integrations/supabase/client';
 import { Image as ImageIcon, Eye } from 'lucide-react';
 
+type UserOpt = {
+  id: string;
+  label: string;
+};
+
 export default function ConfiguracaoIgreja() {
   const { user } = useAuth();
+  const { isAdmin, loading: roleLoading } = useUserRole();
   const { toast } = useToast();
 
   const [form, setForm] = useState({
@@ -22,6 +30,8 @@ export default function ConfiguracaoIgreja() {
   const [loading, setLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [errors, setErrors] = useState<{ igreja_nome?: string; igreja_cnpj?: string; responsavel_nome?: string; responsavel_cpf?: string }>({});
+  const [userOptions, setUserOptions] = useState<UserOpt[]>([]);
+  const [scopeUserId, setScopeUserId] = useState<string>('');
 
   function onlyDigits(s: string) { return s.replace(/\D+/g, ''); }
   function formatCPF(s: string) {
@@ -84,35 +94,78 @@ export default function ConfiguracaoIgreja() {
   }
 
   useEffect(() => {
+    if (!user || roleLoading) return;
+    if (!scopeUserId) setScopeUserId(user.id);
+    if (!isAdmin) {
+      setUserOptions([]);
+      return;
+    }
+
+    supabase
+      .from('profiles')
+      .select('auth_user_id,email,name')
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) return;
+        const opts: UserOpt[] = (data || [])
+          .map((p) => {
+            const id = p.auth_user_id as string | null;
+            if (!id) return null;
+            const label = (p.name || p.email || id) as string;
+            return { id, label };
+          })
+          .filter((x): x is UserOpt => !!x);
+        setUserOptions(opts);
+      });
+  }, [user, roleLoading, isAdmin, scopeUserId]);
+
+  useEffect(() => {
     (async () => {
-      if (!user) return;
+      if (!user || roleLoading) return;
+      const targetUserId = isAdmin ? (scopeUserId || user.id) : user.id;
+      if (!targetUserId) return;
+
+      setPreviewUrl(null);
       const { data, error } = await supabase
         .from('church_settings')
         .select('igreja_nome, igreja_cnpj, responsavel_nome, responsavel_cpf, assinatura_path')
-        .eq('user_id', user.id)
+        .eq('user_id', targetUserId)
         .maybeSingle();
       if (error) {
         toast({ title: 'Erro', description: error.message, variant: 'destructive' });
         return;
       }
-      if (data) {
+      if (!data) {
         setForm({
-          igreja_nome: data.igreja_nome,
-          igreja_cnpj: formatCNPJ(data.igreja_cnpj || ''),
-          responsavel_nome: data.responsavel_nome,
-          responsavel_cpf: formatCPF(data.responsavel_cpf || ''),
-          assinatura_path: data.assinatura_path ?? '',
+          igreja_nome: '',
+          igreja_cnpj: '',
+          responsavel_nome: '',
+          responsavel_cpf: '',
+          assinatura_path: '',
         });
-        if (data.assinatura_path) {
-          const { data: signed } = await supabase.storage.from('Assinaturas').createSignedUrl(data.assinatura_path, 600);
-          setPreviewUrl(signed?.signedUrl ?? null);
-        }
+        return;
+      }
+
+      setForm({
+        igreja_nome: data.igreja_nome,
+        igreja_cnpj: formatCNPJ(data.igreja_cnpj || ''),
+        responsavel_nome: data.responsavel_nome,
+        responsavel_cpf: formatCPF(data.responsavel_cpf || ''),
+        assinatura_path: data.assinatura_path ?? '',
+      });
+      if (data.assinatura_path) {
+        const { data: signed } = await supabase.storage.from('Assinaturas').createSignedUrl(data.assinatura_path, 600);
+        setPreviewUrl(signed?.signedUrl ?? null);
       }
     })();
-  }, [user]);
+  }, [user, roleLoading, isAdmin, scopeUserId, toast]);
 
   const uploadAssinatura = async (file: File) => {
     if (!user) return;
+    if (isAdmin && scopeUserId && scopeUserId !== user.id) {
+      toast({ title: 'Assinatura', description: 'Para enviar assinatura, entre com o usuário selecionado.', variant: 'destructive' });
+      return;
+    }
     try {
       setLoading(true);
       const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
@@ -134,8 +187,9 @@ export default function ConfiguracaoIgreja() {
     if (!user) return;
     try {
       setLoading(true);
+      const targetUserId = isAdmin ? (scopeUserId || user.id) : user.id;
       const payload = {
-        user_id: user.id,
+        user_id: targetUserId,
         igreja_nome: form.igreja_nome,
         igreja_cnpj: onlyDigits(form.igreja_cnpj),
         responsavel_nome: form.responsavel_nome,
@@ -195,6 +249,24 @@ export default function ConfiguracaoIgreja() {
           <CardTitle>Configuração da Igreja</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {isAdmin ? (
+            <div className="space-y-2">
+              <Label>Usuário</Label>
+              <Select value={scopeUserId} onValueChange={setScopeUserId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um usuário" />
+                </SelectTrigger>
+                <SelectContent>
+                  {userOptions.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Nome da Igreja</Label>
@@ -223,7 +295,7 @@ export default function ConfiguracaoIgreja() {
             <div className="flex items-center gap-2">
               <Button asChild variant="outline">
                 <label className="cursor-pointer">
-                  <input type="file" accept="image/png,image/jpeg" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadAssinatura(f); }} />
+                  <input type="file" accept="image/png,image/jpeg" className="hidden" disabled={isAdmin && scopeUserId && scopeUserId !== user?.id} onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadAssinatura(f); }} />
                   <ImageIcon className="w-4 h-4 mr-2" /> Enviar Imagem
                 </label>
               </Button>

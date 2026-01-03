@@ -14,9 +14,10 @@ interface NovaCategoriaModalProps {
   onSuccess?: (categoria: { id: string; name: string; tipo: 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA' }) => void;
   trigger?: React.ReactNode;
   tipoFiltro?: 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA';
+  userId?: string;
 }
 
-const NovaCategoriaModal = ({ onSuccess, trigger, tipoFiltro }: NovaCategoriaModalProps) => {
+const NovaCategoriaModal = ({ onSuccess, trigger, tipoFiltro, userId }: NovaCategoriaModalProps) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -29,21 +30,22 @@ const NovaCategoriaModal = ({ onSuccess, trigger, tipoFiltro }: NovaCategoriaMod
 
   const { toast } = useToast();
   const { user } = useAuth();
+  const targetUserId = userId || user?.id;
 
   // carregar pais quando abrir ou tipo mudar
   useEffect(() => {
-    if (!open || !user) return;
+    if (!open || !targetUserId) return;
     supabase
       .from('categories')
       .select('id,name,tipo')
-      .eq('user_id', user.id)
+      .eq('user_id', targetUserId)
       .eq('tipo', formData.tipo)
       .is('parent_id', null)
       .order('name')
       .then(({ data }) => {
         setParents((data || []).map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })));
       });
-  }, [open, user, formData.tipo]);
+  }, [open, targetUserId, formData.tipo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,7 +67,7 @@ const NovaCategoriaModal = ({ onSuccess, trigger, tipoFiltro }: NovaCategoriaMod
       const { data: existing } = await supabase
         .from('categories')
         .select('id, name, tipo, parent_id')
-        .eq('user_id', user?.id as string)
+        .eq('user_id', targetUserId as string)
         .eq('name', nome);
 
       let createdOrUpdated: { id: string; name: string; tipo: 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA' } | null = null;
@@ -91,7 +93,7 @@ const NovaCategoriaModal = ({ onSuccess, trigger, tipoFiltro }: NovaCategoriaMod
         const { data, error } = await supabase
           .from('categories')
           .insert({
-            user_id: user?.id,
+            user_id: targetUserId,
             name: nome,
             tipo: formData.tipo,
             parent_id: mode === 'CHILD' ? parentId : null

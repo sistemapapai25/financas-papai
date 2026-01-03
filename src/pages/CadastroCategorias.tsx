@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import NovaCategoriaModal from '@/components/NovaCategoriaModal';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 import { supabase } from '@/integrations/supabase/client';
 import { Tag, Edit2, Trash2, Search, Plus, GripVertical, MoreVertical, FolderOpen, Printer, Download, ChevronUp, ChevronDown } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
@@ -34,6 +35,11 @@ interface LancResumoRow {
   descricao?: string | null;
 }
 
+type UserOpt = {
+  id: string;
+  label: string;
+};
+
 const CadastroCategorias = () => {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,23 +57,54 @@ const CadastroCategorias = () => {
   const [chartData, setChartData] = useState<{ mes: string; receita: number; despesa: number }[]>([]);
   const [resumo, setResumo] = useState<{ receita: number; despesa: number; total: number }>({ receita: 0, despesa: 0, total: 0 });
   const [transacoes, setTransacoes] = useState<{ id: string; data: string; descricao: string | null; valor: number }[]>([]);
+  const [userOptions, setUserOptions] = useState<UserOpt[]>([]);
+  const [scopeUserId, setScopeUserId] = useState<string>('');
 
   const { user } = useAuth();
+  const { isAdmin, loading: roleLoading } = useUserRole();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user) {
-      loadCategorias();
+    if (!user || roleLoading) return;
+    if (!scopeUserId) setScopeUserId(user.id);
+    if (!isAdmin) {
+      setUserOptions([]);
+      return;
     }
-  }, [user]);
+
+    supabase
+      .from('profiles')
+      .select('auth_user_id,email,name')
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) return;
+        const opts: UserOpt[] = (data || [])
+          .map((p) => {
+            const id = p.auth_user_id as string | null;
+            if (!id) return null;
+            const label = (p.name || p.email || id) as string;
+            return { id, label };
+          })
+          .filter((x): x is UserOpt => !!x);
+        setUserOptions(opts);
+      });
+  }, [user, roleLoading, isAdmin, scopeUserId]);
+
+  useEffect(() => {
+    if (!user || roleLoading) return;
+    loadCategorias();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, roleLoading, isAdmin, scopeUserId]);
 
   const loadCategorias = async () => {
     try {
-      await ensureTransferCategory();
+      const targetUserId = isAdmin ? (scopeUserId || user?.id) : user?.id;
+      if (!targetUserId) return;
+      await ensureTransferCategory(targetUserId);
       const { data, error } = await supabase
         .from('categories')
         .select('id,name,tipo,created_at,parent_id,ordem')
-        .eq('user_id', user?.id)
+        .eq('user_id', targetUserId)
         .order('tipo')
         .order('ordem', { ascending: true })
         .order('name', { ascending: true });
@@ -86,16 +123,15 @@ const CadastroCategorias = () => {
     }
   };
 
-  const ensureTransferCategory = async () => {
-    if (!user) return;
+  const ensureTransferCategory = async (targetUserId: string) => {
     try {
       const { data: existing } = await supabase
         .from('categories')
         .select('id, name, tipo')
-        .eq('user_id', user.id)
+        .eq('user_id', targetUserId)
         .eq('name', 'Transferência Interna');
       if (!existing || existing.length === 0) {
-        await supabase.from('categories').insert({ user_id: user.id, name: 'Transferência Interna', tipo: 'TRANSFERENCIA', parent_id: null });
+        await supabase.from('categories').insert({ user_id: targetUserId, name: 'Transferência Interna', tipo: 'TRANSFERENCIA', parent_id: null });
       } else {
         const cat = existing[0] as { id: string; name: string; tipo: 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA' };
         if (cat.tipo !== 'TRANSFERENCIA') {
@@ -122,10 +158,12 @@ const CadastroCategorias = () => {
       const inicio = new Date(hoje.getFullYear(), hoje.getMonth() - 11, 1);
       const toYMD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       const inicioStr = toYMD(inicio);
+      const targetUserId = isAdmin ? (scopeUserId || user?.id) : user?.id;
+      if (!targetUserId) return;
       const { data, error } = await supabase
         .from('lancamentos')
         .select('id, tipo, valor, valor_pago, vencimento, data_pagamento, descricao')
-        .eq('user_id', user?.id)
+        .eq('user_id', targetUserId)
         .eq('categoria_id', cat.id)
         .gte('vencimento', inicioStr);
       if (error) throw error;
@@ -146,7 +184,7 @@ const CadastroCategorias = () => {
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         const lbl = d.toLocaleDateString('pt-BR', { month: 'short' });
         const agg = mapMes[key] || { receita: 0, despesa: 0 };
-        serie.push({ mes: lbl, receita: agg.receita, despesa: agg.despesa });
+        serie.push({ mes: lbl ? lbl[0].toUpperCase() + lbl.slice(1) : lbl, receita: agg.receita, despesa: agg.despesa });
       }
       setChartData(serie);
       const totRec = serie.reduce((s, m) => s + m.receita, 0);
@@ -190,10 +228,12 @@ const CadastroCategorias = () => {
           description: "Categoria atualizada com sucesso!",
         });
       } else {
+        const targetUserId = isAdmin ? (scopeUserId || user?.id) : user?.id;
+        if (!targetUserId) throw new Error('Usuário não selecionado');
         const { error } = await supabase
           .from('categories')
           .insert({
-            user_id: user?.id,
+            user_id: targetUserId,
             name: formData.name.trim(),
             tipo: formData.tipo
           });
@@ -396,11 +436,32 @@ const CadastroCategorias = () => {
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold text-blue-700">Categorias</h1>
           <div className="flex items-center gap-2">
-            <NovaCategoriaModal trigger={<Button className="bg-blue-700 hover:bg-blue-800"><Plus className="w-4 h-4 mr-2" />Adicionar</Button>} onSuccess={() => loadCategorias()} />
+            <NovaCategoriaModal userId={scopeUserId || user?.id} trigger={<Button className="bg-blue-700 hover:bg-blue-800"><Plus className="w-4 h-4 mr-2" />Adicionar</Button>} onSuccess={() => loadCategorias()} />
             <Button variant="outline"><Printer className="w-4 h-4" /></Button>
             <Button variant="outline"><Download className="w-4 h-4" /></Button>
           </div>
         </div>
+
+        {isAdmin ? (
+          <div className="mb-4">
+            <div className="max-w-md space-y-2">
+              <Label>Usuário</Label>
+              <Select value={scopeUserId} onValueChange={setScopeUserId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um usuário" />
+                </SelectTrigger>
+                <SelectContent>
+                  {userOptions.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        ) : null}
+
         <div className="flex items-center gap-3 mb-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />

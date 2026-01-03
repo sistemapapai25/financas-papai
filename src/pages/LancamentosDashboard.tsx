@@ -1687,7 +1687,7 @@ export default function LancamentosDashboard() {
         <Dialog open={extratoPdfOpen} onOpenChange={setExtratoPdfOpen}>
           <DialogContent className="sm:max-w-[900px]" onOpenAutoFocus={(e) => e.preventDefault()}>
             <DialogHeader>
-              <DialogTitle>Extrato Bancário - {mesesPt[mes]} {ano}</DialogTitle>
+              <DialogTitle>Extrato Bancário - {capitalize(mesesPt[mes])} {ano}</DialogTitle>
             </DialogHeader>
             {!contaExtrato ? (
               <div className="text-sm text-muted-foreground">Selecione uma conta (não &quot;Todas&quot;) para vincular o PDF ao mês.</div>

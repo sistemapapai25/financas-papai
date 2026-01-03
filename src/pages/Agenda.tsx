@@ -23,6 +23,7 @@ export default function Agenda() {
   const mes = dataRef.getMonth();
   const inicio = new Date(Date.UTC(ano, mes, 1)).toISOString().slice(0, 10);
   const fim = new Date(Date.UTC(ano, mes + 1, 0)).toISOString().slice(0, 10);
+  const capitalize = (s: string) => (s ? s[0].toLocaleUpperCase("pt-BR") + s.slice(1) : s);
 
   useEffect(() => {
     if (!supabase || !user) return;
@@ -65,7 +66,7 @@ export default function Agenda() {
 
   const tituloMes = useMemo(() => {
     const nomes = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-    return `${nomes[mes]} de ${ano}`;
+    return `${capitalize(nomes[mes])} de ${ano}`;
   }, [mes, ano]);
 
   const diasDoMes = useMemo(() => {

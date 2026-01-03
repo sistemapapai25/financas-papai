@@ -23,6 +23,7 @@ import ListaCultos from "./pages/ListaCultos";
 import CadastroTiposCulto from "./pages/CadastroTiposCulto";
 import CadastroContasFinanceiras from "./pages/CadastroContasFinanceiras";
 import ImportarExtrato from "./pages/ImportarExtrato";
+import ImportarCaixa from "./pages/ImportarCaixa";
 import LancamentosDashboard from "./pages/LancamentosDashboard";
 import Agenda from "@/pages/Agenda";
 import RegrasClassificacao from "./pages/RegrasClassificacao";
@@ -104,6 +105,7 @@ export default function App() {
                   <Route path="/contas-pagas" element={<ContasPagas />} />
                   <Route path="/relatorio-pagamentos" element={<RelatorioPagamentos />} />
                   <Route path="/movimentacoes/importar-extrato" element={<ImportarExtrato />} />
+                  <Route path="/movimentacoes/importar-caixa" element={<ImportarCaixa />} />
 
                   {/* Financeiro */}
                   <Route path="/financeiro/lancamentos" element={<LancamentosDashboard />} />

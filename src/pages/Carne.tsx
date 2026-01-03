@@ -43,6 +43,7 @@ type Desafio = {
 type Participante = {
   id: string;
   status: string;
+  valor_personalizado: number | null;
   pessoa: { id: string; nome: string; telefone: string | null } | null;
 };
 
@@ -109,6 +110,16 @@ export default function Carne() {
   const [dataPagamento, setDataPagamento] = useState("");
   const [salvandoPagamento, setSalvandoPagamento] = useState(false);
 
+  // Edição de valor mensal
+  const [editingValor, setEditingValor] = useState(false);
+  const [novoValorMensal, setNovoValorMensal] = useState("");
+  const [salvandoValor, setSalvandoValor] = useState(false);
+
+  // Edição de parcela individual
+  const [editingParcelaId, setEditingParcelaId] = useState<string | null>(null);
+  const [novoValorParcela, setNovoValorParcela] = useState("");
+  const [salvandoParcela, setSalvandoParcela] = useState(false);
+
   const loadDesafios = async () => {
     setLoadingDesafios(true);
     const { data, error } = await supabase
@@ -136,9 +147,9 @@ export default function Carne() {
     setLoadingParticipantes(true);
     const { data, error } = await supabase
       .from("desafio_participantes")
-      .select("id,status,pessoa:pessoas(id,nome,telefone)")
-      .eq("desafio_id", dId)
-      .order("created_at", { ascending: false });
+      .select("id,status,valor_personalizado,pessoa:pessoas(id,nome,telefone)")
+      .eq("desafio_id", dId);
+    
     setLoadingParticipantes(false);
 
     if (error) {
@@ -146,7 +157,16 @@ export default function Carne() {
       return;
     }
 
-    setParticipantes((data as unknown as Participante[]) ?? []);
+    const list = (data as unknown as Participante[]) ?? [];
+
+    // Ordenar por nome (ordem alfabética)
+    list.sort((a, b) => {
+      const nomeA = a.pessoa?.nome?.toLowerCase() ?? "";
+      const nomeB = b.pessoa?.nome?.toLowerCase() ?? "";
+      return nomeA.localeCompare(nomeB);
+    });
+
+    setParticipantes(list);
   };
 
   const loadParcelas = async (participanteId: string) => {
@@ -168,12 +188,16 @@ export default function Carne() {
 
   const handleClickParticipante = (p: Participante) => {
     setSelectedParticipante(p);
+    setEditingValor(false);
+    setNovoValorMensal("");
     loadParcelas(p.id);
   };
 
   const closeModal = () => {
     setSelectedParticipante(null);
     setParcelas([]);
+    setEditingValor(false);
+    setEditingParcelaId(null);
   };
 
   const abrirModalPagamento = (parcela: Parcela, index: number) => {
@@ -219,6 +243,62 @@ export default function Carne() {
     if (selectedParticipante) {
       loadParcelas(selectedParticipante.id);
     }
+  };
+
+  const handleUpdateValor = async () => {
+    if (!selectedParticipante) return;
+    const valor = parseCurrencyInput(novoValorMensal);
+    if (!Number.isFinite(valor) || valor <= 0) {
+      toast({ title: "Atenção", description: "Informe um valor válido.", variant: "destructive" });
+      return;
+    }
+
+    setSalvandoValor(true);
+    const { error } = await supabase.rpc("atualizar_valor_participante" as any, {
+      _participante_id: selectedParticipante.id,
+      _novo_valor: valor,
+    });
+    setSalvandoValor(false);
+
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Sucesso", description: "Valor atualizado e parcelas em aberto recalculadas." });
+    setEditingValor(false);
+    
+    // Atualizar estado local
+    const updatedParticipante = { ...selectedParticipante, valor_personalizado: valor };
+    setSelectedParticipante(updatedParticipante);
+    setParticipantes((prev) => prev.map((p) => (p.id === updatedParticipante.id ? updatedParticipante : p)));
+    loadParcelas(updatedParticipante.id);
+  };
+
+  const handleUpdateParcela = async (parcelaId: string) => {
+    const valor = parseCurrencyInput(novoValorParcela);
+    if (!Number.isFinite(valor) || valor <= 0) {
+      toast({ title: "Atenção", description: "Informe um valor válido.", variant: "destructive" });
+      return;
+    }
+
+    setSalvandoParcela(true);
+    const { error } = await supabase.rpc("atualizar_valor_parcela" as any, {
+      _parcela_id: parcelaId,
+      _novo_valor: valor,
+    });
+    setSalvandoParcela(false);
+
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Sucesso", description: "Valor da parcela atualizado." });
+    setEditingParcelaId(null);
+    
+    // Atualizar estado local
+    setParcelas((prev) => prev.map((p) => (p.id === parcelaId ? { ...p, valor } : p)));
   };
 
   const enviarWhatsApp = async (numero: string, mensagem: string) => {
@@ -361,12 +441,6 @@ export default function Carne() {
                   ))}
                 </SelectContent>
               </Select>
-              {desafioAtual && (
-                <div className="text-sm text-muted-foreground">
-                  Valor mensal: {formatCurrency(desafioAtual.valor_mensal)} | 
-                  Parcelas: {desafioAtual.qtd_parcelas}
-                </div>
-              )}
             </div>
           )}
         </CardContent>
@@ -413,6 +487,62 @@ export default function Carne() {
             <DialogTitle>
               Carnê de {selectedParticipante?.pessoa?.nome ?? "Participante"} - {desafioAtual?.titulo}
             </DialogTitle>
+            <div className="flex items-center gap-2 mt-1">
+              {!editingValor ? (
+                <>
+                  <div className="text-sm text-muted-foreground flex items-center gap-2">
+                    <span>
+                      Valor mensal padrão:{" "}
+                      <span className="font-medium text-foreground">
+                        {formatCurrency(
+                          selectedParticipante?.valor_personalizado ?? desafioAtual?.valor_mensal ?? 0
+                        )}
+                      </span>
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-xs px-2"
+                      onClick={() => {
+                        setNovoValorMensal(
+                          formatCurrencyInput(
+                            selectedParticipante?.valor_personalizado ?? desafioAtual?.valor_mensal ?? 0
+                          )
+                        );
+                        setEditingValor(true);
+                      }}
+                      title="Alterar valor de todas as parcelas em aberto"
+                    >
+                      Alterar todas as parcelas
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Input
+                    className="h-7 w-24 text-sm"
+                    value={novoValorMensal}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/[^\d]/g, "");
+                      const num = parseInt(raw || "0", 10) / 100;
+                      setNovoValorMensal(formatCurrencyInput(num));
+                    }}
+                  />
+                  <Button size="sm" className="h-7 px-2 text-xs" onClick={handleUpdateValor} disabled={salvandoValor}>
+                    {salvandoValor ? "..." : "Salvar"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setEditingValor(false)}
+                    disabled={salvandoValor}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              )}
+            </div>
           </DialogHeader>
 
           {loadingParcelas ? (
@@ -460,7 +590,56 @@ export default function Carne() {
                       <TableRow key={parcela.id}>
                         <TableCell className="font-medium">{index + 1}/{desafioAtual?.qtd_parcelas}</TableCell>
                         <TableCell>{formatDate(parcela.vencimento)}</TableCell>
-                        <TableCell>{formatCurrency(parcela.valor)}</TableCell>
+                        <TableCell>
+                          {editingParcelaId === parcela.id ? (
+                            <div className="flex items-center gap-2">
+                              <Input
+                                className="h-7 w-20 text-sm p-1"
+                                value={novoValorParcela}
+                                onChange={(e) => {
+                                  const raw = e.target.value.replace(/[^\d]/g, "");
+                                  const num = parseInt(raw || "0", 10) / 100;
+                                  setNovoValorParcela(formatCurrencyInput(num));
+                                }}
+                              />
+                              <Button
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={() => handleUpdateParcela(parcela.id)}
+                                disabled={salvandoParcela}
+                              >
+                                ✓
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={() => setEditingParcelaId(null)}
+                                disabled={salvandoParcela}
+                              >
+                                ✕
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span>{formatCurrency(parcela.valor)}</span>
+                              {parcela.status === "ABERTO" && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 opacity-50 hover:opacity-100"
+                                  onClick={() => {
+                                    setNovoValorParcela(formatCurrencyInput(parcela.valor));
+                                    setEditingParcelaId(parcela.id);
+                                  }}
+                                  title="Editar valor desta parcela"
+                                >
+                                  ✎
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </TableCell>
                         <TableCell>{getStatusBadge(parcela.status)}</TableCell>
                         <TableCell>{parcela.pago_em ? new Date(parcela.pago_em).toLocaleDateString("pt-BR") : "-"}</TableCell>
                         <TableCell>{parcela.pago_valor ? formatCurrency(parcela.pago_valor) : "-"}</TableCell>

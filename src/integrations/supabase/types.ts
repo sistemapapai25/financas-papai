@@ -457,6 +457,7 @@ export type Database = {
           created_at: string
           culto_id: string
           id: string
+          importado: boolean
           nome: string
           valor: number
         }
@@ -464,6 +465,7 @@ export type Database = {
           created_at?: string
           culto_id: string
           id?: string
+          importado?: boolean
           nome: string
           valor: number
         }
@@ -471,6 +473,7 @@ export type Database = {
           created_at?: string
           culto_id?: string
           id?: string
+          importado?: boolean
           nome?: string
           valor?: number
         }
@@ -670,6 +673,7 @@ export type Database = {
           created_at: string
           culto_id: string
           id: string
+          importado: boolean
           valor: number
           valor_dinheiro: number
           valor_moedas: number
@@ -678,6 +682,7 @@ export type Database = {
           created_at?: string
           culto_id: string
           id?: string
+          importado?: boolean
           valor: number
           valor_dinheiro?: number
           valor_moedas?: number
@@ -686,6 +691,7 @@ export type Database = {
           created_at?: string
           culto_id?: string
           id?: string
+          importado?: boolean
           valor?: number
           valor_dinheiro?: number
           valor_moedas?: number

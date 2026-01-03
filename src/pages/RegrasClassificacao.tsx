@@ -3,8 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import { supabase } from "@/integrations/supabase/client";
 import { Trash2, Plus, Check, ChevronsUpDown } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -30,12 +32,20 @@ type Beneficiary = {
     name: string;
 };
 
+type UserOpt = {
+    id: string;
+    label: string;
+};
+
 export default function RegrasClassificacao() {
     const { user } = useAuth();
+    const { isAdmin, loading: roleLoading } = useUserRole();
     const { toast } = useToast();
     const [rules, setRules] = useState<Rule[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
+    const [userOptions, setUserOptions] = useState<UserOpt[]>([]);
+    const [scopeUserId, setScopeUserId] = useState<string>("");
     const [newTerm, setNewTerm] = useState("");
     const [newCategoryId, setNewCategoryId] = useState("");
     const [newBeneficiaryId, setNewBeneficiaryId] = useState("");
@@ -50,15 +60,53 @@ export default function RegrasClassificacao() {
     }, []);
 
     useEffect(() => {
-        if (!user) return;
-        loadRules();
-        loadCategories();
-        loadBeneficiaries();
-    }, [user]);
+        if (!user || roleLoading) return;
 
-    const loadRules = async () => {
+        if (!scopeUserId) setScopeUserId(isAdmin ? "__ALL__" : user.id);
+
+        if (isAdmin) {
+            supabase
+                .from("profiles")
+                .select("auth_user_id,email,name")
+                .order("created_at", { ascending: false })
+                .then(({ data, error }) => {
+                    if (error) return;
+                    const opts: UserOpt[] = (data || [])
+                        .map((p) => {
+                            const id = p.auth_user_id as string | null;
+                            if (!id) return null;
+                            const label = (p.name || p.email || id) as string;
+                            return { id, label };
+                        })
+                        .filter((x): x is UserOpt => !!x);
+                    setUserOptions(opts);
+                });
+        } else {
+            setUserOptions([]);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user, roleLoading, isAdmin]);
+
+    useEffect(() => {
+        if (!user || roleLoading) return;
+        const target = isAdmin ? scopeUserId : user.id;
+        if (!target) return;
+        loadRules(target);
+        if (target === "__ALL__") {
+            setCategories([]);
+            setBeneficiaries([]);
+            setNewCategoryId("");
+            setNewBeneficiaryId("");
+            return;
+        }
+        loadCategories(target);
+        loadBeneficiaries(target);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user, roleLoading, isAdmin, scopeUserId]);
+
+    const loadRules = async (targetUserId: string) => {
         if (!user) return;
-        const { data, error } = await supabase
+        let q = supabase
             .from("classification_rules")
             .select(`
         id,
@@ -68,8 +116,12 @@ export default function RegrasClassificacao() {
         category:categories(name),
         beneficiary:beneficiaries(name)
       `)
-            .eq("user_id", user.id)
             .order("created_at", { ascending: false });
+        if (!isAdmin || targetUserId !== "__ALL__") {
+            q = q.eq("user_id", targetUserId === "__ALL__" ? user.id : targetUserId);
+        }
+
+        const { data, error } = await q;
 
         if (error) {
             toast({ title: "Erro", description: error.message, variant: "destructive" });
@@ -95,12 +147,12 @@ export default function RegrasClassificacao() {
         setRules(mapped);
     };
 
-    const loadCategories = async () => {
+    const loadCategories = async (targetUserId: string) => {
         if (!user) return;
         const { data, error } = await supabase
             .from("categories")
             .select("id, name")
-            .eq("user_id", user.id)
+            .eq("user_id", targetUserId)
             .order("tipo")
             .order("name");
         if (error) {
@@ -110,12 +162,12 @@ export default function RegrasClassificacao() {
         setCategories(data || []);
     };
 
-    const loadBeneficiaries = async () => {
+    const loadBeneficiaries = async (targetUserId: string) => {
         if (!user) return;
         const { data } = await supabase
             .from("beneficiaries")
             .select("id, name")
-            .eq("user_id", user.id)
+            .eq("user_id", targetUserId)
             .order("name");
         setBeneficiaries(data || []);
     };
@@ -126,10 +178,16 @@ export default function RegrasClassificacao() {
             return;
         }
 
+        const targetUserId = isAdmin ? scopeUserId : user.id;
+        if (isAdmin && targetUserId === "__ALL__") {
+            toast({ title: "Usuário", description: "Selecione um usuário específico para criar a regra.", variant: "destructive" });
+            return;
+        }
+
         setLoading(true);
         try {
             const { error } = await supabase.from("classification_rules").insert({
-                user_id: user.id,
+                user_id: targetUserId,
                 term: newTerm.trim(),
                 category_id: newCategoryId || null,
                 beneficiary_id: newBeneficiaryId || null,
@@ -142,7 +200,7 @@ export default function RegrasClassificacao() {
             setNewCategoryId(""
             );
             setNewBeneficiaryId("");
-            loadRules();
+            loadRules(targetUserId);
         } catch (error: unknown) {
             toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro desconhecido", variant: "destructive" });
         } finally {
@@ -152,13 +210,16 @@ export default function RegrasClassificacao() {
 
     const deleteRule = async (id: string) => {
         if (!user) return;
-        const { error } = await supabase.from("classification_rules").delete().eq("id", id).eq("user_id", user.id);
+        let q = supabase.from("classification_rules").delete().eq("id", id);
+        if (!isAdmin) q = q.eq("user_id", user.id);
+        const { error } = await q;
         if (error) {
             toast({ title: "Erro", description: error.message, variant: "destructive" });
             return;
         }
         toast({ title: "Sucesso", description: "Regra excluída" });
-        loadRules();
+        const targetUserId = isAdmin ? scopeUserId : user.id;
+        loadRules(targetUserId || user.id);
     };
 
     return (
@@ -172,6 +233,24 @@ export default function RegrasClassificacao() {
                     </CardHeader>
                     <CardContent>
                         <div className="grid gap-4">
+                            {isAdmin ? (
+                                <div>
+                                    <Label>Usuário</Label>
+                                    <Select value={scopeUserId} onValueChange={setScopeUserId}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Selecione um usuário" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__ALL__">Todos os usuários</SelectItem>
+                                            {userOptions.map((u) => (
+                                                <SelectItem key={u.id} value={u.id}>
+                                                    {u.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            ) : null}
                             <div>
                                 <Label>Se a descrição contiver</Label>
                                 <Input
@@ -254,7 +333,7 @@ export default function RegrasClassificacao() {
                                     </PopoverContent>
                                 </Popover>
                             </div>
-                            <Button onClick={addRule} disabled={loading}>
+                            <Button onClick={addRule} disabled={loading || (isAdmin && scopeUserId === "__ALL__")}>
                                 <Plus className="w-4 h-4 mr-2" />
                                 Adicionar Regra
                             </Button>

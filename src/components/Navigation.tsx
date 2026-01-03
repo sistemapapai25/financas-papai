@@ -69,10 +69,11 @@ const Navigation = () => {
                       </div>
 
                       <div>
-                        <div className={groupTitleCls(['/financeiro/lancamentos', '/movimentacoes/importar-extrato', '/financeiro/resumo-anual'])}>Conciliação</div>
+                        <div className={groupTitleCls(['/financeiro/lancamentos', '/movimentacoes/importar-extrato', '/movimentacoes/importar-caixa', '/financeiro/resumo-anual'])}>Conciliação</div>
                         <div className="flex flex-col">
                           <Link to="/financeiro/lancamentos" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Lançamentos</Link>
                           <Link to="/movimentacoes/importar-extrato" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Importar Extrato</Link>
+                          <Link to="/movimentacoes/importar-caixa" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Importar Caixa</Link>
                           <Link to="/financeiro/resumo-anual" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Resumo Anual</Link>
                         </div>
                       </div>
@@ -160,7 +161,7 @@ const Navigation = () => {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={groupCls(['/financeiro/lancamentos', '/movimentacoes/importar-extrato', '/financeiro/resumo-anual'])}>Conciliação</button>
+                <button className={groupCls(['/financeiro/lancamentos', '/movimentacoes/importar-extrato', '/movimentacoes/importar-caixa', '/financeiro/resumo-anual'])}>Conciliação</button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem asChild>
@@ -168,6 +169,9 @@ const Navigation = () => {
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/movimentacoes/importar-extrato">Importar Extrato</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/movimentacoes/importar-caixa">Importar Caixa</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/financeiro/resumo-anual">Resumo Anual</Link>

@@ -98,6 +98,7 @@ export default function Desafios() {
   const [pessoas, setPessoas] = useState<PessoaOpt[]>([]);
   const [participantes, setParticipantes] = useState<ParticipanteRow[]>([]);
   const [pessoaSel, setPessoaSel] = useState<string>("");
+  const [valorPersonalizado, setValorPersonalizado] = useState<string>("");
   const [adding, setAdding] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deletingDesafio, setDeletingDesafio] = useState<string | null>(null);
@@ -180,6 +181,12 @@ export default function Desafios() {
     if (!selectedId && list.length > 0) setSelectedId(list[0].id);
     if (selectedId && !list.some((d) => d.id === selectedId)) setSelectedId(list[0]?.id ?? null);
   };
+
+  useEffect(() => {
+    if (selected) {
+      setValorPersonalizado(String(selected.valor_mensal));
+    }
+  }, [selected]);
 
   const loadPessoas = async () => {
     if (!canManage) return;
@@ -359,6 +366,9 @@ export default function Desafios() {
     const pessoa = pessoas.find((p) => p.id === pessoaSel) ?? null;
     setAdding(true);
 
+    const valor = Number(valorPersonalizado);
+    const valorFinal = Number.isFinite(valor) && valor > 0 && valor !== selected.valor_mensal ? valor : null;
+
     // Inserir participante
     const { data: insertData, error } = await supabase
       .from("desafio_participantes")
@@ -367,6 +377,7 @@ export default function Desafios() {
         pessoa_id: pessoaSel,
         status: "ATIVO",
         participant_user_id: pessoa?.auth_user_id ?? null,
+        valor_personalizado: valorFinal,
       })
       .select("token_link")
       .maybeSingle();
@@ -381,7 +392,8 @@ export default function Desafios() {
 
     // Enviar mensagem WhatsApp se a pessoa tiver telefone
     if (pessoa?.telefone && selected) {
-      const mensagem = `Olá ${pessoa.nome}! 🎉\n\nVocê foi adicionado ao desafio *${selected.titulo}*.\n\n💰 Valor mensal: ${formatCurrency(selected.valor_mensal)}\n🔢 Parcelas: ${selected.qtd_parcelas}x\n📆 Vencimento: dia ${selected.dia_vencimento}\n\nDeus abençoe!`;
+      const valorMsg = valorFinal ?? selected.valor_mensal;
+      const mensagem = `Olá, ${pessoa.nome}! 🙌\n\nVocê foi adicionado ao ${selected.titulo}.\n\n📌 Informações do voto\n• Parcelamento: ${selected.qtd_parcelas}x\n• Vencimento: dia ${selected.dia_vencimento}\n\n🔑 Chave PIX: 44582345000176\n🏛 Em nome de: Igreja Apostólica e Profética Águas Purificadoras\n\nObrigado pela sua fidelidade! Deus abençoe sua vida e sua casa! 🙏`;
 
       const enviado = await enviarWhatsApp(pessoa.telefone, mensagem);
       if (enviado) {
@@ -393,6 +405,7 @@ export default function Desafios() {
 
     setAdding(false);
     setPessoaSel("");
+    if (selected) setValorPersonalizado(String(selected.valor_mensal));
     loadParticipantes(selectedId);
   };
 
@@ -555,7 +568,8 @@ export default function Desafios() {
       const ok = await enviarWhatsApp(item.telefone as string, msg);
       if (ok) enviados++;
       else falhas++;
-      await new Promise((r) => setTimeout(r, 400));
+      // Intervalo de 5 segundos para evitar bloqueios no WhatsApp
+      await new Promise((r) => setTimeout(r, 5000));
     }
 
     setSendingMensagem(false);
@@ -727,8 +741,8 @@ export default function Desafios() {
               <div className="text-sm text-muted-foreground">Selecione um desafio.</div>
             ) : (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                  <div className="md:col-span-2 space-y-2">
                     <Label>Adicionar pessoa</Label>
                     <Select value={pessoaSel} onValueChange={(val) => setPessoaSel(val ?? "")}>
                       <SelectTrigger>
@@ -745,9 +759,18 @@ export default function Desafios() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex items-end">
+                  <div className="space-y-2">
+                    <Label>Valor Mensal</Label>
+                    <Input
+                      value={valorPersonalizado}
+                      onChange={(e) => setValorPersonalizado(e.target.value)}
+                      inputMode="decimal"
+                      placeholder={formatCurrency(selected.valor_mensal)}
+                    />
+                  </div>
+                  <div>
                     <Button onClick={addParticipante} disabled={adding || !pessoaSel} className="w-full">
-                      Adicionar e gerar carnê
+                      Adicionar
                     </Button>
                   </div>
                 </div>
