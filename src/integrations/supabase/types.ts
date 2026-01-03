@@ -375,6 +375,7 @@ export type Database = {
           status: string
           token_expires_at: string | null
           token_link: string
+          valor_personalizado: number | null
         }
         Insert: {
           created_at?: string
@@ -385,6 +386,7 @@ export type Database = {
           status?: string
           token_expires_at?: string | null
           token_link?: string
+          valor_personalizado?: number | null
         }
         Update: {
           created_at?: string
@@ -395,6 +397,7 @@ export type Database = {
           status?: string
           token_expires_at?: string | null
           token_link?: string
+          valor_personalizado?: number | null
         }
         Relationships: [
           {
@@ -972,6 +975,14 @@ export type Database = {
       }
     }
     Functions: {
+      atualizar_valor_parcela: {
+        Args: { _novo_valor: number; _parcela_id: string }
+        Returns: undefined
+      }
+      atualizar_valor_participante: {
+        Args: { _novo_valor: number; _participante_id: string }
+        Returns: undefined
+      }
       ensure_default_categories: { Args: never; Returns: undefined }
       gerar_carne_para_participante: {
         Args: { _participante_id: string }
