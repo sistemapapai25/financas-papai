@@ -487,63 +487,66 @@ export default function Carne() {
             <DialogTitle>
               Carnê de {selectedParticipante?.pessoa?.nome ?? "Participante"} - {desafioAtual?.titulo}
             </DialogTitle>
-            <div className="flex items-center gap-2 mt-1">
-              {!editingValor ? (
-                <>
-                  <div className="text-sm text-muted-foreground flex items-center gap-2">
-                    <span>
-                      Valor mensal padrão:{" "}
-                      <span className="font-medium text-foreground">
-                        {formatCurrency(
-                          selectedParticipante?.valor_personalizado ?? desafioAtual?.valor_mensal ?? 0
-                        )}
-                      </span>
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-6 text-xs px-2"
-                      onClick={() => {
-                        setNovoValorMensal(
-                          formatCurrencyInput(
-                            selectedParticipante?.valor_personalizado ?? desafioAtual?.valor_mensal ?? 0
-                          )
-                        );
-                        setEditingValor(true);
-                      }}
-                      title="Alterar valor de todas as parcelas em aberto"
-                    >
-                      Alterar todas as parcelas
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <div className="flex items-center gap-2">
+          </DialogHeader>
+
+          <div className="my-6 p-4 border rounded-lg bg-muted/20">
+            {!editingValor ? (
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm text-muted-foreground">Valor mensal padrão</span>
+                  <span className="text-xl font-bold text-foreground">
+                    {formatCurrency(
+                      selectedParticipante?.valor_personalizado ?? desafioAtual?.valor_mensal ?? 0
+                    )}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setNovoValorMensal(
+                      formatCurrencyInput(
+                        selectedParticipante?.valor_personalizado ?? desafioAtual?.valor_mensal ?? 0
+                      )
+                    );
+                    setEditingValor(true);
+                  }}
+                  title="Alterar valor de todas as parcelas em aberto"
+                >
+                  Alterar todas as parcelas
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <span className="text-sm font-medium block mb-1">Novo valor mensal:</span>
                   <Input
-                    className="h-7 w-24 text-sm"
+                    className="h-9"
                     value={novoValorMensal}
                     onChange={(e) => {
                       const raw = e.target.value.replace(/[^\d]/g, "");
                       const num = parseInt(raw || "0", 10) / 100;
                       setNovoValorMensal(formatCurrencyInput(num));
                     }}
+                    placeholder="0,00"
                   />
-                  <Button size="sm" className="h-7 px-2 text-xs" onClick={handleUpdateValor} disabled={salvandoValor}>
+                </div>
+                <div className="flex items-end gap-2 pt-6">
+                  <Button size="sm" onClick={handleUpdateValor} disabled={salvandoValor}>
                     {salvandoValor ? "..." : "Salvar"}
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 px-2 text-xs"
                     onClick={() => setEditingValor(false)}
                     disabled={salvandoValor}
                   >
                     Cancelar
                   </Button>
                 </div>
-              )}
-            </div>
-          </DialogHeader>
+              </div>
+            )}
+          </div>
 
           {loadingParcelas ? (
             <div className="text-sm text-muted-foreground py-4">Carregando parcelas...</div>

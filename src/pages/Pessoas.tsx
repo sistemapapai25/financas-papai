@@ -136,6 +136,16 @@ export default function Pessoas() {
       return;
     }
 
+    const phoneDigits = telefone.replace(/\D/g, "");
+    if (phoneDigits.length !== 11) {
+      toast({
+        title: "Atenção",
+        description: "Número errado. Verifique se o código DDD existe (11 dígitos).",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSaving(true);
 
     const payload = {
@@ -241,24 +251,6 @@ export default function Pessoas() {
                 <Label>Email</Label>
                 <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Ex.: joao@email.com" />
               </div>
-              <div className="space-y-2">
-                <Label>Login (opcional)</Label>
-                <Select value={authUserId} onValueChange={setAuthUserId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Nenhum" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Nenhum</SelectItem>
-                    {profiles
-                      .filter((p) => !!p.auth_user_id)
-                      .map((p) => (
-                        <SelectItem key={p.auth_user_id as string} value={p.auth_user_id as string}>
-                          {p.email}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
               <div className="flex items-center justify-between">
                 <Label>Ativo</Label>
                 <Switch checked={ativo} onCheckedChange={setAtivo} />
@@ -290,7 +282,6 @@ export default function Pessoas() {
                     <TableHead>Nome</TableHead>
                     <TableHead>Telefone</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Login</TableHead>
                     <TableHead className="w-28">Ativo</TableHead>
                     <TableHead className="w-24">Ações</TableHead>
                   </TableRow>
@@ -301,26 +292,6 @@ export default function Pessoas() {
                       <TableCell className="font-medium">{r.nome}</TableCell>
                       <TableCell>{r.telefone ?? "-"}</TableCell>
                       <TableCell>{r.email ?? "-"}</TableCell>
-                      <TableCell>
-                        <Select
-                          value={r.auth_user_id ?? "__none__"}
-                          onValueChange={(v) => updateAuthUserId(r, v)}
-                        >
-                          <SelectTrigger className="h-8">
-                            <SelectValue placeholder="Nenhum" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__">Nenhum</SelectItem>
-                            {profiles
-                              .filter((p) => !!p.auth_user_id)
-                              .map((p) => (
-                                <SelectItem key={p.auth_user_id as string} value={p.auth_user_id as string}>
-                                  {p.email}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
                       <TableCell>
                         <Switch checked={r.ativo} onCheckedChange={() => toggleAtivo(r)} />
                       </TableCell>
