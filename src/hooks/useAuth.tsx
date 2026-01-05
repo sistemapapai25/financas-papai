@@ -41,6 +41,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   useEffect(() => {
+    // Safety timeout to prevent infinite loading
+    const safetyTimeout = setTimeout(() => {
+      setLoading((prev) => {
+        if (prev) {
+          console.warn("Auth check timed out - forcing app load");
+          return false;
+        }
+        return prev;
+      });
+    }, 5000);
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -60,6 +71,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     // THEN check for existing session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      clearTimeout(safetyTimeout);
       setSession(session);
       setUser(session?.user ?? null);
 
@@ -81,6 +93,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       setLoading(false);
       if (session?.user) ensureAdminIfNeeded(session.user);
+    }).catch((error) => {
+      console.error("Erro ao verificar sessão inicial:", error);
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();

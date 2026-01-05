@@ -32,6 +32,7 @@ import ResumoAnual from "./pages/ResumoAnual";
 import Pessoas from "./pages/Pessoas";
 import Desafios from "./pages/Desafios";
 import Carne from "./pages/Carne";
+import GestaoFinanceiraDesafios from "./pages/GestaoFinanceiraDesafios";
 import CarnePublico from "./pages/CarnePublico";
 
 // (opcionais p/ diagnóstico)
@@ -123,6 +124,7 @@ export default function App() {
                   {/* Meus Desafios */}
                   <Route path="/meus-desafios" element={<Desafios />} />
                   <Route path="/meus-desafios/gestao-carnes" element={<Carne />} />
+                  <Route path="/meus-desafios/gestao-financeira" element={<GestaoFinanceiraDesafios />} />
 
                   {/* Configurações */}
                   <Route path="/configuracoes/regras-classificacao" element={<RegrasClassificacao />} />

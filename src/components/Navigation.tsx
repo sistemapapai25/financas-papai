@@ -79,10 +79,11 @@ const Navigation = () => {
                       </div>
 
                       <div>
-                        <div className={groupTitleCls(['/meus-desafios', '/meus-desafios/gestao-carnes'])}>Desafios Financeiros</div>
+                        <div className={groupTitleCls(['/meus-desafios', '/meus-desafios/gestao-carnes', '/meus-desafios/gestao-financeira'])}>Desafios Financeiros</div>
                         <div className="flex flex-col">
                           <Link to="/meus-desafios" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Gestão de Desafios</Link>
                           <Link to="/meus-desafios/gestao-carnes" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Gestão de Carnês</Link>
+                          <Link to="/meus-desafios/gestao-financeira" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Gestão Financeira</Link>
                         </div>
                       </div>
 
@@ -181,7 +182,7 @@ const Navigation = () => {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={groupCls(['/meus-desafios', '/meus-desafios/gestao-carnes'])}>Desafios Financeiros</button>
+                <button className={groupCls(['/meus-desafios', '/meus-desafios/gestao-carnes', '/meus-desafios/gestao-financeira'])}>Desafios Financeiros</button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem asChild>
@@ -189,6 +190,9 @@ const Navigation = () => {
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/meus-desafios/gestao-carnes">Gestão de Carnês</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/meus-desafios/gestao-financeira">Gestão Financeira</Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -97,6 +98,7 @@ export default function Carne() {
 
   const [participantes, setParticipantes] = useState<Participante[]>([]);
   const [loadingParticipantes, setLoadingParticipantes] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Modal de parcelas
   const [selectedParticipante, setSelectedParticipante] = useState<Participante | null>(null);
@@ -119,6 +121,11 @@ export default function Carne() {
   const [editingParcelaId, setEditingParcelaId] = useState<string | null>(null);
   const [novoValorParcela, setNovoValorParcela] = useState("");
   const [salvandoParcela, setSalvandoParcela] = useState(false);
+
+  // Edição de data de vencimento
+  const [editingVencimento, setEditingVencimento] = useState(false);
+  const [novoDiaVencimento, setNovoDiaVencimento] = useState("");
+  const [salvandoVencimento, setSalvandoVencimento] = useState(false);
 
   const loadDesafios = async () => {
     setLoadingDesafios(true);
@@ -275,6 +282,65 @@ export default function Carne() {
     loadParcelas(updatedParticipante.id);
   };
 
+  const handleUpdateVencimento = async () => {
+    if (!selectedParticipante) return;
+    const dia = parseInt(novoDiaVencimento, 10);
+    
+    if (isNaN(dia) || dia < 1 || dia > 31) {
+      toast({ title: "Atenção", description: "Informe um dia válido (1-31).", variant: "destructive" });
+      return;
+    }
+
+    const parcelasAbertas = parcelas.filter(p => p.status === 'ABERTO');
+    if (parcelasAbertas.length === 0) {
+      toast({ title: "Atenção", description: "Não há parcelas em aberto para alterar.", variant: "default" });
+      return;
+    }
+
+    setSalvandoVencimento(true);
+    
+    try {
+      // Atualizar parcelas uma a uma
+      const updates = parcelasAbertas.map(async (p) => {
+        // Criar data baseada no vencimento atual mas com o novo dia
+        // Assumindo p.vencimento = "YYYY-MM-DD"
+        const [ano, mes] = p.vencimento.split('-').map(Number);
+        
+        // Criar data com o novo dia. 
+        // Nota: mês no JS Date começa em 0, então mes - 1.
+        // Mas vamos construir a string manualmente para evitar problemas de timezone
+        
+        // Ajustar dia se o mês não tiver dias suficientes (ex: dia 31 em Fev)
+        // Vamos usar Date para validar quantos dias tem no mês
+        const dateObj = new Date(ano, mes, 0); // dia 0 do próximo mês = último dia deste mês
+        const diasNoMes = dateObj.getDate();
+        
+        const diaFinal = Math.min(dia, diasNoMes);
+        
+        // Formatar YYYY-MM-DD
+        const novaData = `${ano}-${String(mes).padStart(2, '0')}-${String(diaFinal).padStart(2, '0')}`;
+
+        const { error } = await supabase
+          .from('desafio_parcelas')
+          .update({ vencimento: novaData })
+          .eq('id', p.id);
+          
+        if (error) throw error;
+      });
+
+      await Promise.all(updates);
+
+      toast({ title: "Sucesso", description: "Datas de vencimento atualizadas." });
+      setEditingVencimento(false);
+      loadParcelas(selectedParticipante.id);
+      
+    } catch (error: any) {
+      toast({ title: "Erro", description: error.message || "Erro ao atualizar datas.", variant: "destructive" });
+    } finally {
+      setSalvandoVencimento(false);
+    }
+  };
+
   const handleUpdateParcela = async (parcelaId: string) => {
     const valor = parseCurrencyInput(novoValorParcela);
     if (!Number.isFinite(valor) || valor <= 0) {
@@ -413,6 +479,12 @@ export default function Carne() {
   const parcelasPagas = parcelas.filter((p) => p.status === "PAGO").length;
   const totalPago = parcelas.filter((p) => p.status === "PAGO").reduce((acc, p) => acc + (p.pago_valor || p.valor), 0);
   const totalPendente = parcelas.filter((p) => p.status !== "PAGO").reduce((acc, p) => acc + p.valor, 0);
+  const filteredParticipantes = participantes.filter((p) => {
+    if (!searchTerm) return true;
+    const searchLower = searchTerm.toLowerCase();
+    const nome = p.pessoa?.nome?.toLowerCase() || "";
+    return nome.includes(searchLower);
+  });
 
   return (
     <div className="space-y-6">
@@ -448,13 +520,29 @@ export default function Carne() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Participantes ({participantes.length})</CardTitle>
+          <CardTitle>Participantes ({filteredParticipantes.length})</CardTitle>
+          <div className="pt-4 relative max-w-sm">
+            <Input
+              placeholder="Buscar participante..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pr-10"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {loadingParticipantes ? (
             <div className="text-sm text-muted-foreground">Carregando...</div>
-          ) : participantes.length === 0 ? (
-            <div className="text-sm text-muted-foreground">Nenhum participante neste desafio.</div>
+          ) : filteredParticipantes.length === 0 ? (
+            <div className="text-sm text-muted-foreground">Nenhum participante encontrado.</div>
           ) : (
             <div className="overflow-auto">
               <Table>
@@ -466,7 +554,7 @@ export default function Carne() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {participantes.map((p) => (
+                  {filteredParticipantes.map((p) => (
                     <TableRow key={p.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleClickParticipante(p)}>
                       <TableCell className="font-medium text-primary underline">{p.pessoa?.nome ?? "-"}</TableCell>
                       <TableCell>{p.pessoa?.telefone ?? "-"}</TableCell>
@@ -546,6 +634,56 @@ export default function Carne() {
                 </div>
               </div>
             )}
+
+            {/* Seção de Alteração de Vencimento */}
+            <div className="mt-4 pt-4 border-t border-border/50">
+              {!editingVencimento ? (
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm text-muted-foreground">Dia de Vencimento</span>
+                    <span className="text-xs text-muted-foreground">Alterar dia de vencimento das parcelas em aberto</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setNovoDiaVencimento("");
+                      setEditingVencimento(true);
+                    }}
+                  >
+                    Alterar data de vencimento
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <span className="text-sm font-medium block mb-1">Novo dia de vencimento (1-31):</span>
+                    <Input
+                      className="h-9"
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={novoDiaVencimento}
+                      onChange={(e) => setNovoDiaVencimento(e.target.value)}
+                      placeholder="Dia"
+                    />
+                  </div>
+                  <div className="flex items-end gap-2 pt-6">
+                    <Button size="sm" onClick={handleUpdateVencimento} disabled={salvandoVencimento}>
+                      {salvandoVencimento ? "..." : "Salvar"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEditingVencimento(false)}
+                      disabled={salvandoVencimento}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {loadingParcelas ? (

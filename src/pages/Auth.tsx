@@ -1,8 +1,9 @@
 // src/pages/Auth.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { ensureDefaultCategories } from "@/services/categories";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Loader2, Mail, Lock } from "lucide-react";
 import logoUrl from "@/assets/logo-aguas.png";
@@ -11,9 +12,16 @@ const brand = "#1B2546";
 
 export default function Auth() {
   const nav = useNavigate();
+  const { user } = useAuth();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      nav("/");
+    }
+  }, [user, nav]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
