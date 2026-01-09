@@ -1,4 +1,7 @@
+
+/// <reference path="../deno-shim.d.ts" />
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -206,16 +209,22 @@ serve(async (req) => {
         continue;
       }
 
-      const baseUrl = Deno.env.get("PUBLIC_URL") || "https://ghzwyigouhvljubitowt.lovable.app";
-      const link = `${baseUrl}/carne/${participante.token_link}`;
-
       const vencBr = vencNoon.toLocaleDateString("pt-BR");
-      const mensagem =
-        diffDays === 0
-          ? `Olá ${pessoa.nome}! ⚠️\n\n*Hoje* é o dia de vencimento da sua parcela do desafio *${desafio?.titulo}*!\n\n💰 Valor: ${formatCurrency(parcela.valor)}\n📆 Vencimento: ${vencBr}\n\nAcesse seu carnê:\n${link}\n\nDeus abençoe! 🙏`
-          : diffDays === 1
-            ? `Olá ${pessoa.nome}! 📅\n\nLembrete: *amanhã* vence sua parcela do desafio *${desafio?.titulo}*!\n\n💰 Valor: ${formatCurrency(parcela.valor)}\n📆 Vencimento: ${vencBr}\n\nAcesse seu carnê:\n${link}\n\nDeus abençoe! 🙏`
-            : `Olá ${pessoa.nome}! 📅\n\nLembrete: faltam *${diffDays} dias* para vencer sua parcela do desafio *${desafio?.titulo}*.\n\n💰 Valor: ${formatCurrency(parcela.valor)}\n📆 Vencimento: ${vencBr}\n\nAcesse seu carnê:\n${link}\n\nDeus abençoe! 🙏`;
+      
+      const saudacao = `Olá ${pessoa.nome} 🙌`;
+      const rodape = `🔑Chave Pix : 44582345000176\nEm nome de Igreja Apostólica e Profética Águas Purificadoras\nEnvie seu comprovante para a nossa secretaria através do whatsapp 62986193333\nObrigado pela sua fidelidade !\nDeus abençoe sua vida 🙌`;
+      
+      let corpoLembrete = "";
+      
+      if (diffDays === 0) {
+        corpoLembrete = `Lembrete: *hoje* vence sua parcela do desafio ${desafio?.titulo}!`;
+      } else if (diffDays === 1) {
+        corpoLembrete = `Lembrete: *amanhã* vence sua parcela do desafio ${desafio?.titulo}!`;
+      } else {
+        corpoLembrete = `Lembrete: faltam *${diffDays} dias* para vencer sua parcela do desafio ${desafio?.titulo}.`;
+      }
+
+      const mensagem = `${saudacao}\n\n${corpoLembrete}\n\n💰 Valor: ${formatCurrency(parcela.valor)}\n📆 Vencimento: ${vencBr}\n${rodape}`;
 
       const enviado = await enviarWhatsApp(pessoa.telefone, mensagem);
       if (enviado) {
