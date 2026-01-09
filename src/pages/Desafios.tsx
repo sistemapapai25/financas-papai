@@ -578,11 +578,11 @@ export default function Desafios() {
       const primeiroNome = item.nome.split(" ")[0];
       const valorFormatado = formatCurrency(item.valor);
 
-      textoFinal = textoFinal.replace(/{nome}/gi, primeiroNome);
-      textoFinal = textoFinal.replace(/{nome_completo}/gi, item.nome);
-      textoFinal = textoFinal.replace(/{desafio}/gi, selected.titulo);
-      textoFinal = textoFinal.replace(/{valor}/gi, valorFormatado);
-      textoFinal = textoFinal.replace(/{pix}/gi, pixKey);
+      textoFinal = textoFinal.replace(/{nome}/g, primeiroNome);
+      textoFinal = textoFinal.replace(/{nome_completo}/g, item.nome);
+      textoFinal = textoFinal.replace(/{desafio}/g, selected.titulo);
+      textoFinal = textoFinal.replace(/{valor}/g, valorFormatado);
+      textoFinal = textoFinal.replace(/{pix}/g, pixKey);
 
       const ok = await enviarWhatsApp(item.telefone as string, textoFinal);
       if (ok) enviados++;
