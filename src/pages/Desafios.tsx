@@ -67,6 +67,7 @@ type ParticipanteRow = {
   status: string;
   token_link: string;
   token_expires_at: string | null;
+  valor_personalizado: number | null;
   pessoas: { nome: string; email: string | null; telefone: string | null; ativo: boolean } | null;
 };
 
@@ -205,7 +206,7 @@ export default function Desafios() {
     if (!canManage) return;
     const { data, error } = await supabase
       .from("desafio_participantes")
-      .select("id,pessoa_id,status,token_link,token_expires_at,pessoas(nome,email,telefone,ativo)")
+      .select("id,pessoa_id,status,token_link,token_expires_at,valor_personalizado,pessoas(nome,email,telefone,ativo)")
       .eq("desafio_id", desafioId)
       .order("created_at", { ascending: false });
     if (error) {
@@ -542,6 +543,7 @@ export default function Desafios() {
               nome: p.pessoas?.nome ?? "Participante",
               telefone: p.pessoas?.telefone ?? null,
               token: p.token_link,
+              valor: p.valor_personalizado ?? selected.valor_mensal,
             }))
             .filter((p) => !!p.telefone)
         : (() => {
@@ -553,6 +555,7 @@ export default function Desafios() {
                 nome: p.pessoas?.nome ?? "Participante",
                 telefone: p.pessoas?.telefone ?? null,
                 token: p.token_link,
+                valor: p.valor_personalizado ?? selected.valor_mensal,
               },
             ].filter((x) => !!x.telefone);
           })();
@@ -566,17 +569,20 @@ export default function Desafios() {
     let enviados = 0;
     let falhas = 0;
 
-    const baseUrl = window.location.origin;
+    const pixKey = "44582345000176";
 
     for (const item of lista) {
       let textoFinal = msg;
       
       // Substituição de variáveis
       const primeiroNome = item.nome.split(" ")[0];
+      const valorFormatado = formatCurrency(item.valor);
+
       textoFinal = textoFinal.replace(/{nome}/gi, primeiroNome);
       textoFinal = textoFinal.replace(/{nome_completo}/gi, item.nome);
       textoFinal = textoFinal.replace(/{desafio}/gi, selected.titulo);
-      textoFinal = textoFinal.replace(/{link_carne}/gi, `${baseUrl}/carne/${item.token}`);
+      textoFinal = textoFinal.replace(/{valor}/gi, valorFormatado);
+      textoFinal = textoFinal.replace(/{pix}/gi, pixKey);
 
       const ok = await enviarWhatsApp(item.telefone as string, textoFinal);
       if (ok) enviados++;
@@ -865,7 +871,7 @@ export default function Desafios() {
                       rows={4}
                     />
                     <div className="text-xs text-muted-foreground">
-                      Códigos disponíveis: <strong>{`{nome}`}</strong> (primeiro nome), <strong>{`{nome_completo}`}</strong>, <strong>{`{desafio}`}</strong> (título do desafio), <strong>{`{link_carne}`}</strong> (link para o carnê).
+                      Códigos disponíveis: <strong>{`{nome}`}</strong> (primeiro nome), <strong>{`{nome_completo}`}</strong>, <strong>{`{desafio}`}</strong> (título do desafio), <strong>{`{valor}`}</strong> (valor mensal), <strong>{`{pix}`}</strong> (chave pix).
                     </div>
                   </div>
                 </div>
