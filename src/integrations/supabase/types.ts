@@ -365,6 +365,36 @@ export type Database = {
           },
         ]
       }
+      configuracao_mensagens: {
+        Row: {
+          id: string
+          tipo: string
+          titulo: string
+          template_mensagem: string
+          ativo: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tipo: string
+          titulo: string
+          template_mensagem: string
+          ativo?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tipo?: string
+          titulo?: string
+          template_mensagem?: string
+          ativo?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       desafio_participantes: {
         Row: {
           created_at: string

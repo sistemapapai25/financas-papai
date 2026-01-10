@@ -225,7 +225,7 @@ const Navigation = () => {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={groupCls(['/configuracoes/regras-classificacao','/configuracoes/igreja'])}>Configurações</button>
+                <button className={groupCls(['/configuracoes/regras-classificacao','/configuracoes/igreja', '/configuracoes/mensagens'])}>Configurações</button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem asChild>
@@ -233,6 +233,9 @@ const Navigation = () => {
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/configuracoes/igreja">Configuração da Igreja</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/configuracoes/mensagens">Configuração de Mensagens</Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

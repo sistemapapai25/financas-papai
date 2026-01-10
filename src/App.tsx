@@ -34,6 +34,7 @@ import Desafios from "./pages/Desafios";
 import Carne from "./pages/Carne";
 import GestaoFinanceiraDesafios from "./pages/GestaoFinanceiraDesafios";
 import CarnePublico from "./pages/CarnePublico";
+import ConfiguracaoMensagens from "./pages/ConfiguracaoMensagens";
 
 // (opcionais p/ diagnóstico)
 import TesteSupabase from "./pages/TesteSupabase";
@@ -129,6 +130,7 @@ export default function App() {
                   {/* Configurações */}
                   <Route path="/configuracoes/regras-classificacao" element={<RegrasClassificacao />} />
                   <Route path="/configuracoes/igreja" element={<ConfiguracaoIgreja />} />
+                  <Route path="/configuracoes/mensagens" element={<ConfiguracaoMensagens />} />
                 </Route>
 
                 {/* 404 */}

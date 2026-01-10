@@ -173,7 +173,8 @@ serve(async (req) => {
       .from("desafio_parcelas")
       .select(supportsLembreteDias ? selectWith : selectWithout)
       .in("vencimento", datas)
-      .eq("status", "ABERTO");
+      .eq("status", "ABERTO")
+      .is("pago_em", null);
 
     if (parcelasError) {
       console.error("Erro ao buscar parcelas:", parcelasError);
@@ -188,6 +189,19 @@ serve(async (req) => {
     let enviados = 0;
     let falhas = 0;
     let pulados = 0;
+
+    // Buscar configurações de mensagens
+    const { data: configsMsg } = await supabase
+      .from("configuracao_mensagens")
+      .select("*")
+      .eq("ativo", true);
+
+    const getTemplate = (diffDays: number) => {
+      if (!configsMsg) return null;
+      if (diffDays === 0) return configsMsg.find((c: any) => c.tipo === "LEMBRETE_VENCIMENTO_HOJE");
+      if (diffDays === 1) return configsMsg.find((c: any) => c.tipo === "LEMBRETE_VENCIMENTO_AMANHA");
+      return null;
+    };
 
     for (const parcela of parcelas || []) {
       const participante = parcela.desafio_participantes as any;
@@ -209,22 +223,24 @@ serve(async (req) => {
         continue;
       }
 
-      const vencBr = vencNoon.toLocaleDateString("pt-BR");
-      
-      const saudacao = `Olá ${pessoa.nome} 🙌`;
-      const rodape = `🔑Chave Pix : 44582345000176\nEm nome de Igreja Apostólica e Profética Águas Purificadoras\nEnvie seu comprovante para a nossa secretaria através do whatsapp 62986193333\nObrigado pela sua fidelidade !\nDeus abençoe sua vida 🙌`;
-      
-      let corpoLembrete = "";
-      
-      if (diffDays === 0) {
-        corpoLembrete = `Lembrete: *hoje* vence sua parcela do desafio ${desafio?.titulo}!`;
-      } else if (diffDays === 1) {
-        corpoLembrete = `Lembrete: *amanhã* vence sua parcela do desafio ${desafio?.titulo}!`;
-      } else {
-        corpoLembrete = `Lembrete: faltam *${diffDays} dias* para vencer sua parcela do desafio ${desafio?.titulo}.`;
+      const template = getTemplate(diffDays);
+      if (!template) {
+        console.log(`Template não encontrado para D-${diffDays}, pulando...`);
+        pulados++;
+        continue;
       }
 
-      const mensagem = `${saudacao}\n\n${corpoLembrete}\n\n💰 Valor: ${formatCurrency(parcela.valor)}\n📆 Vencimento: ${vencBr}\n${rodape}`;
+      const vencBr = vencNoon.toLocaleDateString("pt-BR");
+      
+      let mensagem = template.template_mensagem;
+      
+      // Substituições
+      mensagem = mensagem.replace(/{nome}/g, pessoa.nome.split(" ")[0]);
+      mensagem = mensagem.replace(/{nome_completo}/g, pessoa.nome);
+      mensagem = mensagem.replace(/{desafio}/g, desafio?.titulo || "");
+      mensagem = mensagem.replace(/{valor}/g, formatCurrency(parcela.valor));
+      mensagem = mensagem.replace(/{vencimento}/g, vencBr);
+      mensagem = mensagem.replace(/{dias_restantes}/g, String(diffDays));
 
       const enviado = await enviarWhatsApp(pessoa.telefone, mensagem);
       if (enviado) {
