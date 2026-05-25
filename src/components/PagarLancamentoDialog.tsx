@@ -343,6 +343,7 @@ export default function PagarLancamentoDialog({
       const { data, error } = await supabase
         .from("contas_financeiras")
         .select("*")
+        .eq("ativo", true)
         .order("tipo", { ascending: true })
         .order("nome", { ascending: true });
 

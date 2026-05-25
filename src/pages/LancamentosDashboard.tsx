@@ -248,6 +248,7 @@ export default function LancamentosDashboard() {
     supabase
       .from("contas_financeiras")
       .select("id,nome,logo,saldo_inicial,saldo_inicial_em")
+      .eq("ativo", true)
       .order("nome")
       .then(({ data }) => {
         const arr = (data || []).map((c: { id: string; nome: string; logo?: string | null; saldo_inicial?: number; saldo_inicial_em?: string | null }) => ({ id: c.id, nome: c.nome, logo: c.logo ?? null, saldo_inicial: Number(c.saldo_inicial || 0), saldo_inicial_em: c.saldo_inicial_em ?? null }));
@@ -1109,7 +1110,8 @@ export default function LancamentosDashboard() {
         const { data: contasAll } = await supabase
           .from('contas_financeiras')
           .select('id,nome,tipo')
-          .eq('user_id', user.id);
+          .eq('user_id', user.id)
+          .eq('ativo', true);
         const appKey = `app:applicationAccountId:${user.id}`;
         const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         const preferredId = localStorage.getItem(appKey);

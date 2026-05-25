@@ -44,6 +44,7 @@ export default function ResumoAnual() {
     supabase
       .from("contas_financeiras")
       .select("id,nome,logo")
+      .eq("ativo", true)
       .order("nome")
       .then(({ data, error }) => {
         if (error) {

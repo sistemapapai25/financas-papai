@@ -83,6 +83,7 @@ export default function ImportarCaixa() {
       .from("contas_financeiras")
       .select("id,nome,tipo")
       .eq("user_id", user.id)
+      .eq("ativo", true)
       .order("nome")
       .then(({ data, error }) => {
         if (error) return;

@@ -114,6 +114,7 @@ export default function EntradasCulto() {
       .from("contas_financeiras")
       .select("*")
       .eq("tipo", "CAIXA")
+      .eq("ativo", true)
       .order("nome");
 
     if (error) {

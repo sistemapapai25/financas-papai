@@ -105,6 +105,7 @@ export default function ImportarExtrato() {
     supabase
       .from("contas_financeiras")
       .select("id,nome")
+      .eq("ativo", true)
       .order("nome")
       .then(({ data, error }) => {
         if (error) return;

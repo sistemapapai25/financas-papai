@@ -238,6 +238,7 @@ export type Database = {
       contas_financeiras: {
         Row: {
           agencia: string | null
+          ativo: boolean
           created_at: string
           id: string
           instituicao: string | null
@@ -251,6 +252,7 @@ export type Database = {
         }
         Insert: {
           agencia?: string | null
+          ativo?: boolean
           created_at?: string
           id?: string
           instituicao?: string | null
@@ -264,6 +266,7 @@ export type Database = {
         }
         Update: {
           agencia?: string | null
+          ativo?: boolean
           created_at?: string
           id?: string
           instituicao?: string | null

@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 
-import { Banknote, Plus, Edit2, Trash2, Search, MoreVertical } from "lucide-react";
+import { Banknote, Plus, Edit2, Trash2, Search, MoreVertical, Power, PowerOff } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 type ContaFinanceira = Tables<"contas_financeiras">;
@@ -39,6 +39,7 @@ export default function CadastroContasFinanceiras() {
   // filtros
   const [busca, setBusca] = useState("");
   const [filtroTipo, setFiltroTipo] = useState<"ALL" | TipoConta>("ALL");
+  const [filtroStatus, setFiltroStatus] = useState<"ATIVAS" | "INATIVAS" | "ALL">("ATIVAS");
 
   // modal + edição
   const [open, setOpen] = useState(false);
@@ -123,7 +124,7 @@ export default function CadastroContasFinanceiras() {
       setLoading(true);
       const { data, error } = await supabase
         .from("contas_financeiras")
-        .select("id, user_id, nome, tipo, instituicao, agencia, numero, saldo_inicial, saldo_inicial_em, logo, created_at")
+        .select("id, user_id, nome, tipo, instituicao, agencia, numero, saldo_inicial, saldo_inicial_em, logo, ativo, created_at")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -305,6 +306,31 @@ export default function CadastroContasFinanceiras() {
     }
   };
 
+  const alternarAtivo = async (c: ContaFinanceira) => {
+    const novoStatus = !c.ativo;
+    const acao = novoStatus ? "ativar" : "desativar";
+    if (!confirm(`Deseja ${acao} a conta "${c.nome}"?`)) return;
+
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from("contas_financeiras")
+        .update({ ativo: novoStatus })
+        .eq("id", c.id);
+      if (error) throw error;
+      toast({
+        title: "Sucesso",
+        description: novoStatus ? "Conta ativada." : "Conta desativada.",
+      });
+      fetchContas();
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Erro", description: `Não foi possível ${acao} a conta.`, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const excluirConta = async (c: ContaFinanceira) => {
     if (!confirm(`Excluir a conta "${c.nome}"?`)) return;
 
@@ -325,6 +351,12 @@ export default function CadastroContasFinanceiras() {
   const contasFiltradas = useMemo(() => {
     return contas.filter((c) => {
       const matchTipo = filtroTipo === "ALL" ? true : c.tipo === filtroTipo;
+      const matchStatus =
+        filtroStatus === "ALL"
+          ? true
+          : filtroStatus === "ATIVAS"
+          ? c.ativo !== false
+          : c.ativo === false;
       const q = busca.trim().toLowerCase();
       const matchBusca =
         !q ||
@@ -332,9 +364,9 @@ export default function CadastroContasFinanceiras() {
         c.instituicao?.toLowerCase().includes(q) ||
         c.agencia?.toLowerCase().includes(q) ||
         c.numero?.toLowerCase().includes(q);
-      return matchTipo && matchBusca;
+      return matchTipo && matchStatus && matchBusca;
     });
-  }, [contas, filtroTipo, busca]);
+  }, [contas, filtroTipo, filtroStatus, busca]);
 
   const formatMoney = (v: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
@@ -497,6 +529,19 @@ export default function CadastroContasFinanceiras() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label className="sr-only">Status</Label>
+              <Select value={filtroStatus} onValueChange={(v: "ATIVAS" | "INATIVAS" | "ALL") => setFiltroStatus(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ATIVAS">Ativas</SelectItem>
+                  <SelectItem value="INATIVAS">Inativas</SelectItem>
+                  <SelectItem value="ALL">Todas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -532,13 +577,16 @@ export default function CadastroContasFinanceiras() {
                   {contasFiltradas.map((c, idx) => (
                     <tr
                       key={c.id}
-                      className={`border-b ${idx % 2 ? "bg-muted/20" : ""}`}
+                      className={`border-b ${idx % 2 ? "bg-muted/20" : ""} ${c.ativo === false ? "opacity-60" : ""}`}
                     >
                       <td className="p-3">
                         <div className="flex items-center gap-2">
                           <span>{c.nome}</span>
                           {appAccountId === c.id ? (
                             <Badge variant="outline">Aplicação</Badge>
+                          ) : null}
+                          {c.ativo === false ? (
+                            <Badge variant="destructive">Inativa</Badge>
                           ) : null}
                         </div>
                       </td>
@@ -586,6 +634,17 @@ export default function CadastroContasFinanceiras() {
                                 <DropdownMenuItem onClick={() => setAppAccountId(c.id)}>
                                   <Banknote className="w-4 h-4 mr-2" />
                                   Marcar como Conta de Aplicação
+                                </DropdownMenuItem>
+                              )}
+                              {c.ativo === false ? (
+                                <DropdownMenuItem onClick={() => alternarAtivo(c)}>
+                                  <Power className="w-4 h-4 mr-2" />
+                                  Ativar
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem onClick={() => alternarAtivo(c)}>
+                                  <PowerOff className="w-4 h-4 mr-2" />
+                                  Desativar
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuItem onClick={() => excluirConta(c)} className="text-red-600 focus:text-red-600">

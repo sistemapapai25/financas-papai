@@ -181,6 +181,7 @@ export type Database = {
           numero: string | null
           saldo_inicial: number
           logo: string | null
+          ativo: boolean
           created_at: string | null
         }
         Insert: {
@@ -193,6 +194,7 @@ export type Database = {
           numero?: string | null
           saldo_inicial?: number
           logo?: string | null
+          ativo?: boolean
           created_at?: string | null
         }
         Update: {
@@ -205,6 +207,7 @@ export type Database = {
           numero?: string | null
           saldo_inicial?: number
           logo?: string | null
+          ativo?: boolean
           created_at?: string | null
         }
         Relationships: []
