@@ -26,7 +26,22 @@ const Navigation = () => {
           </Link>
           <div className="flex items-center gap-4">
             <span className="hidden sm:inline text-sm opacity-90">{user?.email}</span>
-            <Button variant="outline" size="sm" onClick={signOut} className="hidden sm:flex bg-white text-blue-700 hover:bg-white/90">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                try {
+                  Object.keys(localStorage)
+                    .filter((k) => k.startsWith('sb-') || k.includes('supabase'))
+                    .forEach((k) => localStorage.removeItem(k));
+                } catch {
+                  // ignora
+                }
+                signOut().catch(() => undefined);
+                window.location.replace('/auth');
+              }}
+              className="hidden sm:flex bg-white text-blue-700 hover:bg-white/90"
+            >
               <LogOut className="w-4 h-4 mr-2" />
               Sair
             </Button>
@@ -69,10 +84,11 @@ const Navigation = () => {
                       </div>
 
                       <div>
-                        <div className={groupTitleCls(['/financeiro/lancamentos', '/movimentacoes/importar-extrato', '/movimentacoes/importar-caixa', '/financeiro/resumo-anual'])}>Conciliação</div>
+                        <div className={groupTitleCls(['/financeiro/lancamentos', '/movimentacoes/importar-extrato', '/movimentacoes/importar-caixa', '/movimentacoes/conferencia-extrato', '/financeiro/resumo-anual'])}>Conciliação</div>
                         <div className="flex flex-col">
                           <Link to="/financeiro/lancamentos" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Lançamentos</Link>
                           <Link to="/movimentacoes/importar-extrato" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Importar Extrato</Link>
+                          <Link to="/movimentacoes/conferencia-extrato" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Conferência de Extrato</Link>
                           <Link to="/movimentacoes/importar-caixa" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Importar Caixa</Link>
                           <Link to="/financeiro/resumo-anual" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Resumo Anual</Link>
                         </div>
@@ -109,7 +125,22 @@ const Navigation = () => {
                     </nav>
                   </div>
                   <div className="pt-4 border-t">
-                    <Button variant="outline" className="w-full" onClick={() => { signOut(); setIsOpen(false); }}>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        setIsOpen(false);
+                        try {
+                          Object.keys(localStorage)
+                            .filter((k) => k.startsWith('sb-') || k.includes('supabase'))
+                            .forEach((k) => localStorage.removeItem(k));
+                        } catch {
+                          // ignora
+                        }
+                        signOut().catch(() => undefined);
+                        window.location.replace('/auth');
+                      }}
+                    >
                       <LogOut className="w-4 h-4 mr-2" />
                       Sair
                     </Button>
@@ -162,7 +193,7 @@ const Navigation = () => {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={groupCls(['/financeiro/lancamentos', '/movimentacoes/importar-extrato', '/movimentacoes/importar-caixa', '/financeiro/resumo-anual'])}>Conciliação</button>
+                <button className={groupCls(['/financeiro/lancamentos', '/movimentacoes/importar-extrato', '/movimentacoes/importar-caixa', '/movimentacoes/conferencia-extrato', '/financeiro/resumo-anual'])}>Conciliação</button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem asChild>
@@ -170,6 +201,9 @@ const Navigation = () => {
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/movimentacoes/importar-extrato">Importar Extrato</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/movimentacoes/conferencia-extrato">Conferência de Extrato</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/movimentacoes/importar-caixa">Importar Caixa</Link>

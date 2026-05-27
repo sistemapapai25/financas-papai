@@ -636,6 +636,8 @@ export type Database = {
           beneficiario_id: string | null
           categoria_id: string | null
           comprovante_url: string | null
+          conferido: boolean
+          conferido_em: string | null
           conta_id: string
           created_at: string
           data: string
@@ -651,6 +653,8 @@ export type Database = {
           beneficiario_id?: string | null
           categoria_id?: string | null
           comprovante_url?: string | null
+          conferido?: boolean
+          conferido_em?: string | null
           conta_id: string
           created_at?: string
           data: string
@@ -666,6 +670,8 @@ export type Database = {
           beneficiario_id?: string | null
           categoria_id?: string | null
           comprovante_url?: string | null
+          conferido?: boolean
+          conferido_em?: string | null
           conta_id?: string
           created_at?: string
           data?: string

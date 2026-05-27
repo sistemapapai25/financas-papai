@@ -329,7 +329,9 @@ export default function PagarLancamentoDialog({
   const [dataPagamento, setDataPagamento] = useState<string>(() => todayYMD());
   const [contaId, setContaId] = useState<string>("");
   const [formaPagamento, setFormaPagamento] = useState<FormaPagamento>("PIX");
-  const [valorPago, setValorPago] = useState<string>(String(lancamento?.valor ?? ""));
+  const [valorPago, setValorPago] = useState<string>(
+    String(lancamento?.valor_pago ?? lancamento?.valor ?? ""),
+  );
   const [observacoes, setObservacoes] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
 
@@ -368,10 +370,10 @@ export default function PagarLancamentoDialog({
   // Reset de campos ao abrir
   useEffect(() => {
     if (open) {
-      setDataPagamento(todayYMD());
-      setValorPago(String(lancamento?.valor ?? ""));
+      setDataPagamento(lancamento?.data_pagamento ?? todayYMD());
+      setValorPago(String(lancamento?.valor_pago ?? lancamento?.valor ?? ""));
     }
-  }, [open, lancamento?.id]);
+  }, [open, lancamento?.id, lancamento?.valor_pago, lancamento?.data_pagamento]);
 
   async function uploadComprovanteIfNeeded(): Promise<string | null> {
     if (!file) return null;

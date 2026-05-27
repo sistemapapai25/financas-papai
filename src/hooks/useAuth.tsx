@@ -215,9 +215,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         return { error };
       }
 
-      // Treat missing/invalid sessions as already logged out and force local cleanup
-      if (error && isSessionMissing) {
+      // Sempre força limpeza local — evita que a sessão volte pelo onAuthStateChange.
+      try {
         await supabase.auth.signOut({ scope: 'local' } as any);
+      } catch {
+        // ignora
       }
 
       setSession(null);

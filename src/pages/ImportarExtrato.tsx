@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,87 +7,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { parseExtratoFile, type LinhaExtrato } from "@/lib/parseExtrato";
 
-type LinhaPreview = {
-  idx: number;
-  data: string | null;
-  descricao: string | null;
-  credito: number | null;
-  debito: number | null;
-  tipo: "ENTRADA" | "SAIDA" | null;
-  valor: number | null;
-  valido: boolean;
-  erro?: string;
-  selecionado: boolean;
-};
-
-function normalizarValor(v: unknown): number | null {
-  if (v === undefined || v === null) return null;
-  if (typeof v === "number") return v;
-  const s = String(v).trim();
-  if (!s || s === "0" || s === "0,00") return null;
-  const n = Number(s.replace(/\./g, "").replace(/,/g, "."));
-  return isNaN(n) ? null : n;
-}
-
-function normalizarDataPT(s: unknown): string | null {
-  if (!s) return null;
-  const pad2 = (n: number) => String(n).padStart(2, "0");
-  const mkYmd = (ano: number, mes: number, dia: number) => {
-    if (!Number.isFinite(ano) || !Number.isFinite(mes) || !Number.isFinite(dia)) return null;
-    if (ano < 1900 || ano > 2100) return null;
-    if (mes < 1 || mes > 12) return null;
-    if (dia < 1 || dia > 31) return null;
-    return `${ano}-${pad2(mes)}-${pad2(dia)}`;
-  };
-  if (s instanceof Date) {
-    const d = s as Date;
-    return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())).toISOString().slice(0, 10);
-  }
-  const txt = String(s).trim();
-  const isoWithOptionalTime = txt.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);
-  if (isoWithOptionalTime) {
-    return mkYmd(Number(isoWithOptionalTime[1]), Number(isoWithOptionalTime[2]), Number(isoWithOptionalTime[3]));
-  }
-  const brWithOptionalTime = txt.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s.*)?$/);
-  if (brWithOptionalTime) {
-    return mkYmd(Number(brWithOptionalTime[3]), Number(brWithOptionalTime[2]), Number(brWithOptionalTime[1]));
-  }
-  const brShortYear = txt.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})(?:\s.*)?$/);
-  if (brShortYear) {
-    const yy = Number(brShortYear[3]);
-    const ano = yy >= 70 ? 1900 + yy : 2000 + yy;
-    return mkYmd(ano, Number(brShortYear[2]), Number(brShortYear[1]));
-  }
-  const dashDMY = txt.match(/^(\d{1,2})-(\d{1,2})-(\d{4})(?:\s.*)?$/);
-  if (dashDMY) {
-    return mkYmd(Number(dashDMY[3]), Number(dashDMY[2]), Number(dashDMY[1]));
-  }
-  const slashYMD = txt.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})(?:\s.*)?$/);
-  if (slashYMD) {
-    return mkYmd(Number(slashYMD[1]), Number(slashYMD[2]), Number(slashYMD[3]));
-  }
-  // Ex.: "Sexta, 28 de fevereiro de 2025"
-  const m = txt.match(/(\d{1,2})\s+de\s+([a-zç]+)\s+de\s+(\d{4})/i);
-  if (m) {
-    const dia = Number(m[1]);
-    const meses = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-    const nome = m[2].toLowerCase();
-    const mes = meses.indexOf(nome);
-    const ano = Number(m[3]);
-    if (mes >= 0) {
-      return new Date(Date.UTC(ano, mes, dia)).toISOString().slice(0, 10);
-    }
-  }
-  // Tenta parse padrão Excel como número de série
-  const maybeNum = Number(txt);
-  if (!isNaN(maybeNum) && maybeNum > 30000) {
-    const epoch = new Date(Date.UTC(1899, 11, 30));
-    const d = new Date(epoch.getTime() + maybeNum * 86400000);
-    return d.toISOString().slice(0, 10);
-  }
-  return null;
-}
+type LinhaPreview = LinhaExtrato & { selecionado: boolean };
 
 export default function ImportarExtrato() {
   const { user } = useAuth();
@@ -126,120 +47,12 @@ export default function ImportarExtrato() {
     setFile(f);
     setLinhas([]);
     if (!f) return;
-    let rows: unknown[][] = [];
-    try {
-      const isCsv = f.name.toLowerCase().endsWith(".csv") || (f.type || "").toLowerCase().includes("csv");
-      if (isCsv) {
-        const text = (await f.text()).replace(/^\uFEFF/, "");
-        const wb = XLSX.read(text, { type: "string" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true }) as unknown as unknown[][];
-      } else {
-        const buf = await f.arrayBuffer();
-        const wb = XLSX.read(buf, { type: "array" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true }) as unknown as unknown[][];
-      }
-    } catch (err) {
-      toast({ title: "Arquivo inválido", description: "Não foi possível ler o arquivo. Envie um .xlsx ou .csv válido.", variant: "destructive" });
+    const res = await parseExtratoFile(f);
+    if (!res.ok) {
+      toast({ title: "Arquivo inválido", description: res.erro, variant: "destructive" });
       return;
     }
-
-    // Encontrar linha de cabeçalho real - suporta múltiplos formatos
-    let headerRowIdx = -1;
-    let formatType: "padrao" | "cora" = "padrao";
-    
-    for (let i = 0; i < Math.min(rows.length, 30); i++) {
-      const r = rows[i].map((x: unknown) =>
-        String(x ?? "")
-          .replace(/^\uFEFF/, "")
-          .trim()
-          .toLowerCase()
-      );
-      if (r.some((c: string) => c.includes("data")) && r.some((c: string) => c.includes("descri"))) {
-        if (r.some((c: string) => c.includes("crédito")) || r.some((c: string) => c.includes("credito"))) {
-          headerRowIdx = i;
-          formatType = "padrao";
-          break;
-        }
-      }
-      // Formato Cora: Data, Transação, Tipo Transação, Identificação, Valor
-      if (r.some((c: string) => c === "data") && 
-          r.some((c: string) => c === "transação" || c === "transacao") && 
-          r.some((c: string) => c.includes("tipo")) && 
-          r.some((c: string) => c === "valor")) {
-        headerRowIdx = i;
-        formatType = "cora";
-        break;
-      }
-    }
-    
-    if (headerRowIdx < 0) {
-      toast({ title: "Cabeçalho não encontrado", description: "Verifique se a planilha tem as colunas Data, Descrição, Crédito, Débito ou formato Cora (Data, Transação, Tipo Transação, Valor)", variant: "destructive" });
-      return;
-    }
-
-    const header = rows[headerRowIdx].map((x: unknown) => String(x ?? "").replace(/^\uFEFF/, "").trim());
-    const parsed: LinhaPreview[] = [];
-    
-    if (formatType === "cora") {
-      // Formato Cora
-      const idxData = header.findIndex((h: string) => h.toLowerCase() === "data");
-      const idxTransacao = header.findIndex((h: string) => h.toLowerCase() === "transação" || h.toLowerCase() === "transacao");
-      const idxTipo = header.findIndex((h: string) => h.toLowerCase().includes("tipo"));
-      const idxValor = header.findIndex((h: string) => h.toLowerCase() === "valor");
-      
-      for (let i = headerRowIdx + 1; i < rows.length; i++) {
-        const r = rows[i];
-        if (!r || r.length === 0) continue;
-        const data = normalizarDataPT(r[idxData]);
-        const descricao = r[idxTransacao] != null ? String(r[idxTransacao]).trim() : null;
-        const tipoStr = r[idxTipo] != null ? String(r[idxTipo]).toUpperCase().trim() : "";
-        const valorRaw = normalizarValor(r[idxValor]);
-        
-        let tipo: "ENTRADA" | "SAIDA" | null = null;
-        let valor: number | null = null;
-        let credito: number | null = null;
-        let debito: number | null = null;
-        
-        if (tipoStr.includes("CRÉD") || tipoStr.includes("CRED")) {
-          tipo = "ENTRADA";
-          valor = valorRaw ? Math.abs(valorRaw) : null;
-          credito = valor;
-        } else if (tipoStr.includes("DÉB") || tipoStr.includes("DEB")) {
-          tipo = "SAIDA";
-          valor = valorRaw ? Math.abs(valorRaw) : null;
-          debito = valor;
-        }
-        
-        const valido = Boolean(data && descricao && valor && tipo);
-        if (!data && !descricao && !valorRaw) continue;
-        parsed.push({ idx: i, data, descricao, credito, debito, tipo, valor, valido, selecionado: valido, erro: valido ? undefined : "Linha incompleta" });
-      }
-    } else {
-      // Formato padrão
-      const idxData = header.findIndex((h: string) => h.toLowerCase().includes("data"));
-      const idxDesc = header.findIndex((h: string) => h.toLowerCase().includes("descri"));
-      const idxCred = header.findIndex((h: string) => h.toLowerCase().includes("crédito") || h.toLowerCase().includes("credito"));
-      const idxDeb = header.findIndex((h: string) => h.toLowerCase().includes("débito") || h.toLowerCase().includes("debito"));
-      
-      for (let i = headerRowIdx + 1; i < rows.length; i++) {
-        const r = rows[i];
-        if (!r || r.length === 0) continue;
-        const data = normalizarDataPT(r[idxData]);
-        const descricao = r[idxDesc] != null ? String(r[idxDesc]).trim() : null;
-        const credito = normalizarValor(r[idxCred]);
-        const debito = normalizarValor(r[idxDeb]);
-        let tipo: "ENTRADA" | "SAIDA" | null = null;
-        let valor: number | null = null;
-        if (credito && !debito) { tipo = "ENTRADA"; valor = credito; }
-        else if (debito && !credito) { tipo = "SAIDA"; valor = debito; }
-        const valido = Boolean(data && descricao && valor && tipo);
-        if (!data && !descricao && !credito && !debito) continue;
-        parsed.push({ idx: i, data, descricao, credito, debito, tipo, valor, valido, selecionado: valido, erro: valido ? undefined : "Linha incompleta" });
-      }
-    }
-    setLinhas(parsed);
+    setLinhas(res.linhas.map((l) => ({ ...l, selecionado: l.valido })));
   }
 
   const resumo = useMemo(() => {
@@ -256,6 +69,56 @@ export default function ImportarExtrato() {
     if (!supabase) { toast({ title: "Ambiente", description: "Supabase não configurado", variant: "destructive" }); return; }
     if (!contaId) { toast({ title: "Conta financeira", description: "Selecione a conta", variant: "destructive" }); return; }
     let selecionadas = linhas.filter(l => l.selecionado && l.valido);
+    let vinculados = 0;
+
+    // Vinculação anti-duplicação: pra cada linha do extrato, se já existe
+    // movimento com mesma data+valor+tipo+conta e origem=LANCAMENTO (criado
+    // pela tela Contas a Pagar/Pagas) e ainda não conferido, marca esse
+    // lançamento como conferido e pula a importação (não cria duplicado).
+    if (selecionadas.length > 0) {
+      const datasOrdenadas = selecionadas.map(l => l.data!).sort();
+      const minData = datasOrdenadas[0];
+      const maxData = datasOrdenadas[datasOrdenadas.length - 1];
+      const { data: lancExistentes } = await supabase
+        .from('movimentos_financeiros')
+        .select('id,data,valor,tipo,conferido')
+        .eq('conta_id', contaId)
+        .eq('origem', 'LANCAMENTO')
+        .gte('data', minData)
+        .lte('data', maxData);
+
+      const candidatos = new Map<string, string[]>();
+      for (const r of (lancExistentes ?? [])) {
+        const obj = r as Record<string, unknown>;
+        if (obj.conferido === true) continue; // já vinculado antes
+        const key = `${String(obj.data)}|${Number(obj.valor).toFixed(2)}|${String(obj.tipo)}`;
+        const arr = candidatos.get(key) ?? [];
+        arr.push(String(obj.id));
+        candidatos.set(key, arr);
+      }
+
+      const idsParaConferir: string[] = [];
+      const filtradas: typeof selecionadas = [];
+      for (const l of selecionadas) {
+        const key = `${l.data}|${(l.valor || 0).toFixed(2)}|${l.tipo}`;
+        const ids = candidatos.get(key) ?? [];
+        const id = ids.shift();
+        if (id) {
+          idsParaConferir.push(id);
+          vinculados++;
+        } else {
+          filtradas.push(l);
+        }
+      }
+      selecionadas = filtradas;
+
+      if (idsParaConferir.length > 0) {
+        await supabase
+          .from('movimentos_financeiros')
+          .update({ conferido: true, conferido_em: new Date().toISOString() })
+          .in('id', idsParaConferir);
+      }
+    }
 
     // Deduplicação básica por conjunto (data|valor|descricao) no intervalo selecionado
     if (!permitirDuplicados && selecionadas.length > 0) {
@@ -296,7 +159,7 @@ export default function ImportarExtrato() {
       descricao: l.descricao,
       origem: permitirDuplicados ? "EXTRATO" : "AJUSTE",
     }));
-    if (registros.length === 0) { toast({ title: "Nada para importar" }); return; }
+    if (registros.length === 0 && vinculados === 0) { toast({ title: "Nada para importar" }); return; }
     setLoading(true);
     try {
       let inseridos = 0;
@@ -322,7 +185,10 @@ export default function ImportarExtrato() {
         }
         inseridos++;
       }
-      toast({ title: "Importação concluída", description: `${inseridos} novos movimentos. Duplicados ignorados: ${duplicados}.` });
+      toast({
+        title: "Importação concluída",
+        description: `${inseridos} novos. ${vinculados} vinculados a Contas a Pagar. ${duplicados} duplicados ignorados.`,
+      });
       setLinhas([]);
       setFile(null);
     } finally {

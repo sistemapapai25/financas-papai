@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { supabase } from "@/integrations/supabase/client";
-import { Calculator, ChevronLeft, ChevronRight, Filter, Rows, Square, Edit3, Search, X, Wand2, FileText, ExternalLink, ScanText, Receipt, MoreVertical } from "lucide-react";
+import { Calculator, ChevronLeft, ChevronRight, Filter, Rows, Square, Edit3, Search, X, Wand2, FileText, ExternalLink, ScanText, Receipt, MoreVertical, Plus } from "lucide-react";
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { ymdToBr } from "@/utils/date";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -26,6 +26,7 @@ type Mov = {
   descricao: string | null;
   conta_id: string | null;
   conta_nome?: string | null;
+  conta_logo?: string | null;
   categoria_id?: string | null;
   beneficiario_id?: string | null;
   categoria_nome?: string | null;
@@ -53,6 +54,8 @@ export default function LancamentosDashboard() {
   const [editOpen, setEditOpen] = useState(false);
   const [editMov, setEditMov] = useState<Mov | null>(null);
   const [editDesc, setEditDesc] = useState("");
+  const [editValor, setEditValor] = useState<string>("");
+  const [editContaId, setEditContaId] = useState<string>("");
   const [editData, setEditData] = useState("");
   const [editCategoriaId, setEditCategoriaId] = useState<string>("");
   const [editBenefId, setEditBenefId] = useState<string>("");
@@ -95,6 +98,16 @@ export default function LancamentosDashboard() {
   const [extratoPdfBusy, setExtratoPdfBusy] = useState(false);
   const [extratoPdfExists, setExtratoPdfExists] = useState(false);
   const [extratoPdfUrl, setExtratoPdfUrl] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [novoOpen, setNovoOpen] = useState(false);
+  const [novoData, setNovoData] = useState<string>("");
+  const [novoContaId, setNovoContaId] = useState<string>("");
+  const [novoTipo, setNovoTipo] = useState<"ENTRADA" | "SAIDA">("SAIDA");
+  const [novoValor, setNovoValor] = useState<string>("");
+  const [novoDescricao, setNovoDescricao] = useState<string>("");
+  const [novoCategoriaId, setNovoCategoriaId] = useState<string>("");
+  const [novoBenefId, setNovoBenefId] = useState<string>("");
+  const [novoSalvando, setNovoSalvando] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -496,7 +509,7 @@ export default function LancamentosDashboard() {
     (async () => {
       let q = supabase
         .from("movimentos_financeiros")
-        .select("id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, contas:contas_financeiras(nome), categoria:categories(name), beneficiario:beneficiaries(name)")
+        .select("id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name)")
         .or(filtroPeriodoMovimentos)
         .order("data");
       if (!isAdmin) {
@@ -517,6 +530,7 @@ export default function LancamentosDashboard() {
         descricao: r.descricao ?? null,
         conta_id: r.conta_id ?? null,
         conta_nome: r.contas?.nome ?? null,
+        conta_logo: r.contas?.logo ?? null,
         categoria_id: r.categoria_id ?? null,
         beneficiario_id: r.beneficiario_id ?? null,
         categoria_nome: r.categoria?.name ?? null,
@@ -531,49 +545,33 @@ export default function LancamentosDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [user, inicio, fimExclusivo, contasSel, toast, isAdmin, roleLoading]);
+  }, [user, inicio, fimExclusivo, contasSel, toast, isAdmin, roleLoading, reloadKey]);
 
   useEffect(() => {
     if (!supabase || !user || roleLoading) return;
     let cancelled = false;
     (async () => {
       const contasConsideradas = contasSel.length ? contas.filter(c => contasSel.includes(c.id)) : contas;
-      const anchors = new Map<string, string>();
-      for (const c of contasConsideradas) {
-        if (c.saldo_inicial_em) anchors.set(c.id, c.saldo_inicial_em);
-      }
+      // Base = saldo_inicial das contas cuja âncora não é posterior ao período.
       const baseInicial = contasConsideradas.reduce((s, c) => {
         const anchor = c.saldo_inicial_em ?? null;
         if (anchor && anchor > inicio) return s;
         return s + Number(c.saldo_inicial || 0);
       }, 0);
-      let q = supabase
-        .from("movimentos_financeiros")
-        .select("data,valor,tipo,conta_id")
-        .lt("data", inicio);
-      if (!isAdmin) {
-        q = q.eq("user_id", user.id);
-      }
-      if (contasSel.length > 0) {
-        q = q.in("conta_id", contasSel);
-      }
-      const { data, error } = await q;
+      // Delta de movimentos anteriores: 1 RPC por conta (sem limite de 1000 linhas).
+      const promises = contasConsideradas.map((c) =>
+        supabase.rpc("saldo_conta_ate", { p_conta_id: c.id, p_data: inicio }),
+      );
+      const results = await Promise.all(promises);
       if (cancelled) return;
-      if (error) {
-        toast({ title: "Erro", description: error.message, variant: "destructive" });
-        return;
+      let net = 0;
+      for (const r of results) {
+        if (r.error) {
+          toast({ title: "Erro", description: r.error.message, variant: "destructive" });
+          return;
+        }
+        net += Number(r.data ?? 0);
       }
-      const dataComAncora = (data || []).filter((r: { data: string; conta_id?: string | null }) => {
-        const contaId = (r as { conta_id?: string | null }).conta_id ?? null;
-        if (!contaId) return true;
-        const anchor = anchors.get(contaId);
-        if (!anchor) return true;
-        if (anchor > inicio) return false;
-        return (r as { data: string }).data >= anchor;
-      });
-      const net = dataComAncora.reduce((s: number, r) => {
-        return s + (r.tipo === "ENTRADA" ? Number((r as { valor?: number | string }).valor || 0) : -Number((r as { valor?: number | string }).valor || 0));
-      }, 0);
       setSaldoInicial(baseInicial + net);
     })();
     return () => {
@@ -982,6 +980,8 @@ export default function LancamentosDashboard() {
     setEditMov(m);
     setEditDesc(m.descricao || "");
     setEditData(m.data || "");
+    setEditValor(String(m.valor ?? ""));
+    setEditContaId(m.conta_id || "");
     setEditCategoriaId(m.categoria_id || "");
     setEditBenefId(m.beneficiario_id || "");
     setEditComprovanteUrl(m.comprovante_url || "");
@@ -994,12 +994,23 @@ export default function LancamentosDashboard() {
     if (!confirm(`Excluir o lançamento "${m.descricao || 'sem descrição'}" de ${formatCurrency(m.valor)}?`)) return;
     setDeleting(true);
     try {
-      const { error } = await supabase
+      let q = supabase
         .from("movimentos_financeiros")
         .delete()
-        .eq("id", m.id)
-        .eq("user_id", user.id);
+        .eq("id", m.id);
+      if (!isAdmin) {
+        q = q.eq("user_id", user.id);
+      }
+      const { data, error } = await q.select("id");
       if (error) throw error;
+      if (!data || data.length === 0) {
+        toast({
+          title: "Nada excluído",
+          description: "Sem permissão para excluir este lançamento ou o registro já foi removido.",
+          variant: "destructive",
+        });
+        return;
+      }
       setRows(prev => prev.filter(r => r.id !== m.id));
       toast({ title: "Excluído", description: "Lançamento removido" });
     } catch (e) {
@@ -1077,11 +1088,22 @@ export default function LancamentosDashboard() {
 
   async function salvarEdicao() {
     if (!editMov || !user) return;
+    const valorNum = Number(String(editValor).replace(",", "."));
+    if (!Number.isFinite(valorNum) || valorNum <= 0) {
+      toast({ title: "Atenção", description: "Informe um valor válido (maior que zero).", variant: "destructive" });
+      return;
+    }
+    if (!editContaId) {
+      toast({ title: "Atenção", description: "Selecione a conta.", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
-      const payload: Partial<{ data: string; descricao: string; categoria_id: string | null; beneficiario_id: string | null; comprovante_url: string | null }> = {
+      const payload: Partial<{ data: string; descricao: string; valor: number; conta_id: string; categoria_id: string | null; beneficiario_id: string | null; comprovante_url: string | null }> = {
         data: editData,
         descricao: editDesc,
+        valor: valorNum,
+        conta_id: editContaId,
         categoria_id: editCategoriaId ? editCategoriaId : null,
         beneficiario_id: editBenefId ? editBenefId : null,
         comprovante_url: editComprovanteUrl ? editComprovanteUrl : null,
@@ -1095,10 +1117,15 @@ export default function LancamentosDashboard() {
         toast({ title: "Erro", description: error.message, variant: "destructive" });
         return;
       }
+      const contaSel = contas.find(c => c.id === editContaId);
       setRows(prev => prev.map(r => r.id === editMov.id ? {
         ...r,
         data: editData || r.data,
         descricao: editDesc || null,
+        valor: valorNum,
+        conta_id: editContaId,
+        conta_nome: contaSel?.nome ?? r.conta_nome ?? null,
+        conta_logo: contaSel?.logo ?? r.conta_logo ?? null,
         categoria_id: payload.categoria_id || null,
         beneficiario_id: payload.beneficiario_id || null,
         categoria_nome: (catOpts.find(c => c.id === editCategoriaId)?.name) || null,
@@ -1264,7 +1291,7 @@ export default function LancamentosDashboard() {
       // Recarregar dados
       let q = supabase
         .from("movimentos_financeiros")
-        .select("id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, contas:contas_financeiras(nome), categoria:categories(name), beneficiario:beneficiaries(name)")
+        .select("id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name)")
         .eq("user_id", user.id)
         .or(filtroPeriodoMovimentos)
         .order("data");
@@ -1278,6 +1305,7 @@ export default function LancamentosDashboard() {
         descricao: r.descricao ?? null,
         conta_id: r.conta_id ?? null,
         conta_nome: r.contas?.nome ?? null,
+        conta_logo: r.contas?.logo ?? null,
         categoria_id: r.categoria_id ?? null,
         beneficiario_id: r.beneficiario_id ?? null,
         categoria_nome: r.categoria?.name ?? null,
@@ -1391,6 +1419,46 @@ export default function LancamentosDashboard() {
     }
   }
 
+  async function confirmarNovoLancamento() {
+    if (!user) return;
+    if (!novoContaId) {
+      toast({ title: "Atenção", description: "Selecione a conta.", variant: "destructive" });
+      return;
+    }
+    if (!novoData || !/^\d{4}-\d{2}-\d{2}$/.test(novoData)) {
+      toast({ title: "Atenção", description: "Data inválida.", variant: "destructive" });
+      return;
+    }
+    const valor = Number(String(novoValor).replace(",", "."));
+    if (!Number.isFinite(valor) || valor <= 0) {
+      toast({ title: "Atenção", description: "Informe um valor válido.", variant: "destructive" });
+      return;
+    }
+    setNovoSalvando(true);
+    try {
+      const { error } = await supabase.from("movimentos_financeiros").insert({
+        user_id: user.id,
+        conta_id: novoContaId,
+        data: novoData,
+        tipo: novoTipo,
+        valor,
+        descricao: novoDescricao.trim() || null,
+        categoria_id: novoCategoriaId || null,
+        beneficiario_id: novoBenefId || null,
+        origem: "LANCAMENTO",
+      });
+      if (error) throw error;
+      toast({ title: "Sucesso", description: "Lançamento criado." });
+      setReloadKey((k) => k + 1);
+      // Mantém o diálogo aberto e os campos preenchidos para entrada em série.
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Erro", description: "Não foi possível criar o lançamento.", variant: "destructive" });
+    } finally {
+      setNovoSalvando(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
       <div className="container mx-auto px-4 py-8">
@@ -1434,6 +1502,19 @@ export default function LancamentosDashboard() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+            <DropdownMenu open={tipoMenuOpen} onOpenChange={setTipoMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  {tipoVisao === 'TODOS' ? 'Todos Lançamentos' : tipoVisao === 'DESPESAS' ? 'Despesas' : tipoVisao === 'RECEITAS' ? 'Receitas' : 'Transferências'}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="min-w-[220px]">
+                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('TODOS'); setTipoMenuOpen(false); }}>Todos Lançamentos</DropdownMenuItem>
+                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('DESPESAS'); setTipoMenuOpen(false); }}>Despesas</DropdownMenuItem>
+                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('RECEITAS'); setTipoMenuOpen(false); }}>Receitas</DropdownMenuItem>
+                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('TRANSFERENCIAS'); setTipoMenuOpen(false); }}>Transferências</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -1455,28 +1536,33 @@ export default function LancamentosDashboard() {
               <Calculator className="w-4 h-4 mr-2" />
               Calculadora
             </Button>
-            <DropdownMenu open={tipoMenuOpen} onOpenChange={setTipoMenuOpen}>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  {tipoVisao === 'TODOS' ? 'Todos Lançamentos' : tipoVisao === 'DESPESAS' ? 'Despesas' : tipoVisao === 'RECEITAS' ? 'Receitas' : 'Transferências'}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="min-w-[220px]">
-                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('TODOS'); setTipoMenuOpen(false); }}>Todos Lançamentos</DropdownMenuItem>
-                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('DESPESAS'); setTipoMenuOpen(false); }}>Despesas</DropdownMenuItem>
-                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('RECEITAS'); setTipoMenuOpen(false); }}>Receitas</DropdownMenuItem>
-                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('TRANSFERENCIAS'); setTipoMenuOpen(false); }}>Transferências</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
 
-          <div className="relative w-full lg:w-64">
-            <Input
-              placeholder="Pesquisar"
-              value={busca}
-              onChange={e => setBusca(e.target.value)}
-              className="w-full pr-8"
-            />
+          <div className="w-full lg:w-64 flex flex-col gap-2">
+            <Button
+              className="w-full"
+              onClick={() => {
+                const hoje = new Date();
+                setNovoData(toYmd(hoje));
+                setNovoContaId(contasSel.length === 1 ? contasSel[0] : "");
+                setNovoTipo("SAIDA");
+                setNovoValor("");
+                setNovoDescricao("");
+                setNovoCategoriaId("");
+                setNovoBenefId("");
+                setNovoOpen(true);
+              }}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Lançamento
+            </Button>
+            <div className="relative w-full">
+              <Input
+                placeholder="Pesquisar"
+                value={busca}
+                onChange={e => setBusca(e.target.value)}
+                className="w-full pr-8"
+              />
             {busca && (
               <Button
                 type="button"
@@ -1489,6 +1575,7 @@ export default function LancamentosDashboard() {
                 <X className="w-4 h-4" />
               </Button>
             )}
+            </div>
           </div>
         </div>
 
@@ -1560,6 +1647,7 @@ export default function LancamentosDashboard() {
             <table className="min-w-full text-sm">
               <thead className="bg-muted sticky top-0 z-10">
                 <tr>
+                  <th className="p-2 text-center w-10">Conta</th>
                   <th className="p-2 text-left">Data</th>
                   <th className="p-2 text-left">Descrição</th>
                   <th className="p-2 text-left">Categoria</th>
@@ -1583,6 +1671,23 @@ export default function LancamentosDashboard() {
                   const sd = saldoFechamentoPorDia.get(r.data) || 0;
                   return (
                     <tr key={r.id} className="border-t">
+                      <td className="p-2 text-center">
+                        {r.conta_logo ? (
+                          <img
+                            src={r.conta_logo}
+                            alt={r.conta_nome || ''}
+                            title={r.conta_nome || ''}
+                            className="w-6 h-6 object-contain rounded inline-block"
+                          />
+                        ) : (
+                          <span
+                            title={r.conta_nome || ''}
+                            className="inline-flex items-center justify-center w-6 h-6 rounded bg-muted text-[10px] font-semibold"
+                          >
+                            {(r.conta_nome || '?').slice(0, 2).toUpperCase()}
+                          </span>
+                        )}
+                      </td>
                       <td className="p-2">{ymdToBr(r.data)}</td>
                       <td className="p-2">{r.descricao}</td>
                       <td className="p-2">{r.categoria_nome || ''}</td>
@@ -1629,7 +1734,7 @@ export default function LancamentosDashboard() {
                 })}
                 {rowsView.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-muted-foreground">Nenhum Lançamento</td>
+                    <td colSpan={9} className="p-8 text-center text-muted-foreground">Nenhum Lançamento</td>
                   </tr>
                 )}
               </tbody>
@@ -1642,7 +1747,16 @@ export default function LancamentosDashboard() {
                 <CardContent className="p-4">
                   <div className="text-xs text-muted-foreground">{ymdToBr(r.data)}</div>
                   <div className="font-medium">{r.descricao}</div>
-                  <div className="text-sm">{r.conta_nome || ''}</div>
+                  <div className="text-sm flex items-center gap-2">
+                    {r.conta_logo ? (
+                      <img src={r.conta_logo} alt={r.conta_nome || ''} className="w-5 h-5 object-contain rounded" />
+                    ) : (
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-muted text-[9px] font-semibold">
+                        {(r.conta_nome || '?').slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                    <span>{r.conta_nome || ''}</span>
+                  </div>
                   <div className="text-xs text-muted-foreground">{r.categoria_nome || ''}</div>
                   <div className="text-xs text-muted-foreground">{r.beneficiario_nome || ''}</div>
                   <div className={`mt-2 text-lg font-semibold ${r.tipo === 'ENTRADA' ? 'text-blue-600' : 'text-red-600'}`}>{formatCurrency(r.valor)}</div>
@@ -1798,6 +1912,31 @@ export default function LancamentosDashboard() {
               <div>
                 <Label>Descrição</Label>
                 <Input value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="Descrição" />
+              </div>
+              <div>
+                <Label>Valor</Label>
+                <Input
+                  inputMode="decimal"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0,00"
+                  value={editValor}
+                  onChange={e => setEditValor(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>Conta</Label>
+                <Select value={editContaId} onValueChange={setEditContaId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a conta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {contas.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Categoria</Label>
@@ -2013,6 +2152,105 @@ export default function LancamentosDashboard() {
                 <Button type="button" variant="outline" onClick={() => setShowReciboModal(false)}>Fechar</Button>
                 <Button type="button" onClick={adicionarReciboComoComprovanteMov} disabled={addingComprovante || !reciboBlob || (docType === 'REEMBOLSO' && !reembBenefIdMov)}>
                   {addingComprovante ? 'Adicionando...' : 'Adicionar como comprovante'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={novoOpen} onOpenChange={setNovoOpen}>
+          <DialogContent className="sm:max-w-[520px]">
+            <DialogHeader>
+              <DialogTitle>Novo Lançamento</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Data</Label>
+                  <Input type="date" value={novoData} onChange={(e) => setNovoData(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tipo</Label>
+                  <Select value={novoTipo} onValueChange={(v: "ENTRADA" | "SAIDA") => { setNovoTipo(v); setNovoCategoriaId(""); }}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ENTRADA">Entrada</SelectItem>
+                      <SelectItem value="SAIDA">Saída</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Conta</Label>
+                <Select value={novoContaId} onValueChange={setNovoContaId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a conta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {contas.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Valor</Label>
+                <Input
+                  inputMode="decimal"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0,00"
+                  value={novoValor}
+                  onChange={(e) => setNovoValor(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Descrição</Label>
+                <Input value={novoDescricao} onChange={(e) => setNovoDescricao(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Categoria (opcional)</Label>
+                <Select value={novoCategoriaId} onValueChange={setNovoCategoriaId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sem categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {catOpts
+                      .filter((c) => {
+                        const alvo = novoTipo === "ENTRADA" ? "RECEITA" : "DESPESA";
+                        return !c.tipo || c.tipo === alvo || c.tipo === "TRANSFERENCIA";
+                      })
+                      .map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Beneficiário (opcional)</Label>
+                <Select value={novoBenefId} onValueChange={setNovoBenefId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sem beneficiário" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {benefOpts.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-muted-foreground pt-2">
+                Após salvar, os campos ficam preenchidos para você criar o próximo lançamento mais rápido. Use "Fechar" quando terminar.
+              </p>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button type="button" variant="outline" onClick={() => setNovoOpen(false)} disabled={novoSalvando}>
+                  Fechar
+                </Button>
+                <Button type="button" onClick={confirmarNovoLancamento} disabled={novoSalvando}>
+                  {novoSalvando ? "Salvando..." : "Salvar e continuar"}
                 </Button>
               </div>
             </div>

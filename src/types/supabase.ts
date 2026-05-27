@@ -227,6 +227,8 @@ export type Database = {
           created_at: string | null
           categoria_id: string | null
           beneficiario_id: string | null
+          conferido: boolean
+          conferido_em: string | null
         }
         Insert: {
           id?: string
@@ -241,6 +243,8 @@ export type Database = {
           created_at?: string | null
           categoria_id?: string | null
           beneficiario_id?: string | null
+          conferido?: boolean
+          conferido_em?: string | null
         }
         Update: {
           id?: string
@@ -255,6 +259,8 @@ export type Database = {
           created_at?: string | null
           categoria_id?: string | null
           beneficiario_id?: string | null
+          conferido?: boolean
+          conferido_em?: string | null
         }
         Relationships: [
           {
