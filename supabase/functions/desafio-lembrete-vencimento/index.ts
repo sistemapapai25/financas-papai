@@ -1,5 +1,4 @@
-
-/// <reference path="../deno-shim.d.ts" />
+import "../deno-shim.d.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -13,6 +12,11 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const UAZAPI_BASE_URL = Deno.env.get("UAZAPI_BASE_URL");
 const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
+const ENABLE_DESAFIO_LEMBRETES = (
+  Deno.env.get("ENABLE_DESAFIO_LEMBRETES") ??
+  Deno.env.get("enable_desafio_lembretes") ??
+  "false"
+).toLowerCase() === "true";
 
 function formatarNumero(numero: string): string {
   const numeroLimpo = numero.replace(/\D/g, "");
@@ -79,6 +83,13 @@ serve(async (req) => {
   }
 
   try {
+    if (!ENABLE_DESAFIO_LEMBRETES) {
+      return new Response(JSON.stringify({ disabled: true }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Calcular datas

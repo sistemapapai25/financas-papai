@@ -60,6 +60,7 @@ export default function LancamentosDashboard() {
   const [editCategoriaId, setEditCategoriaId] = useState<string>("");
   const [editBenefId, setEditBenefId] = useState<string>("");
   const [editComprovanteUrl, setEditComprovanteUrl] = useState<string>("");
+  const [editComprovanteUploading, setEditComprovanteUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [catOpts, setCatOpts] = useState<{ id: string; name: string; tipo: string; parent_id: string | null }[]>([]);
   const [benefOpts, setBenefOpts] = useState<{ id: string; name: string }[]>([]);
@@ -985,6 +986,7 @@ export default function LancamentosDashboard() {
     setEditCategoriaId(m.categoria_id || "");
     setEditBenefId(m.beneficiario_id || "");
     setEditComprovanteUrl(m.comprovante_url || "");
+    setEditComprovanteUploading(false);
     // setCatOpts and setBenefOpts will be populated by useEffect
     setEditOpen(true);
   }
@@ -1088,6 +1090,10 @@ export default function LancamentosDashboard() {
 
   async function salvarEdicao() {
     if (!editMov || !user) return;
+    if (editComprovanteUploading) {
+      toast({ title: "Aguarde", description: "O comprovante ainda está sendo enviado." });
+      return;
+    }
     const valorNum = Number(String(editValor).replace(",", "."));
     if (!Number.isFinite(valorNum) || valorNum <= 0) {
       toast({ title: "Atenção", description: "Informe um valor válido (maior que zero).", variant: "destructive" });
@@ -1995,6 +2001,7 @@ export default function LancamentosDashboard() {
                 label="Comprovante"
                 value={editComprovanteUrl}
                 onChange={(url) => setEditComprovanteUrl(url || "")}
+                onUploadingChange={setEditComprovanteUploading}
                 bucket="Comprovantes"
                 folder="comprovantes"
                 filenameHint={editDesc}
@@ -2065,7 +2072,9 @@ export default function LancamentosDashboard() {
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
-                <Button onClick={salvarEdicao} disabled={saving}>{saving ? 'Salvando...' : 'Salvar'}</Button>
+                <Button onClick={salvarEdicao} disabled={saving || editComprovanteUploading}>
+                  {editComprovanteUploading ? 'Enviando comprovante...' : saving ? 'Salvando...' : 'Salvar'}
+                </Button>
               </div>
             </div>
           </DialogContent>

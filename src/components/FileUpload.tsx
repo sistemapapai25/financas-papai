@@ -11,13 +11,14 @@ interface FileUploadProps {
   label: string;
   value?: string;
   onChange: (url: string | null) => void;
+  onUploadingChange?: (uploading: boolean) => void;
   bucket: string;
   folder: string;
   accept?: string;
   filenameHint?: string;
 }
 
-const FileUpload = ({ label, value, onChange, bucket, folder, accept = "*", filenameHint }: FileUploadProps) => {
+const FileUpload = ({ label, value, onChange, onUploadingChange, bucket, folder, accept = "*", filenameHint }: FileUploadProps) => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -27,6 +28,7 @@ const FileUpload = ({ label, value, onChange, bucket, folder, accept = "*", file
     if (!file || !user) return;
 
     setLoading(true);
+    onUploadingChange?.(true);
     try {
       const fileExt = file.name.split('.').pop();
       const slug = String(filenameHint || "").toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
@@ -59,6 +61,7 @@ const FileUpload = ({ label, value, onChange, bucket, folder, accept = "*", file
       });
     } finally {
       setLoading(false);
+      onUploadingChange?.(false);
     }
   };
 
