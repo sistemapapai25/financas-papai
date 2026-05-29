@@ -30,6 +30,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 type Conta = {
   id: string;
+  user_id: string | null;
   nome: string;
   saldo_inicial: number;
   saldo_inicial_em: string | null;
@@ -106,12 +107,16 @@ export default function ConferenciaExtrato() {
     return `${ano}-${String(mes + 1).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
   }, [ano, mes]);
 
+  // Conta selecionada
+  const contaSel = useMemo(() => contas.find((c) => c.id === contaId) ?? null, [contas, contaId]);
+
   // PDF path (mesma convenção do LancamentosDashboard)
   const pdfName = useMemo(() => `${ano}-${String(mes + 1).padStart(2, "0")}.pdf`, [ano, mes]);
   const pdfFolder = useMemo(() => {
     if (!user || !contaId) return null;
-    return `extratos_bancarios/${user.id}/${contaId}`;
-  }, [user, contaId]);
+    const ownerUserId = contaSel?.user_id || user.id;
+    return `extratos_bancarios/${ownerUserId}/${contaId}`;
+  }, [user, contaId, contaSel]);
   const pdfPath = useMemo(() => (pdfFolder ? `${pdfFolder}/${pdfName}` : null), [pdfFolder, pdfName]);
 
   // Cadastros auxiliares
@@ -119,12 +124,13 @@ export default function ConferenciaExtrato() {
     if (!user) return;
     supabase
       .from("contas_financeiras")
-      .select("id,nome,saldo_inicial,saldo_inicial_em")
+      .select("id,user_id,nome,saldo_inicial,saldo_inicial_em")
       .eq("ativo", true)
       .order("nome")
       .then(({ data }) => {
         const arr = (data ?? []).map((c) => ({
           id: c.id as string,
+          user_id: (c.user_id as string) ?? null,
           nome: c.nome as string,
           saldo_inicial: Number(c.saldo_inicial ?? 0),
           saldo_inicial_em: (c.saldo_inicial_em as string) ?? null,
@@ -237,9 +243,6 @@ export default function ConferenciaExtrato() {
     if (filtro === "PENDENTES") return movimentos.filter((m) => !m.conferido);
     return movimentos.filter((m) => m.conferido);
   }, [movimentos, filtro]);
-
-  // Conta selecionada
-  const contaSel = useMemo(() => contas.find((c) => c.id === contaId) ?? null, [contas, contaId]);
 
   // Resumo
   const resumo = useMemo(() => {

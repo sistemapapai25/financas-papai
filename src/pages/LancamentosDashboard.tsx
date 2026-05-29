@@ -44,7 +44,7 @@ export default function LancamentosDashboard() {
   const { isAdmin, loading: roleLoading } = useUserRole();
   const { toast } = useToast();
   const [dataRef, setDataRef] = useState(() => new Date());
-  const [contas, setContas] = useState<{ id: string; nome: string; logo?: string | null; saldo_inicial?: number; saldo_inicial_em?: string | null }[]>([]);
+  const [contas, setContas] = useState<{ id: string; user_id?: string | null; nome: string; logo?: string | null; saldo_inicial?: number; saldo_inicial_em?: string | null }[]>([]);
   const [contasSel, setContasSel] = useState<string[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [busca, setBusca] = useState("");
@@ -150,7 +150,8 @@ export default function LancamentosDashboard() {
   const extratoPdfName = useMemo(() => `${ano}-${String(mes + 1).padStart(2, "0")}.pdf`, [ano, mes]);
   const extratoPdfFolder = useMemo(() => {
     if (!user || !contaExtrato) return null;
-    return `extratos_bancarios/${user.id}/${contaExtrato.id}`;
+    const ownerUserId = contaExtrato.user_id || user.id;
+    return `extratos_bancarios/${ownerUserId}/${contaExtrato.id}`;
   }, [user, contaExtrato]);
   const extratoPdfPath = useMemo(() => {
     if (!extratoPdfFolder) return null;
@@ -261,11 +262,11 @@ export default function LancamentosDashboard() {
     if (!supabase || !user) return;
     supabase
       .from("contas_financeiras")
-      .select("id,nome,logo,saldo_inicial,saldo_inicial_em")
+      .select("id,user_id,nome,logo,saldo_inicial,saldo_inicial_em")
       .eq("ativo", true)
       .order("nome")
       .then(({ data }) => {
-        const arr = (data || []).map((c: { id: string; nome: string; logo?: string | null; saldo_inicial?: number; saldo_inicial_em?: string | null }) => ({ id: c.id, nome: c.nome, logo: c.logo ?? null, saldo_inicial: Number(c.saldo_inicial || 0), saldo_inicial_em: c.saldo_inicial_em ?? null }));
+        const arr = (data || []).map((c: { id: string; user_id?: string | null; nome: string; logo?: string | null; saldo_inicial?: number; saldo_inicial_em?: string | null }) => ({ id: c.id, user_id: c.user_id ?? null, nome: c.nome, logo: c.logo ?? null, saldo_inicial: Number(c.saldo_inicial || 0), saldo_inicial_em: c.saldo_inicial_em ?? null }));
         setContas(arr);
 
         // Ensure "Transferência Interna" categories exist
