@@ -632,20 +632,27 @@ export default function LancamentosDashboard() {
     return out;
   }
 
-  async function gerarReciboMov(m: Mov) {
+  async function gerarReciboMov(m: Mov, beneficiarioIdOverride?: string) {
     try {
       if (!user) { toast({ title: 'Sessão', description: 'Faça login para emitir recibo', variant: 'destructive' }); return; }
       if (m.tipo !== 'SAIDA') { toast({ title: 'Recibo', description: 'Recibo é emitido para saídas (despesas).' }); return; }
       if (!church) { toast({ title: 'Configuração da Igreja', description: 'Preencha os dados em Configurações > Igreja', variant: 'destructive' }); return; }
       setDocType('RECIBO');
       setReciboUrl(null);
-      setReembBenefIdMov(null);
-      setReembBenefNameMov(null);
-      setReembBenefDocMov(null);
-      setReembBenefAssUrlMov(null);
       setShowReciboModal(true);
-      setReciboLoading(true);
       setReciboMovId(m.id);
+      const reciboBenefId = beneficiarioIdOverride || m.beneficiario_id || null;
+      if (!reciboBenefId) {
+        setReembBenefIdMov(null);
+        setReembBenefNameMov(null);
+        setReembBenefDocMov(null);
+        setReembBenefAssUrlMov(null);
+        setReciboBlob(null);
+        setReciboLoading(false);
+        return;
+      }
+      setReembBenefIdMov(reciboBenefId);
+      setReciboLoading(true);
       const ano = new Date().getFullYear();
       const { data: nextNumRes, error: nextErr } = await supabase.rpc('next_recibo_num', { _user_id: user.id, _ano: ano });
       if (nextErr) throw nextErr;
@@ -702,38 +709,46 @@ export default function LancamentosDashboard() {
       let y = yHeader - 40;
       for (const line of wrapByWidth(corpo, 12)) { drawText(line, MARGIN_L, y, 12, false); y -= 18; }
       let yNome = y - 24;
-      if (m.beneficiario_id) {
+      if (reciboBenefId) {
         const { data: ben } = await supabase
           .from('beneficiaries')
           .select('name,documento,assinatura_path,user_id')
-          .eq('id', m.beneficiario_id)
+          .eq('id', reciboBenefId)
           .maybeSingle();
         const signerName = ben?.name || null;
         const signerDoc = ben?.documento || null;
-        let signerPath: string | null = ben?.assinatura_path || null;
-        if (!signerPath && user) {
+        let assinaturaImgBytes: ArrayBuffer | null = null;
+        const signerPaths: string[] = [];
+        if (ben?.assinatura_path) signerPaths.push(ben.assinatura_path);
+        if (user) {
           const folders = Array.from(new Set([
-            ben?.user_id ? `assinaturas/${ben.user_id}/beneficiarios` : null,
             `assinaturas/${user.id}/beneficiarios`,
+            ben?.user_id ? `assinaturas/${ben.user_id}/beneficiarios` : null,
           ].filter(Boolean) as string[]));
           for (const folder of folders) {
             const { data: files } = await supabase.storage.from('Assinaturas').list(folder, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } });
-            const match = (files || []).find(f => f.name.startsWith(`${m.beneficiario_id}-`));
+            const match = (files || []).find(f => f.name.startsWith(`${reciboBenefId}-`));
             if (match) {
-              signerPath = `${folder}/${match.name}`;
-              break;
+              signerPaths.push(`${folder}/${match.name}`);
             }
           }
         }
-        if (signerPath) {
-          const { data: signedAss } = await supabase.storage.from('Assinaturas').createSignedUrl(signerPath, 300);
-          if (signedAss?.signedUrl) {
+        for (const signerPath of Array.from(new Set(signerPaths))) {
+          try {
+            const { data: signedAss } = await supabase.storage.from('Assinaturas').createSignedUrl(signerPath, 300);
+            if (!signedAss?.signedUrl) continue;
             const resp = await fetch(signedAss.signedUrl);
-            if (!resp.ok) throw new Error('Não foi possível carregar a assinatura do beneficiário.');
-            const buf = await resp.arrayBuffer();
+            if (!resp.ok) continue;
+            assinaturaImgBytes = await resp.arrayBuffer();
+            break;
+          } catch {
+            continue;
+          }
+        }
+        if (assinaturaImgBytes) {
             let img;
-            try { img = await pdfDoc.embedPng(buf); }
-            catch { img = await pdfDoc.embedJpg(buf); }
+            try { img = await pdfDoc.embedPng(assinaturaImgBytes); }
+            catch { img = await pdfDoc.embedJpg(assinaturaImgBytes); }
             const maxSigW = Math.min(180, width - MARGIN_L - MARGIN_R);
             const maxSigH = 70;
             const scale = Math.min(maxSigW / img.width, maxSigH / img.height);
@@ -743,7 +758,6 @@ export default function LancamentosDashboard() {
             const sigY = Math.max(64, y - sigH - 8);
             page.drawImage(img, { x: sigX, y: sigY, width: sigW, height: sigH });
             yNome = sigY - 24;
-          }
         }
         if (signerName) {
           center(signerName, yNome, 12, true);
@@ -891,13 +905,22 @@ export default function LancamentosDashboard() {
         }
       }
       setReembBenefAssUrlMov(assUrl);
-      if (m) await gerarReembolsoMovPdf(m);
+      if (m) {
+        if (docType === 'RECIBO') await gerarReciboMov(m, id);
+        else await gerarReembolsoMovPdf(m);
+      }
       else if (reciboMovId) {
         const mov = rows.find(r => r.id === reciboMovId);
-        if (mov) await gerarReembolsoMovPdf(mov);
+        if (mov) {
+          if (docType === 'RECIBO') await gerarReciboMov(mov, id);
+          else await gerarReembolsoMovPdf(mov);
+        }
       }
     } catch {
-      if (m) await gerarReembolsoMovPdf(m);
+      if (m) {
+        if (docType === 'RECIBO') await gerarReciboMov(m, id);
+        else await gerarReembolsoMovPdf(m);
+      }
     }
   }
   const rowsView = useMemo(() => {
@@ -2136,7 +2159,7 @@ export default function LancamentosDashboard() {
               <DialogTitle>{docType === 'RECIBO' ? 'Recibo ERP' : 'Reembolso'}</DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
-              {docType === 'REEMBOLSO' && (
+              {(docType === 'REEMBOLSO' || docType === 'RECIBO') && (
                 <div className="space-y-2">
                   <Label>Beneficiário</Label>
                   <Popover open={openBenefReembMov} onOpenChange={setOpenBenefReembMov}>
@@ -2195,8 +2218,11 @@ export default function LancamentosDashboard() {
                       </Command>
                     </PopoverContent>
                   </Popover>
-                  {!reembBenefIdMov && (
+                  {!reembBenefIdMov && docType === 'REEMBOLSO' && (
                     <div className="text-xs text-muted-foreground">Selecione um beneficiário para gerar o PDF.</div>
+                  )}
+                  {!reembBenefIdMov && docType === 'RECIBO' && !reciboUrl && (
+                    <div className="text-xs text-muted-foreground">Selecione um beneficiário para gerar o recibo com assinatura.</div>
                   )}
                   
                 </div>
@@ -2206,11 +2232,13 @@ export default function LancamentosDashboard() {
               ) : reciboUrl ? (
                 <iframe src={reciboUrl} className="w-full h-[70vh] rounded border" />
               ) : (
-                <div className="text-sm text-muted-foreground">Selecione um beneficiário para gerar o reembolso.</div>
+                <div className="text-sm text-muted-foreground">
+                  {docType === 'RECIBO' ? 'Selecione um beneficiário para gerar o recibo.' : 'Selecione um beneficiário para gerar o reembolso.'}
+                </div>
               )}
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setShowReciboModal(false)}>Fechar</Button>
-                <Button type="button" onClick={adicionarReciboComoComprovanteMov} disabled={addingComprovante || !reciboBlob || (docType === 'REEMBOLSO' && !reembBenefIdMov)}>
+                <Button type="button" onClick={adicionarReciboComoComprovanteMov} disabled={addingComprovante || !reciboBlob || ((docType === 'REEMBOLSO' || docType === 'RECIBO') && !reembBenefIdMov)}>
                   {addingComprovante ? 'Adicionando...' : 'Adicionar como comprovante'}
                 </Button>
               </div>
