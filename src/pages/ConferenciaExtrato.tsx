@@ -89,6 +89,7 @@ export default function ConferenciaExtrato() {
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfExists, setPdfExists] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfFoundPath, setPdfFoundPath] = useState<string | null>(null);
 
   // Dialog "Novo lançamento"
   const [novoOpen, setNovoOpen] = useState(false);
@@ -118,6 +119,13 @@ export default function ConferenciaExtrato() {
     return `extratos_bancarios/${ownerUserId}/${contaId}`;
   }, [user, contaId, contaSel]);
   const pdfPath = useMemo(() => (pdfFolder ? `${pdfFolder}/${pdfName}` : null), [pdfFolder, pdfName]);
+  const pdfFolders = useMemo(() => {
+    if (!user || !contaId) return [];
+    return Array.from(new Set([
+      contaSel?.user_id ? `extratos_bancarios/${contaSel.user_id}/${contaId}` : null,
+      `extratos_bancarios/${user.id}/${contaId}`,
+    ].filter(Boolean) as string[]));
+  }, [user, contaId, contaSel]);
 
   // Cadastros auxiliares
   useEffect(() => {
@@ -203,24 +211,32 @@ export default function ConferenciaExtrato() {
   };
 
   const checkPdfExists = async () => {
-    if (!user || !pdfFolder) {
+    if (!user || pdfFolders.length === 0) {
       setPdfExists(false);
       setPdfUrl(null);
+      setPdfFoundPath(null);
       return;
     }
     setPdfBusy(true);
     try {
-      const { data } = await supabase.storage.from("Comprovantes").list(pdfFolder, { limit: 200 });
-      const ok = (data || []).some((f) => f.name === pdfName);
-      setPdfExists(ok);
-      if (ok && pdfPath) {
-        const { data: signed } = await supabase.storage.from("Comprovantes").createSignedUrl(pdfPath, 3600);
-        setPdfUrl(signed?.signedUrl ?? null);
-      } else {
-        setPdfUrl(null);
+      for (const folder of pdfFolders) {
+        const { data } = await supabase.storage.from("Comprovantes").list(folder, { limit: 200 });
+        const ok = (data || []).some((f) => f.name === pdfName);
+        if (ok) {
+          const foundPath = `${folder}/${pdfName}`;
+          const { data: signed } = await supabase.storage.from("Comprovantes").createSignedUrl(foundPath, 3600);
+          setPdfExists(true);
+          setPdfFoundPath(foundPath);
+          setPdfUrl(signed?.signedUrl ?? null);
+          return;
+        }
       }
+      setPdfExists(false);
+      setPdfFoundPath(null);
+      setPdfUrl(null);
     } catch {
       setPdfExists(false);
+      setPdfFoundPath(null);
       setPdfUrl(null);
     } finally {
       setPdfBusy(false);
@@ -408,6 +424,7 @@ export default function ConferenciaExtrato() {
       });
       if (error) throw error;
       toast({ title: "PDF enviado", description: "Extrato carregado." });
+      setPdfFoundPath(pdfPath);
       await checkPdfExists();
     } catch (err: unknown) {
       toast({
@@ -421,13 +438,15 @@ export default function ConferenciaExtrato() {
   };
 
   const removerPdf = async () => {
-    if (!pdfPath) return;
+    const pathToRemove = pdfFoundPath || pdfPath;
+    if (!pathToRemove) return;
     if (!confirm("Remover o PDF do extrato deste mês?")) return;
     setPdfBusy(true);
     try {
-      const { error } = await supabase.storage.from("Comprovantes").remove([pdfPath]);
+      const { error } = await supabase.storage.from("Comprovantes").remove([pathToRemove]);
       if (error) throw error;
       setPdfExists(false);
+      setPdfFoundPath(null);
       setPdfUrl(null);
       toast({ title: "PDF removido" });
     } catch (err: unknown) {

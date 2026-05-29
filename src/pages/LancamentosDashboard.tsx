@@ -99,6 +99,7 @@ export default function LancamentosDashboard() {
   const [extratoPdfBusy, setExtratoPdfBusy] = useState(false);
   const [extratoPdfExists, setExtratoPdfExists] = useState(false);
   const [extratoPdfUrl, setExtratoPdfUrl] = useState<string | null>(null);
+  const [extratoPdfFoundPath, setExtratoPdfFoundPath] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [novoOpen, setNovoOpen] = useState(false);
   const [novoData, setNovoData] = useState<string>("");
@@ -157,18 +158,34 @@ export default function LancamentosDashboard() {
     if (!extratoPdfFolder) return null;
     return `${extratoPdfFolder}/${extratoPdfName}`;
   }, [extratoPdfFolder, extratoPdfName]);
+  const extratoPdfFolders = useMemo(() => {
+    if (!user || !contaExtrato) return [];
+    return Array.from(new Set([
+      contaExtrato.user_id ? `extratos_bancarios/${contaExtrato.user_id}/${contaExtrato.id}` : null,
+      `extratos_bancarios/${user.id}/${contaExtrato.id}`,
+    ].filter(Boolean) as string[]));
+  }, [user, contaExtrato]);
 
   async function refreshExtratoPdfExists() {
     if (!user) return;
-    if (!extratoPdfFolder) { setExtratoPdfExists(false); return; }
+    if (extratoPdfFolders.length === 0) { setExtratoPdfExists(false); setExtratoPdfFoundPath(null); return; }
     setExtratoPdfBusy(true);
     try {
-      const { data, error } = await supabase.storage.from("Comprovantes").list(extratoPdfFolder, { limit: 200 });
-      if (error) throw error;
-      const ok = (data || []).some(f => f.name === extratoPdfName);
-      setExtratoPdfExists(ok);
+      for (const folder of extratoPdfFolders) {
+        const { data, error } = await supabase.storage.from("Comprovantes").list(folder, { limit: 200 });
+        if (error) throw error;
+        const ok = (data || []).some(f => f.name === extratoPdfName);
+        if (ok) {
+          setExtratoPdfExists(true);
+          setExtratoPdfFoundPath(`${folder}/${extratoPdfName}`);
+          return;
+        }
+      }
+      setExtratoPdfExists(false);
+      setExtratoPdfFoundPath(null);
     } catch {
       setExtratoPdfExists(false);
+      setExtratoPdfFoundPath(null);
     } finally {
       setExtratoPdfBusy(false);
     }
@@ -182,7 +199,7 @@ export default function LancamentosDashboard() {
     }
     setExtratoPdfBusy(true);
     try {
-      const { data, error } = await supabase.storage.from("Comprovantes").createSignedUrl(extratoPdfPath, 3600);
+      const { data, error } = await supabase.storage.from("Comprovantes").createSignedUrl(extratoPdfFoundPath || extratoPdfPath, 3600);
       if (error) throw error;
       if (data?.signedUrl) window.open(data.signedUrl, "_blank");
       else throw new Error("Não foi possível gerar link do PDF");
@@ -208,6 +225,7 @@ export default function LancamentosDashboard() {
       const { error } = await supabase.storage.from("Comprovantes").upload(extratoPdfPath, file, { upsert: true, cacheControl: "3600", contentType: "application/pdf" });
       if (error) throw error;
       setExtratoPdfExists(true);
+      setExtratoPdfFoundPath(extratoPdfPath);
       toast({ title: "Extrato PDF", description: "PDF enviado com sucesso." });
     } catch (e: unknown) {
       toast({ title: "Extrato PDF", description: e instanceof Error ? e.message : "Falha ao enviar PDF", variant: "destructive" });
@@ -219,11 +237,13 @@ export default function LancamentosDashboard() {
   async function removerExtratoPdf() {
     if (!user) return;
     if (!contaExtrato || !extratoPdfPath) return;
+    const pathToRemove = extratoPdfFoundPath || extratoPdfPath;
     setExtratoPdfBusy(true);
     try {
-      const { error } = await supabase.storage.from("Comprovantes").remove([extratoPdfPath]);
+      const { error } = await supabase.storage.from("Comprovantes").remove([pathToRemove]);
       if (error) throw error;
       setExtratoPdfExists(false);
+      setExtratoPdfFoundPath(null);
       setExtratoPdfUrl(null);
       toast({ title: "Extrato PDF", description: "PDF removido." });
     } catch (e: unknown) {
@@ -238,7 +258,7 @@ export default function LancamentosDashboard() {
     if (!contaExtrato || !extratoPdfPath) { setExtratoPdfUrl(null); return; }
     setExtratoPdfBusy(true);
     try {
-      const { data, error } = await supabase.storage.from("Comprovantes").createSignedUrl(extratoPdfPath, 3600);
+      const { data, error } = await supabase.storage.from("Comprovantes").createSignedUrl(extratoPdfFoundPath || extratoPdfPath, 3600);
       if (error) throw error;
       setExtratoPdfUrl(data?.signedUrl ?? null);
     } catch {
