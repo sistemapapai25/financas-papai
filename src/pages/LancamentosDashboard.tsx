@@ -634,7 +634,7 @@ export default function LancamentosDashboard() {
     return out;
   }
 
-  async function gerarReciboMov(m: Mov, beneficiarioIdOverride?: string) {
+  async function gerarReciboMov(m: Mov, beneficiarioIdOverride?: string, beneficiarioDocOverride?: string | null, beneficiarioNameOverride?: string | null) {
     try {
       if (!user) { toast({ title: 'Sessão', description: 'Faça login para emitir recibo', variant: 'destructive' }); return; }
       if (m.tipo !== 'SAIDA') { toast({ title: 'Recibo', description: 'Recibo é emitido para saídas (despesas).' }); return; }
@@ -717,8 +717,8 @@ export default function LancamentosDashboard() {
           .select('name,documento,assinatura_path,user_id')
           .eq('id', reciboBenefId)
           .maybeSingle();
-        const signerName = ben?.name || reembBenefNameMov || benefOpts.find(b => b.id === reciboBenefId)?.name || null;
-        const signerDoc = ben?.documento || reembBenefDocMov || null;
+        const signerName = ben?.name || beneficiarioNameOverride || reembBenefNameMov || benefOpts.find(b => b.id === reciboBenefId)?.name || null;
+        const signerDoc = ben?.documento || beneficiarioDocOverride || reembBenefDocMov || null;
         setReembBenefIdMov(reciboBenefId);
         setReembBenefNameMov(signerName);
         setReembBenefDocMov(signerDoc);
@@ -915,19 +915,18 @@ export default function LancamentosDashboard() {
       }
       setReembBenefAssUrlMov(assUrl);
       if (m) {
-        if (docType === 'RECIBO') await gerarReciboMov(m, id);
+        if (docType === 'RECIBO') await gerarReciboMov(m, id, doc, name);
         else await gerarReembolsoMovPdf(m);
-      }
-      else if (reciboMovId) {
+      } else if (reciboMovId) {
         const mov = rows.find(r => r.id === reciboMovId);
         if (mov) {
-          if (docType === 'RECIBO') await gerarReciboMov(mov, id);
+          if (docType === 'RECIBO') await gerarReciboMov(mov, id, doc, name);
           else await gerarReembolsoMovPdf(mov);
         }
       }
     } catch {
       if (m) {
-        if (docType === 'RECIBO') await gerarReciboMov(m, id);
+        if (docType === 'RECIBO') await gerarReciboMov(m, id, doc, name);
         else await gerarReembolsoMovPdf(m);
       }
     }
