@@ -982,14 +982,20 @@ export default function LancamentosDashboard() {
       const { data: pub } = supabase.storage.from('Comprovantes').getPublicUrl(destPath);
       const publicUrl = pub?.publicUrl ?? null;
       if (publicUrl) {
-        const { error: upMovErr } = await supabase
+        let updateQuery = supabase
           .from('movimentos_financeiros')
           .update({ comprovante_url: publicUrl })
-          .eq('id', reciboMovId)
-          .eq('user_id', user.id);
+          .eq('id', reciboMovId);
+        if (!isAdmin) {
+          updateQuery = updateQuery.eq('user_id', user.id);
+        }
+        const { data: updatedRows, error: upMovErr } = await updateQuery.select('id');
         if (upMovErr) throw upMovErr;
+        if (!updatedRows || updatedRows.length === 0) {
+          throw new Error('Não foi possível atualizar este lançamento. Verifique a permissão do registro.');
+        }
         setRows(prev => prev.map(r => r.id === reciboMovId ? { ...r, comprovante_url: publicUrl } : r));
-        toast({ title: 'Comprovante', description: 'Recibo adicionado como comprovante.' });
+        toast({ title: 'Comprovante', description: `${docType === 'REEMBOLSO' ? 'Reembolso' : 'Recibo'} adicionado como comprovante.` });
       }
     } catch (e) {
       toast({ title: 'Erro', description: e instanceof Error ? e.message : 'Falha ao adicionar comprovante', variant: 'destructive' });
