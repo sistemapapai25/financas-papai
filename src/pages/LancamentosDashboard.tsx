@@ -717,8 +717,8 @@ export default function LancamentosDashboard() {
           .select('name,documento,assinatura_path,user_id')
           .eq('id', reciboBenefId)
           .maybeSingle();
-        const signerName = ben?.name || null;
-        const signerDoc = ben?.documento || null;
+        const signerName = ben?.name || reembBenefNameMov || benefOpts.find(b => b.id === reciboBenefId)?.name || null;
+        const signerDoc = ben?.documento || reembBenefDocMov || null;
         let assinaturaImgBytes: ArrayBuffer | null = null;
         const signerPaths: string[] = [];
         if (ben?.assinatura_path) signerPaths.push(ben.assinatura_path);
@@ -757,14 +757,15 @@ export default function LancamentosDashboard() {
             const sigW = img.width * scale;
             const sigH = img.height * scale;
             const sigX = (width - sigW) / 2;
-            const sigY = Math.max(64, y - sigH - 8);
+            const sigY = Math.max(110, y - sigH - 8);
             page.drawImage(img, { x: sigX, y: sigY, width: sigW, height: sigH });
-            yNome = sigY - 24;
+            y = sigY;
+            yNome = y - 24;
         }
         if (signerName) {
           center(signerName, yNome, 12, true);
-          const docFmt = signerDoc ? (onlyDigits(signerDoc).length <= 11 ? formatCPF(signerDoc) : formatCNPJ(signerDoc)) : null;
-          if (docFmt) center(`CPF / CNPJ: ${docFmt}`, yNome - 18, 12);
+          const docFmt = signerDoc ? (onlyDigits(signerDoc).length >= 14 ? formatCNPJ(signerDoc) : formatCPF(signerDoc)) : null;
+          if (docFmt) center(`CPF/CNPJ: ${docFmt}`, yNome - 18, 12);
         }
       }
       const pdfBytes = await pdfDoc.save();
