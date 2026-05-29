@@ -1114,13 +1114,24 @@ export default function LancamentosDashboard() {
         beneficiario_id: editBenefId ? editBenefId : null,
         comprovante_url: editComprovanteUrl ? editComprovanteUrl : null,
       };
-      const { error } = await supabase
+      let updateQuery = supabase
         .from("movimentos_financeiros")
         .update(payload)
-        .eq("id", editMov.id)
-        .eq("user_id", user.id);
+        .eq("id", editMov.id);
+      if (!isAdmin) {
+        updateQuery = updateQuery.eq("user_id", user.id);
+      }
+      const { data: updatedRows, error } = await updateQuery.select("id");
       if (error) {
         toast({ title: "Erro", description: error.message, variant: "destructive" });
+        return;
+      }
+      if (!updatedRows || updatedRows.length === 0) {
+        toast({
+          title: "Nada salvo",
+          description: "Não foi possível atualizar este lançamento. Verifique a permissão do registro.",
+          variant: "destructive",
+        });
         return;
       }
       const contaSel = contas.find(c => c.id === editContaId);
