@@ -719,6 +719,9 @@ export default function LancamentosDashboard() {
           .maybeSingle();
         const signerName = ben?.name || reembBenefNameMov || benefOpts.find(b => b.id === reciboBenefId)?.name || null;
         const signerDoc = ben?.documento || reembBenefDocMov || null;
+        setReembBenefIdMov(reciboBenefId);
+        setReembBenefNameMov(signerName);
+        setReembBenefDocMov(signerDoc);
         let assinaturaImgBytes: ArrayBuffer | null = null;
         const signerPaths: string[] = [];
         if (ben?.assinatura_path) signerPaths.push(ben.assinatura_path);
@@ -760,12 +763,15 @@ export default function LancamentosDashboard() {
             const sigY = Math.max(110, y - sigH - 8);
             page.drawImage(img, { x: sigX, y: sigY, width: sigW, height: sigH });
             y = sigY;
-            yNome = y - 24;
         }
         if (signerName) {
-          center(signerName, yNome, 12, true);
+          center(signerName, y - 24, 12, true);
+          y -= 24;
           const docFmt = signerDoc ? (onlyDigits(signerDoc).length >= 14 ? formatCNPJ(signerDoc) : formatCPF(signerDoc)) : null;
-          if (docFmt) center(`CPF/CNPJ: ${docFmt}`, yNome - 18, 12);
+          if (docFmt) {
+            center(`CPF/CNPJ: ${docFmt}`, y - 18, 12);
+            y -= 18;
+          }
         }
       }
       const pdfBytes = await pdfDoc.save();
