@@ -726,16 +726,21 @@ export default function LancamentosDashboard() {
           }
         }
         if (signerPath) {
-          const { data: blobRes } = await supabase.storage.from('Assinaturas').download(signerPath);
-          if (blobRes) {
-            const buf = await blobRes.arrayBuffer();
+          const { data: signedAss } = await supabase.storage.from('Assinaturas').createSignedUrl(signerPath, 300);
+          if (signedAss?.signedUrl) {
+            const resp = await fetch(signedAss.signedUrl);
+            if (!resp.ok) throw new Error('Não foi possível carregar a assinatura do beneficiário.');
+            const buf = await resp.arrayBuffer();
             let img;
             try { img = await pdfDoc.embedPng(buf); }
             catch { img = await pdfDoc.embedJpg(buf); }
-            const sigW = Math.min(180, width - MARGIN_L - MARGIN_R);
-            const sigH = img.height * (sigW / img.width);
+            const maxSigW = Math.min(180, width - MARGIN_L - MARGIN_R);
+            const maxSigH = 70;
+            const scale = Math.min(maxSigW / img.width, maxSigH / img.height);
+            const sigW = img.width * scale;
+            const sigH = img.height * scale;
             const sigX = (width - sigW) / 2;
-            const sigY = y - sigH - 8;
+            const sigY = Math.max(64, y - sigH - 8);
             page.drawImage(img, { x: sigX, y: sigY, width: sigW, height: sigH });
             yNome = sigY - 24;
           }
