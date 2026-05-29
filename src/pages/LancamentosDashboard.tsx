@@ -705,17 +705,25 @@ export default function LancamentosDashboard() {
       if (m.beneficiario_id) {
         const { data: ben } = await supabase
           .from('beneficiaries')
-          .select('name,documento')
+          .select('name,documento,assinatura_path,user_id')
           .eq('id', m.beneficiario_id)
           .maybeSingle();
         const signerName = ben?.name || null;
         const signerDoc = ben?.documento || null;
-        let signerPath: string | null = null;
-        if (user) {
-          const folder = `assinaturas/${user.id}/beneficiarios`;
-          const { data: files } = await supabase.storage.from('Assinaturas').list(folder, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } });
-          const match = (files || []).find(f => f.name.startsWith(`${m.beneficiario_id}-`));
-          if (match) signerPath = `${folder}/${match.name}`;
+        let signerPath: string | null = ben?.assinatura_path || null;
+        if (!signerPath && user) {
+          const folders = Array.from(new Set([
+            ben?.user_id ? `assinaturas/${ben.user_id}/beneficiarios` : null,
+            `assinaturas/${user.id}/beneficiarios`,
+          ].filter(Boolean) as string[]));
+          for (const folder of folders) {
+            const { data: files } = await supabase.storage.from('Assinaturas').list(folder, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } });
+            const match = (files || []).find(f => f.name.startsWith(`${m.beneficiario_id}-`));
+            if (match) {
+              signerPath = `${folder}/${match.name}`;
+              break;
+            }
+          }
         }
         if (signerPath) {
           const { data: blobRes } = await supabase.storage.from('Assinaturas').download(signerPath);
