@@ -1336,12 +1336,15 @@ export default function LancamentosDashboard() {
     if (!user) return;
     setApplyingRules(true);
     try {
-      // Buscar todas as regras
-      const { data: rules, error: rulesError } = await supabase
+      const contaRegra = contasSel.length === 1 ? contas.find(c => c.id === contasSel[0]) : null;
+      const regraUserId = isAdmin ? (contaRegra?.user_id || user.id) : user.id;
+
+      const rulesQuery = supabase
         .from("classification_rules")
         .select("id, term, category_id, beneficiary_id")
-        .eq("user_id", user.id);
+        .eq("user_id", regraUserId);
 
+      const { data: rules, error: rulesError } = await rulesQuery;
       if (rulesError) throw rulesError;
       if (!rules || rules.length === 0) {
         toast({ title: "Aviso", description: "Nenhuma regra cadastrada", variant: "destructive" });
@@ -1352,27 +1355,41 @@ export default function LancamentosDashboard() {
 
       // Para cada regra, buscar e atualizar lançamentos do mês visível
       for (const rule of rules) {
-        const { data: movs } = await supabase
+        let movsQuery = supabase
           .from("movimentos_financeiros")
           .select("id")
-          .eq("user_id", user.id)
           .or(filtroPeriodoMovimentos)
           .ilike("descricao", `%${rule.term}%`);
+        if (!isAdmin) {
+          movsQuery = movsQuery.eq("user_id", user.id);
+        } else if (contaRegra?.user_id) {
+          movsQuery = movsQuery.eq("user_id", contaRegra.user_id);
+        }
+        if (contasSel.length > 0) {
+          movsQuery = movsQuery.in("conta_id", contasSel);
+        }
+
+        const { data: movs, error: movsError } = await movsQuery;
+        if (movsError) throw movsError;
 
         if (movs && movs.length > 0) {
           const ids = movs.map(m => m.id);
-          const { error: updateError } = await supabase
+          let updateQuery = supabase
             .from("movimentos_financeiros")
             .update({
               categoria_id: rule.category_id,
               beneficiario_id: rule.beneficiary_id,
             })
-            .in("id", ids)
-            .eq("user_id", user.id);
-
-          if (!updateError) {
-            totalUpdated += movs.length;
+            .in("id", ids);
+          if (!isAdmin) {
+            updateQuery = updateQuery.eq("user_id", user.id);
+          } else if (contaRegra?.user_id) {
+            updateQuery = updateQuery.eq("user_id", contaRegra.user_id);
           }
+          const { data: updatedRows, error: updateError } = await updateQuery.select("id");
+
+          if (updateError) throw updateError;
+          totalUpdated += updatedRows?.length ?? 0;
         }
       }
 
@@ -1385,9 +1402,11 @@ export default function LancamentosDashboard() {
       let q = supabase
         .from("movimentos_financeiros")
         .select("id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name,documento)")
-        .eq("user_id", user.id)
         .or(filtroPeriodoMovimentos)
         .order("data");
+      if (!isAdmin) {
+        q = q.eq("user_id", user.id);
+      }
       if (contasSel.length > 0) {
         q = q.in("conta_id", contasSel);
       }
