@@ -607,6 +607,9 @@ export default function LancamentosDashboard() {
 
   const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
   function onlyDigits(s: string | null | undefined) { return String(s ?? '').replace(/\D+/g, ''); }
+  function normalizeSearchText(s: string | null | undefined) {
+    return String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
   function formatCPF(s: string | null | undefined) {
     const d = onlyDigits(s).slice(0, 11);
     const p1 = d.slice(0, 3);
@@ -2046,7 +2049,11 @@ export default function LancamentosDashboard() {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
-                    <Command>
+                    <Command
+                      filter={(value, search) => (
+                        normalizeSearchText(value).includes(normalizeSearchText(search)) ? 1 : 0
+                      )}
+                    >
                       <CommandInput placeholder="Buscar categoria..." />
                       <CommandList>
                         <CommandEmpty>Nenhuma categoria encontrada.</CommandEmpty>
