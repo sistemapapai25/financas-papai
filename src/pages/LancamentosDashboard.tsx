@@ -31,6 +31,7 @@ type Mov = {
   beneficiario_id?: string | null;
   categoria_nome?: string | null;
   beneficiario_nome?: string | null;
+  beneficiario_documento?: string | null;
   tipo: "ENTRADA" | "SAIDA";
   valor: number;
   origem?: "LANCAMENTO" | "CULTO" | "AJUSTE" | null;
@@ -533,7 +534,7 @@ export default function LancamentosDashboard() {
     (async () => {
       let q = supabase
         .from("movimentos_financeiros")
-        .select("id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name)")
+        .select("id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name,documento)")
         .or(filtroPeriodoMovimentos)
         .order("data");
       if (!isAdmin) {
@@ -559,6 +560,7 @@ export default function LancamentosDashboard() {
         beneficiario_id: r.beneficiario_id ?? null,
         categoria_nome: r.categoria?.name ?? null,
         beneficiario_nome: r.beneficiario?.name ?? null,
+        beneficiario_documento: r.beneficiario?.documento ?? null,
         tipo: r.tipo as Mov["tipo"],
         valor: r.valor,
         origem: (r.origem as Mov["origem"]) ?? null,
@@ -717,7 +719,7 @@ export default function LancamentosDashboard() {
           .eq('id', reciboBenefId)
           .maybeSingle();
         const signerName = ben?.name || beneficiarioNameOverride || reembBenefNameMov || benefOpts.find(b => b.id === reciboBenefId)?.name || null;
-        const signerDoc = ben?.documento || beneficiarioDocOverride || reembBenefDocMov || null;
+        const signerDoc = ben?.documento || beneficiarioDocOverride || reembBenefDocMov || m.beneficiario_documento || null;
         setReembBenefIdMov(reciboBenefId);
         setReembBenefNameMov(signerName);
         setReembBenefDocMov(signerDoc);
@@ -1379,7 +1381,7 @@ export default function LancamentosDashboard() {
       // Recarregar dados
       let q = supabase
         .from("movimentos_financeiros")
-        .select("id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name)")
+        .select("id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name,documento)")
         .eq("user_id", user.id)
         .or(filtroPeriodoMovimentos)
         .order("data");
@@ -1398,6 +1400,7 @@ export default function LancamentosDashboard() {
         beneficiario_id: r.beneficiario_id ?? null,
         categoria_nome: r.categoria?.name ?? null,
         beneficiario_nome: r.beneficiario?.name ?? null,
+        beneficiario_documento: r.beneficiario?.documento ?? null,
         tipo: r.tipo as Mov["tipo"],
         valor: r.valor,
         origem: (r.origem as Mov["origem"]) ?? null,
