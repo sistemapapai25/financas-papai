@@ -1446,7 +1446,7 @@ export default function LancamentosDashboard() {
           beneficiaryId = null;
 
           if (matchedRule.category_name) {
-            categoryId = categoryByOwnerAndName.get(lookupKey(ownerId, matchedRule.category_name)) ?? null;
+            categoryId = categoryByOwnerAndName.get(lookupKey(ownerId, matchedRule.category_name)) ?? matchedRule.category_id ?? null;
             if (!categoryId) {
               skippedUnresolved++;
               continue;
@@ -1454,7 +1454,7 @@ export default function LancamentosDashboard() {
           }
 
           if (matchedRule.beneficiary_name) {
-            beneficiaryId = beneficiaryByOwnerAndName.get(lookupKey(ownerId, matchedRule.beneficiary_name)) ?? null;
+            beneficiaryId = beneficiaryByOwnerAndName.get(lookupKey(ownerId, matchedRule.beneficiary_name)) ?? matchedRule.beneficiary_id ?? null;
             if (!beneficiaryId) {
               skippedUnresolved++;
               continue;

@@ -207,14 +207,14 @@ Se não for um comprovante de pagamento válido, responda: {"error": "Não é um
             if (r.category_name) {
               const categoryName = strip(r.category_name).toLowerCase();
               categoria_id = ((cats || []) as { id: string; name: string }[])
-                .find((c) => strip(c.name).toLowerCase() === categoryName)?.id ?? null;
+                .find((c) => strip(c.name).toLowerCase() === categoryName)?.id ?? r.category_id ?? null;
               if (!categoria_id) continue;
             }
 
             if (r.beneficiary_name) {
               const beneficiaryName = strip(r.beneficiary_name).toLowerCase();
               beneficiario_id = ((bens || []) as { id: string; name: string }[])
-                .find((b) => strip(b.name).toLowerCase() === beneficiaryName)?.id ?? null;
+                .find((b) => strip(b.name).toLowerCase() === beneficiaryName)?.id ?? r.beneficiary_id ?? null;
               if (!beneficiario_id) continue;
             }
           }
