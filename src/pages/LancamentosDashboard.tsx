@@ -22,6 +22,7 @@ import FileUpload from "@/components/FileUpload";
 
 type Mov = {
   id: string;
+  user_id: string | null;
   data: string;
   descricao: string | null;
   conta_id: string | null;
@@ -534,7 +535,7 @@ export default function LancamentosDashboard() {
     (async () => {
       let q = supabase
         .from("movimentos_financeiros")
-        .select("id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name,documento)")
+        .select("id, user_id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name,documento)")
         .or(filtroPeriodoMovimentos)
         .order("data");
       if (!isAdmin) {
@@ -551,6 +552,7 @@ export default function LancamentosDashboard() {
       }
       const arr: Mov[] = (data || []).map((r) => ({
         id: r.id,
+        user_id: r.user_id ?? null,
         data: r.data,
         descricao: r.descricao ?? null,
         conta_id: r.conta_id ?? null,
@@ -1305,6 +1307,7 @@ export default function LancamentosDashboard() {
                   ...prev,
                   {
                     id: insOpp.id,
+                    user_id: user.id,
                     data: editMov.data,
                     descricao: `Transferência: ${editDesc || editMov.descricao || ''}`,
                     conta_id: appConta.id,
@@ -1336,99 +1339,116 @@ export default function LancamentosDashboard() {
     if (!user) return;
     setApplyingRules(true);
     try {
-      const contaRegra = contasSel.length === 1 ? contas.find(c => c.id === contasSel[0]) : null;
-      const regraUserId = isAdmin ? (contaRegra?.user_id || user.id) : user.id;
+      type ClassificationRule = {
+        id: string;
+        user_id: string;
+        term: string;
+        category_id: string | null;
+        beneficiary_id: string | null;
+      };
 
-      const rulesQuery = supabase
+      const visibleRows = rows.filter((mov) => (
+        contasSel.length === 0 || (mov.conta_id ? contasSel.includes(mov.conta_id) : false)
+      ));
+
+      if (visibleRows.length === 0) {
+        toast({ title: "Aviso", description: `Nenhum lançamento encontrado no mês ${tituloMes}.`, variant: "destructive" });
+        return;
+      }
+
+      const ownerByConta = new Map(contas.map((conta) => [conta.id, conta.user_id ?? null]));
+      const ownerForMov = (mov: Mov) => mov.user_id || (mov.conta_id ? ownerByConta.get(mov.conta_id) : null) || user.id;
+      const ruleOwnerIds = isAdmin
+        ? Array.from(new Set(visibleRows.map(ownerForMov))).filter(Boolean)
+        : [user.id];
+
+      let rulesQuery = supabase
         .from("classification_rules")
-        .select("id, term, category_id, beneficiary_id")
-        .eq("user_id", regraUserId);
+        .select("id, user_id, term, category_id, beneficiary_id")
+        .order("created_at", { ascending: false });
+
+      if (ruleOwnerIds.length === 1) {
+        rulesQuery = rulesQuery.eq("user_id", ruleOwnerIds[0]);
+      } else {
+        rulesQuery = rulesQuery.in("user_id", ruleOwnerIds);
+      }
 
       const { data: rules, error: rulesError } = await rulesQuery;
       if (rulesError) throw rulesError;
-      if (!rules || rules.length === 0) {
+      const fetchedRules = (rules || []) as ClassificationRule[];
+      if (fetchedRules.length === 0) {
         toast({ title: "Aviso", description: "Nenhuma regra cadastrada", variant: "destructive" });
         return;
       }
 
+      const rulesByOwner = new Map<string, ClassificationRule[]>();
+      for (const rule of fetchedRules) {
+        const ownerRules = rulesByOwner.get(rule.user_id) || [];
+        ownerRules.push(rule);
+        rulesByOwner.set(rule.user_id, ownerRules);
+      }
+
+      const updates = new Map<string, { ownerId: string; categoryId: string | null; beneficiaryId: string | null; ids: string[] }>();
+
+      for (const mov of visibleRows) {
+        const description = normalizeSearchText(mov.descricao);
+        if (!description) continue;
+
+        const ownerId = ownerForMov(mov);
+        const ownerRules = rulesByOwner.get(ownerId) || [];
+        const matchedRule = ownerRules.find((rule) => {
+          const term = normalizeSearchText(rule.term);
+          return !!term && description.includes(term);
+        });
+
+        if (!matchedRule) continue;
+
+        const key = `${ownerId}|${matchedRule.category_id ?? ""}|${matchedRule.beneficiary_id ?? ""}`;
+        const group = updates.get(key) || {
+          ownerId,
+          categoryId: matchedRule.category_id,
+          beneficiaryId: matchedRule.beneficiary_id,
+          ids: [],
+        };
+        group.ids.push(mov.id);
+        updates.set(key, group);
+      }
+
+      if (updates.size === 0) {
+        toast({
+          title: "Regras Aplicadas",
+          description: "Nenhum lançamento do mês visível corresponde aos termos cadastrados.",
+        });
+        return;
+      }
+
       let totalUpdated = 0;
-
-      // Para cada regra, buscar e atualizar lançamentos do mês visível
-      for (const rule of rules) {
-        let movsQuery = supabase
+      for (const group of updates.values()) {
+        let updateQuery = supabase
           .from("movimentos_financeiros")
-          .select("id")
-          .or(filtroPeriodoMovimentos)
-          .ilike("descricao", `%${rule.term}%`);
+          .update({
+            categoria_id: group.categoryId,
+            beneficiario_id: group.beneficiaryId,
+          })
+          .in("id", group.ids);
+
         if (!isAdmin) {
-          movsQuery = movsQuery.eq("user_id", user.id);
-        } else if (contaRegra?.user_id) {
-          movsQuery = movsQuery.eq("user_id", contaRegra.user_id);
-        }
-        if (contasSel.length > 0) {
-          movsQuery = movsQuery.in("conta_id", contasSel);
+          updateQuery = updateQuery.eq("user_id", user.id);
+        } else {
+          updateQuery = updateQuery.eq("user_id", group.ownerId);
         }
 
-        const { data: movs, error: movsError } = await movsQuery;
-        if (movsError) throw movsError;
-
-        if (movs && movs.length > 0) {
-          const ids = movs.map(m => m.id);
-          let updateQuery = supabase
-            .from("movimentos_financeiros")
-            .update({
-              categoria_id: rule.category_id,
-              beneficiario_id: rule.beneficiary_id,
-            })
-            .in("id", ids);
-          if (!isAdmin) {
-            updateQuery = updateQuery.eq("user_id", user.id);
-          } else if (contaRegra?.user_id) {
-            updateQuery = updateQuery.eq("user_id", contaRegra.user_id);
-          }
-          const { data: updatedRows, error: updateError } = await updateQuery.select("id");
-
-          if (updateError) throw updateError;
-          totalUpdated += updatedRows?.length ?? 0;
-        }
+        const { data: updatedRows, error: updateError } = await updateQuery.select("id");
+        if (updateError) throw updateError;
+        totalUpdated += updatedRows?.length ?? 0;
       }
 
       toast({
         title: "Regras Aplicadas",
-        description: `${totalUpdated} lançamento(s) atualizado(s) no mês ${tituloMes}`
+        description: `${totalUpdated} lançamento(s) atualizado(s) no mês ${tituloMes}.`
       });
 
-      // Recarregar dados
-      let q = supabase
-        .from("movimentos_financeiros")
-        .select("id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name,documento)")
-        .or(filtroPeriodoMovimentos)
-        .order("data");
-      if (!isAdmin) {
-        q = q.eq("user_id", user.id);
-      }
-      if (contasSel.length > 0) {
-        q = q.in("conta_id", contasSel);
-      }
-      const { data } = await q;
-      const arr: Mov[] = (data || []).map((r) => ({
-        id: r.id,
-        data: r.data,
-        descricao: r.descricao ?? null,
-        conta_id: r.conta_id ?? null,
-        conta_nome: r.contas?.nome ?? null,
-        conta_logo: r.contas?.logo ?? null,
-        categoria_id: r.categoria_id ?? null,
-        beneficiario_id: r.beneficiario_id ?? null,
-        categoria_nome: r.categoria?.name ?? null,
-        beneficiario_nome: r.beneficiario?.name ?? null,
-        beneficiario_documento: r.beneficiario?.documento ?? null,
-        tipo: r.tipo as Mov["tipo"],
-        valor: r.valor,
-        origem: (r.origem as Mov["origem"]) ?? null,
-        comprovante_url: r.comprovante_url ?? null,
-      }));
-      setRows(arr);
+      setReloadKey((key) => key + 1);
     } catch (error: unknown) {
       toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao recarregar dados", variant: "destructive" });
     } finally {
