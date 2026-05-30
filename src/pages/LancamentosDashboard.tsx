@@ -1342,9 +1342,12 @@ export default function LancamentosDashboard() {
       type ClassificationRule = {
         id: string;
         user_id: string;
+        aplica_todos: boolean;
         term: string;
         category_id: string | null;
         beneficiary_id: string | null;
+        category_name: string | null;
+        beneficiary_name: string | null;
       };
 
       const visibleRows = rows.filter((mov) => (
@@ -1364,38 +1367,70 @@ export default function LancamentosDashboard() {
 
       let rulesQuery = supabase
         .from("classification_rules")
-        .select("id, user_id, term, category_id, beneficiary_id")
+        .select("id, user_id, aplica_todos, term, category_id, beneficiary_id, category_name, beneficiary_name")
         .order("created_at", { ascending: false });
 
-      if (ruleOwnerIds.length === 1) {
-        rulesQuery = rulesQuery.eq("user_id", ruleOwnerIds[0]);
-      } else {
-        rulesQuery = rulesQuery.in("user_id", ruleOwnerIds);
+      if (!isAdmin) {
+        rulesQuery = rulesQuery.or(`user_id.eq.${user.id},aplica_todos.eq.true`);
       }
 
       const { data: rules, error: rulesError } = await rulesQuery;
       if (rulesError) throw rulesError;
-      const fetchedRules = (rules || []) as ClassificationRule[];
+      const fetchedRules = ((rules || []) as ClassificationRule[])
+        .filter((rule) => rule.aplica_todos || ruleOwnerIds.includes(rule.user_id));
       if (fetchedRules.length === 0) {
         toast({ title: "Aviso", description: "Nenhuma regra cadastrada", variant: "destructive" });
         return;
       }
 
+      const globalRules = fetchedRules.filter((rule) => rule.aplica_todos);
+      const categoryByOwnerAndName = new Map<string, string>();
+      const beneficiaryByOwnerAndName = new Map<string, string>();
+      const lookupKey = (ownerId: string, name: string) => `${ownerId}|${normalizeSearchText(name)}`;
+
+      if (globalRules.length > 0) {
+        const [categoriesResult, beneficiariesResult] = await Promise.all([
+          supabase
+            .from("categories")
+            .select("id, user_id, name")
+            .in("user_id", ruleOwnerIds),
+          supabase
+            .from("beneficiaries")
+            .select("id, user_id, name")
+            .in("user_id", ruleOwnerIds),
+        ]);
+
+        if (categoriesResult.error) throw categoriesResult.error;
+        if (beneficiariesResult.error) throw beneficiariesResult.error;
+
+        for (const category of categoriesResult.data || []) {
+          if (category.user_id && category.name) {
+            categoryByOwnerAndName.set(lookupKey(category.user_id, category.name), category.id);
+          }
+        }
+        for (const beneficiary of beneficiariesResult.data || []) {
+          if (beneficiary.user_id && beneficiary.name) {
+            beneficiaryByOwnerAndName.set(lookupKey(beneficiary.user_id, beneficiary.name), beneficiary.id);
+          }
+        }
+      }
+
       const rulesByOwner = new Map<string, ClassificationRule[]>();
-      for (const rule of fetchedRules) {
+      for (const rule of fetchedRules.filter((item) => !item.aplica_todos)) {
         const ownerRules = rulesByOwner.get(rule.user_id) || [];
         ownerRules.push(rule);
         rulesByOwner.set(rule.user_id, ownerRules);
       }
 
       const updates = new Map<string, { ownerId: string; categoryId: string | null; beneficiaryId: string | null; ids: string[] }>();
+      let skippedUnresolved = 0;
 
       for (const mov of visibleRows) {
         const description = normalizeSearchText(mov.descricao);
         if (!description) continue;
 
         const ownerId = ownerForMov(mov);
-        const ownerRules = rulesByOwner.get(ownerId) || [];
+        const ownerRules = [...(rulesByOwner.get(ownerId) || []), ...globalRules];
         const matchedRule = ownerRules.find((rule) => {
           const term = normalizeSearchText(rule.term);
           return !!term && description.includes(term);
@@ -1403,11 +1438,35 @@ export default function LancamentosDashboard() {
 
         if (!matchedRule) continue;
 
-        const key = `${ownerId}|${matchedRule.category_id ?? ""}|${matchedRule.beneficiary_id ?? ""}`;
+        let categoryId = matchedRule.category_id;
+        let beneficiaryId = matchedRule.beneficiary_id;
+
+        if (matchedRule.aplica_todos) {
+          categoryId = null;
+          beneficiaryId = null;
+
+          if (matchedRule.category_name) {
+            categoryId = categoryByOwnerAndName.get(lookupKey(ownerId, matchedRule.category_name)) ?? null;
+            if (!categoryId) {
+              skippedUnresolved++;
+              continue;
+            }
+          }
+
+          if (matchedRule.beneficiary_name) {
+            beneficiaryId = beneficiaryByOwnerAndName.get(lookupKey(ownerId, matchedRule.beneficiary_name)) ?? null;
+            if (!beneficiaryId) {
+              skippedUnresolved++;
+              continue;
+            }
+          }
+        }
+
+        const key = `${ownerId}|${categoryId ?? ""}|${beneficiaryId ?? ""}`;
         const group = updates.get(key) || {
           ownerId,
-          categoryId: matchedRule.category_id,
-          beneficiaryId: matchedRule.beneficiary_id,
+          categoryId,
+          beneficiaryId,
           ids: [],
         };
         group.ids.push(mov.id);
@@ -1445,7 +1504,7 @@ export default function LancamentosDashboard() {
 
       toast({
         title: "Regras Aplicadas",
-        description: `${totalUpdated} lançamento(s) atualizado(s) no mês ${tituloMes}.`
+        description: `${totalUpdated} lançamento(s) atualizado(s) no mês ${tituloMes}.${skippedUnresolved ? ` ${skippedUnresolved} ignorado(s) por categoria/beneficiário inexistente no usuário.` : ""}`
       });
 
       setReloadKey((key) => key + 1);

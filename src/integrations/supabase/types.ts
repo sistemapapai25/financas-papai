@@ -195,24 +195,33 @@ export type Database = {
       }
       classification_rules: {
         Row: {
+          aplica_todos: boolean
           beneficiary_id: string | null
+          beneficiary_name: string | null
           category_id: string | null
+          category_name: string | null
           created_at: string | null
           id: string
           term: string
           user_id: string
         }
         Insert: {
+          aplica_todos?: boolean
           beneficiary_id?: string | null
+          beneficiary_name?: string | null
           category_id?: string | null
+          category_name?: string | null
           created_at?: string | null
           id?: string
           term: string
           user_id: string
         }
         Update: {
+          aplica_todos?: boolean
           beneficiary_id?: string | null
+          beneficiary_name?: string | null
           category_id?: string | null
+          category_name?: string | null
           created_at?: string | null
           id?: string
           term?: string

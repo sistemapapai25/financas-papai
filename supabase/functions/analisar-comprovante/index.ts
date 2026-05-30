@@ -36,6 +36,11 @@ Deno.serve(async (req) => {
       .select("id,name")
       .eq("user_id", user_id);
 
+    const { data: cats } = await supabase
+      .from("categories")
+      .select("id,name")
+      .eq("user_id", user_id);
+
     // Try to use AI vision to analyze the comprovante
     let aiResult: { recebedor_nome?: string; valor?: string; data?: string } | null = null;
     
@@ -166,23 +171,57 @@ Se não for um comprovante de pagamento válido, responda: {"error": "Não é um
     
     const { data: rules } = await supabase
       .from("classification_rules")
-      .select("term,category_id,beneficiary_id")
-      .eq("user_id", user_id);
+      .select("term,category_id,beneficiary_id,aplica_todos,category_name,beneficiary_name")
+      .or(`user_id.eq.${user_id},aplica_todos.eq.true`)
+      .order("created_at", { ascending: false });
 
     const desc = (typeof descricao === "string" ? descricao : "").toLowerCase();
     const strip = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const norm = strip(`${recebedor_nome || ""} ${desc}`).toLowerCase();
     
     if (rules && norm) {
-      type Rule = { term: string | null; category_id?: string | null; beneficiary_id?: string | null };
+      type Rule = {
+        term: string | null;
+        category_id?: string | null;
+        beneficiary_id?: string | null;
+        aplica_todos?: boolean | null;
+        category_name?: string | null;
+        beneficiary_name?: string | null;
+      };
       const rs: Rule[] = Array.isArray(rules) ? (rules as Rule[]) : [];
-      for (const r of rs) {
+      const orderedRules = [
+        ...rs.filter((r) => !r.aplica_todos),
+        ...rs.filter((r) => r.aplica_todos),
+      ];
+      for (const r of orderedRules) {
         const term = strip(String(r.term || "")).toLowerCase();
         if (!term) continue;
         if (norm.includes(term)) {
+          let categoria_id = r.category_id || null;
+          let beneficiario_id = r.beneficiary_id || null;
+
+          if (r.aplica_todos) {
+            categoria_id = null;
+            beneficiario_id = null;
+
+            if (r.category_name) {
+              const categoryName = strip(r.category_name).toLowerCase();
+              categoria_id = ((cats || []) as { id: string; name: string }[])
+                .find((c) => strip(c.name).toLowerCase() === categoryName)?.id ?? null;
+              if (!categoria_id) continue;
+            }
+
+            if (r.beneficiary_name) {
+              const beneficiaryName = strip(r.beneficiary_name).toLowerCase();
+              beneficiario_id = ((bens || []) as { id: string; name: string }[])
+                .find((b) => strip(b.name).toLowerCase() === beneficiaryName)?.id ?? null;
+              if (!beneficiario_id) continue;
+            }
+          }
+
           sugestao = {
-            categoria_id: r.category_id || null,
-            beneficiario_id: r.beneficiary_id || null,
+            categoria_id,
+            beneficiario_id,
             motivo: `Termo encontrado: ${r.term}`,
           };
           break;

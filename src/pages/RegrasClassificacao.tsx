@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 
 type Rule = {
     id: string;
+    user_id: string;
+    aplica_todos: boolean;
     term: string;
     category_id: string | null;
     beneficiary_id: string | null;
@@ -60,6 +62,13 @@ export default function RegrasClassificacao() {
     }, []);
 
     useEffect(() => {
+        setNewCategoryId("");
+        setNewBeneficiaryId("");
+        setCategorySearch("");
+        setBeneficiarySearch("");
+    }, [scopeUserId]);
+
+    useEffect(() => {
         if (!user || roleLoading) return;
 
         if (!scopeUserId) setScopeUserId(isAdmin ? "__ALL__" : user.id);
@@ -92,15 +101,9 @@ export default function RegrasClassificacao() {
         const target = isAdmin ? scopeUserId : user.id;
         if (!target) return;
         loadRules(target);
-        if (target === "__ALL__") {
-            setCategories([]);
-            setBeneficiaries([]);
-            setNewCategoryId("");
-            setNewBeneficiaryId("");
-            return;
-        }
-        loadCategories(target);
-        loadBeneficiaries(target);
+        const optionsUserId = isAdmin && target === "__ALL__" ? user.id : target;
+        loadCategories(optionsUserId);
+        loadBeneficiaries(optionsUserId);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user, roleLoading, isAdmin, scopeUserId]);
 
@@ -110,9 +113,13 @@ export default function RegrasClassificacao() {
             .from("classification_rules")
             .select(`
         id,
+        user_id,
+        aplica_todos,
         term,
         category_id,
         beneficiary_id,
+        category_name,
+        beneficiary_name,
         category:categories(name),
         beneficiary:beneficiaries(name)
       `)
@@ -130,19 +137,25 @@ export default function RegrasClassificacao() {
 
         type RuleRow = {
             id: string;
+            user_id: string;
+            aplica_todos?: boolean | null;
             term: string;
             category_id: string | null;
             beneficiary_id: string | null;
+            category_name?: string | null;
+            beneficiary_name?: string | null;
             category?: { name?: string | null } | null;
             beneficiary?: { name?: string | null } | null;
         };
         const mapped: Rule[] = (data || []).map((r: RuleRow) => ({
             id: r.id,
+            user_id: r.user_id,
+            aplica_todos: !!r.aplica_todos,
             term: r.term,
             category_id: r.category_id,
             beneficiary_id: r.beneficiary_id,
-            category_name: r.category?.name,
-            beneficiary_name: r.beneficiary?.name,
+            category_name: r.category_name || r.category?.name,
+            beneficiary_name: r.beneficiary_name || r.beneficiary?.name,
         }));
         setRules(mapped);
     };
@@ -179,18 +192,34 @@ export default function RegrasClassificacao() {
         }
 
         const targetUserId = isAdmin ? scopeUserId : user.id;
-        if (isAdmin && targetUserId === "__ALL__") {
-            toast({ title: "Usuário", description: "Selecione um usuário específico para criar a regra.", variant: "destructive" });
+        const isGlobalRule = isAdmin && targetUserId === "__ALL__";
+        const ownerUserId = isGlobalRule ? user.id : targetUserId;
+        const selectedCategory = categories.find((c) => c.id === newCategoryId);
+        const selectedBeneficiary = beneficiaries.find((b) => b.id === newBeneficiaryId);
+
+        if (!ownerUserId) {
+            toast({ title: "Escopo", description: "Selecione o escopo da regra.", variant: "destructive" });
+            return;
+        }
+        if (newCategoryId && !selectedCategory) {
+            toast({ title: "Categoria", description: "Selecione uma categoria válida para este escopo.", variant: "destructive" });
+            return;
+        }
+        if (newBeneficiaryId && !selectedBeneficiary) {
+            toast({ title: "Beneficiário", description: "Selecione um beneficiário válido para este escopo.", variant: "destructive" });
             return;
         }
 
         setLoading(true);
         try {
             const { error } = await supabase.from("classification_rules").insert({
-                user_id: targetUserId,
+                user_id: ownerUserId,
+                aplica_todos: isGlobalRule,
                 term: newTerm.trim(),
                 category_id: newCategoryId || null,
+                category_name: selectedCategory?.name ?? null,
                 beneficiary_id: newBeneficiaryId || null,
+                beneficiary_name: selectedBeneficiary?.name ?? null,
             });
 
             if (error) throw error;
@@ -235,13 +264,13 @@ export default function RegrasClassificacao() {
                         <div className="grid gap-4">
                             {isAdmin ? (
                                 <div>
-                                    <Label>Usuário</Label>
+                                    <Label>Escopo</Label>
                                     <Select value={scopeUserId} onValueChange={setScopeUserId}>
                                         <SelectTrigger>
-                                            <SelectValue placeholder="Selecione um usuário" />
+                                            <SelectValue placeholder="Selecione o escopo" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="__ALL__">Todos os usuários</SelectItem>
+                                            <SelectItem value="__ALL__">Todos os usuários (global)</SelectItem>
                                             {userOptions.map((u) => (
                                                 <SelectItem key={u.id} value={u.id}>
                                                     {u.label}
@@ -333,7 +362,7 @@ export default function RegrasClassificacao() {
                                     </PopoverContent>
                                 </Popover>
                             </div>
-                            <Button onClick={addRule} disabled={loading || (isAdmin && scopeUserId === "__ALL__")}>
+                            <Button onClick={addRule} disabled={loading}>
                                 <Plus className="w-4 h-4 mr-2" />
                                 Adicionar Regra
                             </Button>
@@ -354,6 +383,9 @@ export default function RegrasClassificacao() {
                                     <div key={rule.id} className="flex items-center justify-between p-3 border rounded">
                                         <div className="flex-1">
                                             <div className="font-medium">"{rule.term}"</div>
+                                            <div className="text-xs text-muted-foreground">
+                                                {rule.aplica_todos ? "Escopo: todos os usuários" : `Escopo: ${userOptions.find((u) => u.id === rule.user_id)?.label || "usuário individual"}`}
+                                            </div>
                                             <div className="text-sm text-muted-foreground">
                                                 {rule.category_name && <span>Categoria: {rule.category_name}</span>}
                                                 {rule.category_name && rule.beneficiary_name && <span> • </span>}
