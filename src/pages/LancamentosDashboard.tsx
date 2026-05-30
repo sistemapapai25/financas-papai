@@ -710,7 +710,6 @@ export default function LancamentosDashboard() {
       const corpo = `Recebi da Igreja ${church.igreja_nome} a quantia de ${formatCurrency(valor)}, "${desc}" na data ${dataStr}.`;
       let y = yHeader - 40;
       for (const line of wrapByWidth(corpo, 12)) { drawText(line, MARGIN_L, y, 12, false); y -= 18; }
-      let yNome = y - 24;
       if (reciboBenefId) {
         const { data: ben } = await supabase
           .from('beneficiaries')
@@ -751,27 +750,28 @@ export default function LancamentosDashboard() {
           }
         }
         if (assinaturaImgBytes) {
-            let img;
-            try { img = await pdfDoc.embedPng(assinaturaImgBytes); }
-            catch { img = await pdfDoc.embedJpg(assinaturaImgBytes); }
-            const maxSigW = Math.min(180, width - MARGIN_L - MARGIN_R);
-            const maxSigH = 70;
-            const scale = Math.min(maxSigW / img.width, maxSigH / img.height);
-            const sigW = img.width * scale;
-            const sigH = img.height * scale;
-            const sigX = (width - sigW) / 2;
-            const sigY = Math.max(110, y - sigH - 8);
-            page.drawImage(img, { x: sigX, y: sigY, width: sigW, height: sigH });
-            y = sigY;
+          let img;
+          try { img = await pdfDoc.embedPng(assinaturaImgBytes); }
+          catch { img = await pdfDoc.embedJpg(assinaturaImgBytes); }
+          const maxSigW = Math.min(180, width - MARGIN_L - MARGIN_R);
+          const maxSigH = 70;
+          const scale = Math.min(maxSigW / img.width, maxSigH / img.height);
+          const sigW = img.width * scale;
+          const sigH = img.height * scale;
+          const sigX = (width - sigW) / 2;
+          const sigY = Math.max(110, y - sigH - 8);
+          page.drawImage(img, { x: sigX, y: sigY, width: sigW, height: sigH });
+          y = sigY;
         }
         if (signerName) {
           center(signerName, y - 24, 12, true);
           y -= 24;
-          const docFmt = signerDoc ? (onlyDigits(signerDoc).length >= 14 ? formatCNPJ(signerDoc) : formatCPF(signerDoc)) : null;
-          if (docFmt) {
-            center(`CPF/CNPJ: ${docFmt}`, y - 18, 12);
-            y -= 18;
-          }
+        }
+        if (signerDoc) {
+          const d = onlyDigits(signerDoc);
+          const docFmt = d.length >= 14 ? formatCNPJ(signerDoc) : formatCPF(signerDoc);
+          center(`CPF/CNPJ: ${docFmt}`, y - 18, 12, false);
+          y -= 18;
         }
       }
       const pdfBytes = await pdfDoc.save();
