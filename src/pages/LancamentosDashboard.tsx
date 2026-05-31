@@ -1772,7 +1772,7 @@ export default function LancamentosDashboard() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 items-start gap-y-4 sm:grid-cols-2 sm:gap-x-10 lg:gap-x-14">
             <div className="flex flex-col items-start gap-2">
               <div className="flex items-center gap-1">
                 <Button className="w-48 justify-start" variant="outline" onClick={aplicarRegras} disabled={applyingRules}>
