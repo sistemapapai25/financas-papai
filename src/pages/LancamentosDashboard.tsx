@@ -1824,17 +1824,19 @@ export default function LancamentosDashboard() {
                 </Popover>
               </div>
             </div>
-            <Button variant="outline" onClick={() => setExtratoPdfOpen(true)} disabled={extratoPdfBusy}>
-              <FileText className="w-4 h-4 mr-2" />
-              Extrato PDF
-              {contaExtrato && extratoPdfExists ? (
-                <span className="ml-2 inline-flex items-center rounded border px-2 py-0.5 text-xs">OK</span>
-              ) : null}
-            </Button>
-            <Button variant="outline" onClick={() => setCalcOpen(true)} aria-label="Abrir calculadora">
-              <Calculator className="w-4 h-4 mr-2" />
-              Calculadora
-            </Button>
+            <div className="flex flex-col items-start gap-2">
+              <Button className="w-48 justify-start" variant="outline" onClick={() => setExtratoPdfOpen(true)} disabled={extratoPdfBusy}>
+                <FileText className="w-4 h-4 mr-2" />
+                Extrato PDF
+                {contaExtrato && extratoPdfExists ? (
+                  <span className="ml-2 inline-flex items-center rounded border px-2 py-0.5 text-xs">OK</span>
+                ) : null}
+              </Button>
+              <Button className="w-48 justify-start" variant="outline" onClick={() => setCalcOpen(true)} aria-label="Abrir calculadora">
+                <Calculator className="w-4 h-4 mr-2" />
+                Calculadora
+              </Button>
+            </div>
           </div>
 
           <div className="w-full lg:w-64 flex flex-col gap-2">
