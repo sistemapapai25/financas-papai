@@ -1674,7 +1674,7 @@ export default function LancamentosDashboard() {
     <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">Extrato de Lançamentos</h1>
-        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="flex flex-col items-start gap-2">
             <div className="flex items-center gap-1">
               <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
@@ -1772,7 +1772,7 @@ export default function LancamentosDashboard() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-start gap-2">
+          <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
             <div className="flex flex-col items-start gap-2">
               <div className="flex items-center gap-1">
                 <Button className="w-48 justify-start" variant="outline" onClick={aplicarRegras} disabled={applyingRules}>
