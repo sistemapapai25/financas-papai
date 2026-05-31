@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { supabase } from "@/integrations/supabase/client";
-import { Calculator, ChevronLeft, ChevronRight, Filter, Rows, Square, Edit3, Search, X, Wand2, FileText, ExternalLink, ScanText, Receipt, MoreVertical, Plus } from "lucide-react";
+import { Calculator, ChevronLeft, ChevronRight, Filter, Rows, Square, Edit3, Search, X, Wand2, FileText, ExternalLink, ScanText, Receipt, MoreVertical, Plus, CircleHelp } from "lucide-react";
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { ymdToBr } from "@/utils/date";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -1694,19 +1694,40 @@ export default function LancamentosDashboard() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            <DropdownMenu open={tipoMenuOpen} onOpenChange={setTipoMenuOpen}>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  {tipoVisao === 'TODOS' ? 'Todos Lançamentos' : tipoVisao === 'DESPESAS' ? 'Despesas' : tipoVisao === 'RECEITAS' ? 'Receitas' : 'Transferências'}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="min-w-[220px]">
-                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('TODOS'); setTipoMenuOpen(false); }}>Todos Lançamentos</DropdownMenuItem>
-                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('DESPESAS'); setTipoMenuOpen(false); }}>Despesas</DropdownMenuItem>
-                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('RECEITAS'); setTipoMenuOpen(false); }}>Receitas</DropdownMenuItem>
-                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('TRANSFERENCIAS'); setTipoMenuOpen(false); }}>Transferências</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-1">
+              <DropdownMenu open={tipoMenuOpen} onOpenChange={setTipoMenuOpen}>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    {tipoVisao === 'TODOS' ? 'Todos os Lançamentos' : tipoVisao === 'DESPESAS' ? 'Despesas' : tipoVisao === 'RECEITAS' ? 'Receitas' : 'Transferências'}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="min-w-[220px]">
+                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('TODOS'); setTipoMenuOpen(false); }}>Todos os Lançamentos</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('DESPESAS'); setTipoMenuOpen(false); }}>Despesas</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('RECEITAS'); setTipoMenuOpen(false); }}>Receitas</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTipoVisao('TRANSFERENCIAS'); setTipoMenuOpen(false); }}>Transferências</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-10 text-muted-foreground"
+                    aria-label="Ajuda sobre Todos os Lançamentos"
+                  >
+                    <CircleHelp className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-72 text-sm leading-relaxed">
+                  <p className="font-medium text-foreground">Todos os Lançamentos</p>
+                  <p className="mt-1 text-muted-foreground">
+                    Mostra todos os movimentos do mês selecionado: despesas, receitas e transferências. Use as outras opções para ver apenas um tipo de lançamento.
+                  </p>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
