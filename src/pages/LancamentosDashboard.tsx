@@ -72,6 +72,7 @@ export default function LancamentosDashboard() {
   const [benefSearch, setBenefSearch] = useState("");
   const [addingBenef, setAddingBenef] = useState(false);
   const [applyingRules, setApplyingRules] = useState(false);
+  const [rulesAppliedForCurrentView, setRulesAppliedForCurrentView] = useState(false);
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
   const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set());
   const [tipoMenuOpen, setTipoMenuOpen] = useState(false);
@@ -146,6 +147,10 @@ export default function LancamentosDashboard() {
   const inicioNoPad = toYmdNoPad(inicioDate);
   const fimExclusivoNoPad = toYmdNoPad(fimExclusivoDate);
   const filtroPeriodoMovimentos = `and(data.gte.${inicio},data.lt.${fimExclusivo}),and(data.gte.${inicioNoPad},data.lt.${fimExclusivoNoPad})`;
+
+  useEffect(() => {
+    setRulesAppliedForCurrentView(false);
+  }, [ano, mes, contasSel, tipoVisao]);
 
   const contaExtrato = useMemo(() => {
     if (contasSel.length !== 1) return null;
@@ -309,6 +314,14 @@ export default function LancamentosDashboard() {
   async function ajustarDescricoesLote() {
     try {
       if (!user) { toast({ title: 'Sessão', description: 'Faça login para ajustar descrições', variant: 'destructive' }); return; }
+      if (!rulesAppliedForCurrentView) {
+        toast({
+          title: 'Atenção',
+          description: 'Clique em Aplicar Regras primeiro para atualizar as categorias antes de ajustar as descrições.',
+          variant: 'destructive',
+        });
+        return;
+      }
       setBulkAdjusting(true);
       let ok = 0, skip = 0, fail = 0;
       const updates: { id: string; desc: string }[] = [];
@@ -1338,6 +1351,7 @@ export default function LancamentosDashboard() {
   async function aplicarRegras() {
     if (!user) return;
     setApplyingRules(true);
+    let rulesRunCompleted = false;
     try {
       type ClassificationRule = {
         id: string;
@@ -1356,6 +1370,7 @@ export default function LancamentosDashboard() {
 
       if (visibleRows.length === 0) {
         toast({ title: "Aviso", description: `Nenhum lançamento encontrado no mês ${tituloMes}.`, variant: "destructive" });
+        rulesRunCompleted = true;
         return;
       }
 
@@ -1380,6 +1395,7 @@ export default function LancamentosDashboard() {
         .filter((rule) => rule.aplica_todos || ruleOwnerIds.includes(rule.user_id));
       if (fetchedRules.length === 0) {
         toast({ title: "Aviso", description: "Nenhuma regra cadastrada", variant: "destructive" });
+        rulesRunCompleted = true;
         return;
       }
 
@@ -1478,6 +1494,7 @@ export default function LancamentosDashboard() {
           title: "Regras Aplicadas",
           description: "Nenhum lançamento do mês visível corresponde aos termos cadastrados.",
         });
+        rulesRunCompleted = true;
         return;
       }
 
@@ -1507,10 +1524,12 @@ export default function LancamentosDashboard() {
         description: `${totalUpdated} lançamento(s) atualizado(s) no mês ${tituloMes}.${skippedUnresolved ? ` ${skippedUnresolved} ignorado(s) por categoria/beneficiário inexistente no usuário.` : ""}`
       });
 
+      rulesRunCompleted = true;
       setReloadKey((key) => key + 1);
     } catch (error: unknown) {
       toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao recarregar dados", variant: "destructive" });
     } finally {
+      if (rulesRunCompleted) setRulesAppliedForCurrentView(true);
       setApplyingRules(false);
     }
   }
