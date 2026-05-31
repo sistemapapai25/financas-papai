@@ -1657,43 +1657,64 @@ export default function LancamentosDashboard() {
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">Extrato de Lançamentos</h1>
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-2">
-            <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  {(() => {
-                    const first = contasSel.length ? contas.find(c => c.id === contasSel[0]) : null;
-                    return (
-                      <div className="flex items-center gap-2">
-                        {first?.logo ? (
-                          <img src={first.logo} alt="Logo" className="h-5 w-5 object-contain" />
-                        ) : null}
-                        <span>{first?.nome || 'Todas Contas e Cartões'}</span>
-                      </div>
-                    );
-                  })()}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="min-w-[260px]">
-                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setContasSel([]); setMenuOpen(false); }}>
-                  <div className="flex items-center gap-2">
-                    <span>Todas Contas e Cartões</span>
-                  </div>
-                </DropdownMenuItem>
-                {contas.map(c => (
-                  <DropdownMenuItem
-                    key={c.id}
-                    onSelect={(e) => { e.preventDefault(); setContasSel([c.id]); setMenuOpen(false); }}
-                  >
-                    <div className="flex items-center gap-2 w-full">
-                      {c.logo ? (
-                        <img src={c.logo} alt="Logo" className="h-5 w-5 object-contain" />
-                      ) : null}
-                      <span>{c.nome}</span>
+            <div className="flex items-center gap-1">
+              <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    {(() => {
+                      const first = contasSel.length ? contas.find(c => c.id === contasSel[0]) : null;
+                      return (
+                        <div className="flex items-center gap-2">
+                          {first?.logo ? (
+                            <img src={first.logo} alt="Logo" className="h-5 w-5 object-contain" />
+                          ) : null}
+                          <span>{first?.nome || 'Todas as Contas e Cartões'}</span>
+                        </div>
+                      );
+                    })()}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="min-w-[260px]">
+                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setContasSel([]); setMenuOpen(false); }}>
+                    <div className="flex items-center gap-2">
+                      <span>Todas as Contas e Cartões</span>
                     </div>
                   </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  {contas.map(c => (
+                    <DropdownMenuItem
+                      key={c.id}
+                      onSelect={(e) => { e.preventDefault(); setContasSel([c.id]); setMenuOpen(false); }}
+                    >
+                      <div className="flex items-center gap-2 w-full">
+                        {c.logo ? (
+                          <img src={c.logo} alt="Logo" className="h-5 w-5 object-contain" />
+                        ) : null}
+                        <span>{c.nome}</span>
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-10 text-muted-foreground"
+                    aria-label="Ajuda sobre Todas as Contas e Cartões"
+                  >
+                    <CircleHelp className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-72 text-sm leading-relaxed">
+                  <p className="font-medium text-foreground">Todas as Contas e Cartões</p>
+                  <p className="mt-1 text-muted-foreground">
+                    Mostra os lançamentos de todas as contas e cartões no mês selecionado. Escolha uma conta ou cartão na lista para ver somente os movimentos dela.
+                  </p>
+                </PopoverContent>
+              </Popover>
+            </div>
             <div className="flex items-center gap-1">
               <DropdownMenu open={tipoMenuOpen} onOpenChange={setTipoMenuOpen}>
                 <DropdownMenuTrigger asChild>
