@@ -1656,7 +1656,7 @@ export default function LancamentosDashboard() {
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">Extrato de Lançamentos</h1>
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col items-start gap-2">
             <div className="flex items-center gap-1">
               <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
                 <DropdownMenuTrigger asChild>
