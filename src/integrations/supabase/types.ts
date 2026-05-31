@@ -654,6 +654,7 @@ export type Database = {
           id: string
           origem: string | null
           ref_id: string | null
+          regras_aplicadas_em: string | null
           tipo: string
           user_id: string
           valor: number
@@ -671,6 +672,7 @@ export type Database = {
           id?: string
           origem?: string | null
           ref_id?: string | null
+          regras_aplicadas_em?: string | null
           tipo: string
           user_id: string
           valor: number
@@ -688,6 +690,7 @@ export type Database = {
           id?: string
           origem?: string | null
           ref_id?: string | null
+          regras_aplicadas_em?: string | null
           tipo?: string
           user_id?: string
           valor?: number

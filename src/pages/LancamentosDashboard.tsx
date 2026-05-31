@@ -37,6 +37,7 @@ type Mov = {
   valor: number;
   origem?: "LANCAMENTO" | "CULTO" | "AJUSTE" | null;
   comprovante_url?: string | null;
+  regras_aplicadas_em?: string | null;
 };
 
 const mesesPt = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
@@ -548,7 +549,7 @@ export default function LancamentosDashboard() {
     (async () => {
       let q = supabase
         .from("movimentos_financeiros")
-        .select("id, user_id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name,documento)")
+        .select("id, user_id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, regras_aplicadas_em, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name,documento)")
         .or(filtroPeriodoMovimentos)
         .order("data");
       if (!isAdmin) {
@@ -580,6 +581,7 @@ export default function LancamentosDashboard() {
         valor: r.valor,
         origem: (r.origem as Mov["origem"]) ?? null,
         comprovante_url: r.comprovante_url ?? null,
+        regras_aplicadas_em: r.regras_aplicadas_em ?? null,
       }));
       setRows(arr);
     })();
@@ -1364,12 +1366,23 @@ export default function LancamentosDashboard() {
         beneficiary_name: string | null;
       };
 
-      const visibleRows = rows.filter((mov) => (
+      const visibleRowsForSelection = rowsView.filter((mov) => (
         contasSel.length === 0 || (mov.conta_id ? contasSel.includes(mov.conta_id) : false)
       ));
+      const alreadyAppliedCount = visibleRowsForSelection.filter((mov) => mov.regras_aplicadas_em).length;
+      const visibleRows = visibleRowsForSelection.filter((mov) => !mov.regras_aplicadas_em);
+
+      if (visibleRowsForSelection.length === 0) {
+        toast({ title: "Aviso", description: `Nenhum lançamento encontrado no mês ${tituloMes}.`, variant: "destructive" });
+        rulesRunCompleted = true;
+        return;
+      }
 
       if (visibleRows.length === 0) {
-        toast({ title: "Aviso", description: `Nenhum lançamento encontrado no mês ${tituloMes}.`, variant: "destructive" });
+        toast({
+          title: "Regras Aplicadas",
+          description: "Todos os lançamentos visíveis já receberam aplicação de regras.",
+        });
         rulesRunCompleted = true;
         return;
       }
@@ -1499,14 +1512,17 @@ export default function LancamentosDashboard() {
       }
 
       let totalUpdated = 0;
+      const regrasAplicadasEm = new Date().toISOString();
       for (const group of updates.values()) {
         let updateQuery = supabase
           .from("movimentos_financeiros")
           .update({
             categoria_id: group.categoryId,
             beneficiario_id: group.beneficiaryId,
+            regras_aplicadas_em: regrasAplicadasEm,
           })
-          .in("id", group.ids);
+          .in("id", group.ids)
+          .is("regras_aplicadas_em", null);
 
         if (!isAdmin) {
           updateQuery = updateQuery.eq("user_id", user.id);
@@ -1521,7 +1537,7 @@ export default function LancamentosDashboard() {
 
       toast({
         title: "Regras Aplicadas",
-        description: `${totalUpdated} lançamento(s) atualizado(s) no mês ${tituloMes}.${skippedUnresolved ? ` ${skippedUnresolved} ignorado(s) por categoria/beneficiário inexistente no usuário.` : ""}`
+        description: `${totalUpdated} lançamento(s) novo(s) atualizado(s) no mês ${tituloMes}.${alreadyAppliedCount ? ` ${alreadyAppliedCount} já tinha(m) regras aplicadas e foi/foram ignorado(s).` : ""}${skippedUnresolved ? ` ${skippedUnresolved} ignorado(s) por categoria/beneficiário inexistente no usuário.` : ""}`
       });
 
       rulesRunCompleted = true;
@@ -1794,7 +1810,7 @@ export default function LancamentosDashboard() {
                   <PopoverContent align="start" className="w-72 text-sm leading-relaxed">
                     <p className="font-medium text-foreground">Aplicar Regras</p>
                     <p className="mt-1 text-muted-foreground">
-                      Atualiza categoria e beneficiário dos lançamentos visíveis no mês, usando as regras cadastradas pela descrição. Se uma conta estiver selecionada, aplica somente nos movimentos dela.
+                      Atualiza categoria e beneficiário dos lançamentos visíveis que ainda não receberam regras, usando os termos cadastrados pela descrição.
                     </p>
                   </PopoverContent>
                 </Popover>
@@ -1990,7 +2006,16 @@ export default function LancamentosDashboard() {
                         )}
                       </td>
                       <td className="p-2">{ymdToBr(r.data)}</td>
-                      <td className="p-2">{r.descricao}</td>
+                      <td className="p-2">
+                        <div className="flex flex-col gap-1">
+                          <span>{r.descricao}</span>
+                          {r.regras_aplicadas_em ? (
+                            <span className="inline-flex w-fit items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                              Regras aplicadas
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
                       <td className="p-2">{r.categoria_nome || ''}</td>
                       <td className="p-2">{r.beneficiario_nome || ''}</td>
                       <td className="p-2 text-center">
@@ -2060,6 +2085,11 @@ export default function LancamentosDashboard() {
                   </div>
                   <div className="text-xs text-muted-foreground">{r.categoria_nome || ''}</div>
                   <div className="text-xs text-muted-foreground">{r.beneficiario_nome || ''}</div>
+                  {r.regras_aplicadas_em ? (
+                    <div className="mt-2 inline-flex w-fit items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                      Regras aplicadas
+                    </div>
+                  ) : null}
                   <div className={`mt-2 text-lg font-semibold ${r.tipo === 'ENTRADA' ? 'text-blue-600' : 'text-red-600'}`}>{formatCurrency(r.valor)}</div>
                   <div className="text-xs text-muted-foreground">{r.tipo}</div>
                   {r.comprovante_url ? (
