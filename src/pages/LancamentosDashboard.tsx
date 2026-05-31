@@ -1754,10 +1754,31 @@ export default function LancamentosDashboard() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" onClick={aplicarRegras} disabled={applyingRules}>
-              <Wand2 className="w-4 h-4 mr-2" />
-              {applyingRules ? "Aplicando..." : "Aplicar Regras"}
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" onClick={aplicarRegras} disabled={applyingRules}>
+                <Wand2 className="w-4 h-4 mr-2" />
+                {applyingRules ? "Aplicando..." : "Aplicar Regras"}
+              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-10 text-muted-foreground"
+                    aria-label="Ajuda sobre Aplicar Regras"
+                  >
+                    <CircleHelp className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-72 text-sm leading-relaxed">
+                  <p className="font-medium text-foreground">Aplicar Regras</p>
+                  <p className="mt-1 text-muted-foreground">
+                    Atualiza categoria e beneficiário dos lançamentos visíveis no mês, usando as regras cadastradas pela descrição. Se uma conta estiver selecionada, aplica somente nos movimentos dela.
+                  </p>
+                </PopoverContent>
+              </Popover>
+            </div>
             <Button variant="outline" onClick={ajustarDescricoesLote} disabled={bulkAdjusting}>
               {bulkAdjusting ? 'Ajustando...' : 'Ajustar Descrições'}
             </Button>
