@@ -1660,15 +1660,15 @@ export default function LancamentosDashboard() {
             <div className="flex items-center gap-1">
               <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
+                  <Button variant="outline" className="w-60 justify-start sm:w-64">
                     {(() => {
                       const first = contasSel.length ? contas.find(c => c.id === contasSel[0]) : null;
                       return (
-                        <div className="flex items-center gap-2">
+                        <div className="flex w-full min-w-0 items-center gap-2">
                           {first?.logo ? (
-                            <img src={first.logo} alt="Logo" className="h-5 w-5 object-contain" />
+                            <img src={first.logo} alt="Logo" className="h-5 w-5 shrink-0 object-contain" />
                           ) : null}
-                          <span>{first?.nome || 'Todas as Contas e Cartões'}</span>
+                          <span className="truncate">{first?.nome || 'Todas as Contas e Cartões'}</span>
                         </div>
                       );
                     })()}
@@ -1718,8 +1718,10 @@ export default function LancamentosDashboard() {
             <div className="flex items-center gap-1">
               <DropdownMenu open={tipoMenuOpen} onOpenChange={setTipoMenuOpen}>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    {tipoVisao === 'TODOS' ? 'Todos os Lançamentos' : tipoVisao === 'DESPESAS' ? 'Despesas' : tipoVisao === 'RECEITAS' ? 'Receitas' : 'Transferências'}
+                  <Button variant="outline" className="w-60 justify-start sm:w-64">
+                    <span className="truncate">
+                      {tipoVisao === 'TODOS' ? 'Todos os Lançamentos' : tipoVisao === 'DESPESAS' ? 'Despesas' : tipoVisao === 'RECEITAS' ? 'Receitas' : 'Transferências'}
+                    </span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="min-w-[220px]">
