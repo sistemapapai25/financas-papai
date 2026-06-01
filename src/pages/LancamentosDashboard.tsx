@@ -37,6 +37,7 @@ type Mov = {
   valor: number;
   origem?: "LANCAMENTO" | "CULTO" | "AJUSTE" | null;
   comprovante_url?: string | null;
+  nota_fiscal_url?: string | null;
   regras_aplicadas_em?: string | null;
   descricao_ajustada_em?: string | null;
 };
@@ -65,6 +66,8 @@ export default function LancamentosDashboard() {
   const [editBenefId, setEditBenefId] = useState<string>("");
   const [editComprovanteUrl, setEditComprovanteUrl] = useState<string>("");
   const [editComprovanteUploading, setEditComprovanteUploading] = useState(false);
+  const [editNotaFiscalUrl, setEditNotaFiscalUrl] = useState<string>("");
+  const [editNotaFiscalUploading, setEditNotaFiscalUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [catOpts, setCatOpts] = useState<{ id: string; name: string; tipo: string; parent_id: string | null }[]>([]);
   const [benefOpts, setBenefOpts] = useState<{ id: string; name: string }[]>([]);
@@ -565,7 +568,7 @@ export default function LancamentosDashboard() {
     (async () => {
       let q = supabase
         .from("movimentos_financeiros")
-        .select("id, user_id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, regras_aplicadas_em, descricao_ajustada_em, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name,documento)")
+        .select("id, user_id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, nota_fiscal_url, regras_aplicadas_em, descricao_ajustada_em, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name,documento)")
         .or(filtroPeriodoMovimentos)
         .order("data");
       if (!isAdmin) {
@@ -597,6 +600,7 @@ export default function LancamentosDashboard() {
         valor: r.valor,
         origem: (r.origem as Mov["origem"]) ?? null,
         comprovante_url: r.comprovante_url ?? null,
+        nota_fiscal_url: r.nota_fiscal_url ?? null,
         regras_aplicadas_em: r.regras_aplicadas_em ?? null,
         descricao_ajustada_em: r.descricao_ajustada_em ?? null,
       }));
@@ -1096,7 +1100,9 @@ export default function LancamentosDashboard() {
     setEditCategoriaId(m.categoria_id || "");
     setEditBenefId(m.beneficiario_id || "");
     setEditComprovanteUrl(m.comprovante_url || "");
+    setEditNotaFiscalUrl(m.nota_fiscal_url || "");
     setEditComprovanteUploading(false);
+    setEditNotaFiscalUploading(false);
     // setCatOpts and setBenefOpts will be populated by useEffect
     setEditOpen(true);
   }
@@ -1204,6 +1210,10 @@ export default function LancamentosDashboard() {
       toast({ title: "Aguarde", description: "O comprovante ainda está sendo enviado." });
       return;
     }
+    if (editNotaFiscalUploading) {
+      toast({ title: "Aguarde", description: "A nota fiscal ainda está sendo enviada." });
+      return;
+    }
     const valorNum = Number(String(editValor).replace(",", "."));
     if (!Number.isFinite(valorNum) || valorNum <= 0) {
       toast({ title: "Atenção", description: "Informe um valor válido (maior que zero).", variant: "destructive" });
@@ -1215,7 +1225,7 @@ export default function LancamentosDashboard() {
     }
     setSaving(true);
     try {
-      const payload: Partial<{ data: string; descricao: string; valor: number; conta_id: string; categoria_id: string | null; beneficiario_id: string | null; comprovante_url: string | null }> = {
+      const payload: Partial<{ data: string; descricao: string; valor: number; conta_id: string; categoria_id: string | null; beneficiario_id: string | null; comprovante_url: string | null; nota_fiscal_url: string | null }> = {
         data: editData,
         descricao: editDesc,
         valor: valorNum,
@@ -1223,6 +1233,7 @@ export default function LancamentosDashboard() {
         categoria_id: editCategoriaId ? editCategoriaId : null,
         beneficiario_id: editBenefId ? editBenefId : null,
         comprovante_url: editComprovanteUrl ? editComprovanteUrl : null,
+        nota_fiscal_url: editNotaFiscalUrl ? editNotaFiscalUrl : null,
       };
       let updateQuery = supabase
         .from("movimentos_financeiros")
@@ -1258,6 +1269,7 @@ export default function LancamentosDashboard() {
         categoria_nome: (catOpts.find(c => c.id === editCategoriaId)?.name) || null,
         beneficiario_nome: (benefOpts.find(b => b.id === editBenefId)?.name) || null,
         comprovante_url: payload.comprovante_url || null,
+        nota_fiscal_url: payload.nota_fiscal_url || null,
       } : r));
 
       if (editMov.conta_id && editCategoriaId && editBenefId) {
@@ -2358,6 +2370,19 @@ export default function LancamentosDashboard() {
               />
             </div>
 
+            <div className="space-y-2">
+              <FileUpload
+                label="Nota fiscal"
+                value={editNotaFiscalUrl}
+                onChange={(url) => setEditNotaFiscalUrl(url || "")}
+                onUploadingChange={setEditNotaFiscalUploading}
+                bucket="Comprovantes"
+                folder="notas_fiscais"
+                filenameHint={editDesc}
+                accept=".pdf,.jpg,.jpeg,.png"
+              />
+            </div>
+
               <div className="space-y-2">
                 <Label>Beneficiário</Label>
                 <Popover open={openBeneficiario} onOpenChange={setOpenBeneficiario}>
@@ -2421,8 +2446,8 @@ export default function LancamentosDashboard() {
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
-                <Button onClick={salvarEdicao} disabled={saving || editComprovanteUploading}>
-                  {editComprovanteUploading ? 'Enviando comprovante...' : saving ? 'Salvando...' : 'Salvar'}
+                <Button onClick={salvarEdicao} disabled={saving || editComprovanteUploading || editNotaFiscalUploading}>
+                  {editComprovanteUploading ? 'Enviando comprovante...' : editNotaFiscalUploading ? 'Enviando nota fiscal...' : saving ? 'Salvando...' : 'Salvar'}
                 </Button>
               </div>
             </div>
