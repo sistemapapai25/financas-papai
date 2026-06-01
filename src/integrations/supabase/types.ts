@@ -653,6 +653,7 @@ export type Database = {
           descricao_ajustada_em: string | null
           descricao: string | null
           id: string
+          nota_fiscal_url: string | null
           origem: string | null
           ref_id: string | null
           regras_aplicadas_em: string | null
@@ -672,6 +673,7 @@ export type Database = {
           descricao_ajustada_em?: string | null
           descricao?: string | null
           id?: string
+          nota_fiscal_url?: string | null
           origem?: string | null
           ref_id?: string | null
           regras_aplicadas_em?: string | null
@@ -691,6 +693,7 @@ export type Database = {
           descricao_ajustada_em?: string | null
           descricao?: string | null
           id?: string
+          nota_fiscal_url?: string | null
           origem?: string | null
           ref_id?: string | null
           regras_aplicadas_em?: string | null

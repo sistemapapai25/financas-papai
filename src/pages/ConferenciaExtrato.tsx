@@ -44,6 +44,7 @@ type Movimento = {
   valor: number;
   descricao: string | null;
   conferido: boolean;
+  nota_fiscal_url: string | null;
 };
 
 type Filtro = "TODOS" | "PENDENTES" | "CONFERIDOS";
@@ -90,6 +91,7 @@ export default function ConferenciaExtrato() {
   const [pdfExists, setPdfExists] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfFoundPath, setPdfFoundPath] = useState<string | null>(null);
+  const [notaFiscalBusyIds, setNotaFiscalBusyIds] = useState<Set<string>>(new Set());
 
   // Dialog "Novo lançamento"
   const [novoOpen, setNovoOpen] = useState(false);
@@ -179,7 +181,7 @@ export default function ConferenciaExtrato() {
       const [{ data: dataMes, error: errMes }, { data: somaAnt, error: errAnt }] = await Promise.all([
         supabase
           .from("movimentos_financeiros")
-          .select("id,data,tipo,valor,descricao,conferido")
+          .select("id,data,tipo,valor,descricao,conferido,nota_fiscal_url")
           .eq("conta_id", contaId)
           .gte("data", dataInicio)
           .lte("data", dataFim)
@@ -199,6 +201,7 @@ export default function ConferenciaExtrato() {
         valor: Number(m.valor),
         descricao: (m.descricao as string) ?? null,
         conferido: Boolean((m as Record<string, unknown>).conferido),
+        nota_fiscal_url: ((m as Record<string, unknown>).nota_fiscal_url as string | null) ?? null,
       }));
       setMovimentos(arr);
       setMovimentosAnterioresSoma(Number(somaAnt ?? 0));
@@ -403,6 +406,69 @@ export default function ConferenciaExtrato() {
       toast({ title: "Erro", description: "Não foi possível atualizar.", variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const setNotaFiscalBusy = (id: string, busy: boolean) => {
+    setNotaFiscalBusyIds((prev) => {
+      const next = new Set(prev);
+      if (busy) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const uploadNotaFiscal = async (mov: Movimento, file: File) => {
+    if (!user) return;
+    setNotaFiscalBusy(mov.id, true);
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "pdf";
+      const path = `notas_fiscais/${user.id}/${mov.id}-${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("Comprovantes")
+        .upload(path, file, {
+          cacheControl: "3600",
+          contentType: file.type || undefined,
+          upsert: false,
+        });
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from("Comprovantes").getPublicUrl(path);
+      const publicUrl = data.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from("movimentos_financeiros")
+        .update({ nota_fiscal_url: publicUrl })
+        .eq("id", mov.id);
+      if (updateError) throw updateError;
+
+      setMovimentos((prev) => prev.map((m) => (m.id === mov.id ? { ...m, nota_fiscal_url: publicUrl } : m)));
+      toast({ title: "Nota fiscal", description: "Nota fiscal anexada ao lançamento." });
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Erro", description: "Não foi possível anexar a nota fiscal.", variant: "destructive" });
+    } finally {
+      setNotaFiscalBusy(mov.id, false);
+    }
+  };
+
+  const removerNotaFiscal = async (mov: Movimento) => {
+    if (!mov.nota_fiscal_url) return;
+    if (!confirm("Remover a nota fiscal deste lançamento?")) return;
+    setNotaFiscalBusy(mov.id, true);
+    try {
+      const { error } = await supabase
+        .from("movimentos_financeiros")
+        .update({ nota_fiscal_url: null })
+        .eq("id", mov.id);
+      if (error) throw error;
+      setMovimentos((prev) => prev.map((m) => (m.id === mov.id ? { ...m, nota_fiscal_url: null } : m)));
+      toast({ title: "Nota fiscal", description: "Nota fiscal removida do lançamento." });
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Erro", description: "Não foi possível remover a nota fiscal.", variant: "destructive" });
+    } finally {
+      setNotaFiscalBusy(mov.id, false);
     }
   };
 
@@ -741,6 +807,7 @@ export default function ConferenciaExtrato() {
                         <th className="text-center p-2 w-10"></th>
                         <th className="text-left p-2 w-24">Data</th>
                         <th className="text-left p-2">Descrição</th>
+                        <th className="text-center p-2 w-32">Nota fiscal</th>
                         <th className="text-right p-2 w-28">Valor</th>
                         <th className="text-right p-2 w-28">Saldo do dia</th>
                       </tr>
@@ -772,6 +839,60 @@ export default function ConferenciaExtrato() {
                                       <span className="truncate" title={m.descricao ?? ""}>{m.descricao ?? "(sem descrição)"}</span>
                                     </div>
                                   </td>
+                                  <td className="p-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex items-center justify-center gap-1">
+                                      {m.nota_fiscal_url ? (
+                                        <>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => window.open(m.nota_fiscal_url || "", "_blank")}
+                                            aria-label="Abrir nota fiscal"
+                                          >
+                                            <ExternalLink className="w-4 h-4" />
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-destructive"
+                                            onClick={() => removerNotaFiscal(m)}
+                                            disabled={notaFiscalBusyIds.has(m.id)}
+                                            aria-label="Remover nota fiscal"
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </Button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Input
+                                            id={`nota-fiscal-${m.id}`}
+                                            type="file"
+                                            accept="application/pdf,image/*"
+                                            className="hidden"
+                                            onChange={(e) => {
+                                              const file = e.target.files?.[0];
+                                              e.target.value = "";
+                                              if (file) void uploadNotaFiscal(m, file);
+                                            }}
+                                          />
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 px-2"
+                                            onClick={() => document.getElementById(`nota-fiscal-${m.id}`)?.click()}
+                                            disabled={notaFiscalBusyIds.has(m.id)}
+                                          >
+                                            <Upload className={`w-4 h-4 ${notaFiscalBusyIds.has(m.id) ? "animate-pulse" : ""}`} />
+                                            <span className="sr-only">Anexar nota fiscal</span>
+                                          </Button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </td>
                                   <td className={`p-2 text-right whitespace-nowrap font-medium ${m.tipo === "ENTRADA" ? "text-green-700" : "text-red-700"}`}>
                                     {fmtMoney(m.valor)}
                                   </td>
@@ -789,7 +910,7 @@ export default function ConferenciaExtrato() {
                                   <ChevronRight className="w-4 h-4 mx-auto" />
                                 )}
                               </td>
-                              <td className="p-2 whitespace-nowrap" colSpan={2}>
+                              <td className="p-2 whitespace-nowrap" colSpan={3}>
                                 Saldo em {fmtData(d.data)}{" "}
                                 <span className="text-xs font-normal text-muted-foreground">
                                   ({d.totalDia} {d.totalDia === 1 ? "lançamento" : "lançamentos"}

@@ -225,6 +225,7 @@ export type Database = {
           descricao: string | null
           origem: "CULTO" | "LANCAMENTO" | "AJUSTE" | "EXTRATO" | null
           ref_id: string | null
+          nota_fiscal_url: string | null
           regras_aplicadas_em: string | null
           created_at: string | null
           categoria_id: string | null
@@ -243,6 +244,7 @@ export type Database = {
           descricao?: string | null
           origem?: "CULTO" | "LANCAMENTO" | "AJUSTE" | "EXTRATO" | null
           ref_id?: string | null
+          nota_fiscal_url?: string | null
           regras_aplicadas_em?: string | null
           created_at?: string | null
           categoria_id?: string | null
@@ -261,6 +263,7 @@ export type Database = {
           descricao?: string | null
           origem?: "CULTO" | "LANCAMENTO" | "AJUSTE" | null
           ref_id?: string | null
+          nota_fiscal_url?: string | null
           regras_aplicadas_em?: string | null
           created_at?: string | null
           categoria_id?: string | null
