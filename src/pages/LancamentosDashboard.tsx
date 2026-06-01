@@ -311,18 +311,21 @@ export default function LancamentosDashboard() {
   async function ajustarDescricoesLote() {
     try {
       if (!user) { toast({ title: 'Sessão', description: 'Faça login para ajustar descrições', variant: 'destructive' }); return; }
-      const rowsComRegrasAplicadas = rowsView.filter((r) => r.regras_aplicadas_em);
+      const rowsDoPeriodoConta = rows.filter((r) => (
+        contasSel.length === 0 || (r.conta_id ? contasSel.includes(r.conta_id) : false)
+      ));
+      const rowsComRegrasAplicadas = rowsDoPeriodoConta.filter((r) => r.regras_aplicadas_em);
       if (rowsComRegrasAplicadas.length === 0) {
         toast({
           title: 'Atenção',
-          description: 'Nenhum lançamento visível recebeu aplicação de regras. Clique em Aplicar Regras primeiro.',
+          description: 'Nenhum lançamento do mês/conta selecionado recebeu aplicação de regras. Clique em Aplicar Regras primeiro.',
           variant: 'destructive',
         });
         return;
       }
       setBulkAdjusting(true);
       let ok = 0, skip = 0, fail = 0;
-      const semRegras = rowsView.length - rowsComRegrasAplicadas.length;
+      const semRegras = rowsDoPeriodoConta.length - rowsComRegrasAplicadas.length;
       const jaAjustados = rowsComRegrasAplicadas.filter((r) => r.descricao_ajustada_em).length;
       const rowsParaAjustar = rowsComRegrasAplicadas.filter((r) => !r.descricao_ajustada_em);
       if (rowsParaAjustar.length === 0) {
@@ -1839,7 +1842,7 @@ export default function LancamentosDashboard() {
                   <PopoverContent align="start" className="w-72 text-sm leading-relaxed">
                     <p className="font-medium text-foreground">Ajustar Descrições</p>
                     <p className="mt-1 text-muted-foreground">
-                      Padroniza a descrição apenas dos lançamentos visíveis que já receberam regras, usando "Valor referente a" mais o nome da categoria.
+                      Padroniza a descrição apenas dos lançamentos do mês/conta selecionados que já receberam regras, usando "Valor referente a" mais o nome da categoria.
                     </p>
                   </PopoverContent>
                 </Popover>
