@@ -344,13 +344,15 @@ export default function LancamentosDashboard() {
         const payload = (r.descricao || '').trim() === nova
           ? { descricao_ajustada_em: descricaoAjustadaEm }
           : { descricao: nova, descricao_ajustada_em: descricaoAjustadaEm };
-        const { error } = await supabase
+        let updateQuery = supabase
           .from('movimentos_financeiros')
           .update(payload)
           .eq('id', r.id)
-          .eq('user_id', user.id)
           .is('descricao_ajustada_em', null);
+        updateQuery = updateQuery.eq('user_id', isAdmin ? (r.user_id || user.id) : user.id);
+        const { data: updatedRows, error } = await updateQuery.select('id');
         if (error) { fail++; continue; }
+        if (!updatedRows || updatedRows.length === 0) { skip++; continue; }
         ok++;
         updates.push({ id: r.id, desc: nova });
       }
