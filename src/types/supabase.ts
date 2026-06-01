@@ -219,6 +219,7 @@ export type Database = {
           user_id: string
           conta_id: string
           data: string        // 'YYYY-MM-DD'
+          descricao_ajustada_em: string | null
           tipo: "ENTRADA" | "SAIDA"
           valor: number
           descricao: string | null
@@ -236,6 +237,7 @@ export type Database = {
           user_id: string
           conta_id: string
           data: string
+          descricao_ajustada_em?: string | null
           tipo: "ENTRADA" | "SAIDA"
           valor: number
           descricao?: string | null
@@ -253,6 +255,7 @@ export type Database = {
           user_id?: string
           conta_id?: string
           data?: string
+          descricao_ajustada_em?: string | null
           tipo?: "ENTRADA" | "SAIDA"
           valor?: number
           descricao?: string | null

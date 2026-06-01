@@ -38,6 +38,7 @@ type Mov = {
   origem?: "LANCAMENTO" | "CULTO" | "AJUSTE" | null;
   comprovante_url?: string | null;
   regras_aplicadas_em?: string | null;
+  descricao_ajustada_em?: string | null;
 };
 
 const mesesPt = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
@@ -73,7 +74,6 @@ export default function LancamentosDashboard() {
   const [benefSearch, setBenefSearch] = useState("");
   const [addingBenef, setAddingBenef] = useState(false);
   const [applyingRules, setApplyingRules] = useState(false);
-  const [rulesAppliedForCurrentView, setRulesAppliedForCurrentView] = useState(false);
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
   const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set());
   const [tipoMenuOpen, setTipoMenuOpen] = useState(false);
@@ -148,10 +148,6 @@ export default function LancamentosDashboard() {
   const inicioNoPad = toYmdNoPad(inicioDate);
   const fimExclusivoNoPad = toYmdNoPad(fimExclusivoDate);
   const filtroPeriodoMovimentos = `and(data.gte.${inicio},data.lt.${fimExclusivo}),and(data.gte.${inicioNoPad},data.lt.${fimExclusivoNoPad})`;
-
-  useEffect(() => {
-    setRulesAppliedForCurrentView(false);
-  }, [ano, mes, contasSel, tipoVisao]);
 
   const contaExtrato = useMemo(() => {
     if (contasSel.length !== 1) return null;
@@ -315,27 +311,42 @@ export default function LancamentosDashboard() {
   async function ajustarDescricoesLote() {
     try {
       if (!user) { toast({ title: 'Sessão', description: 'Faça login para ajustar descrições', variant: 'destructive' }); return; }
-      if (!rulesAppliedForCurrentView) {
+      const rowsComRegrasAplicadas = rowsView.filter((r) => r.regras_aplicadas_em);
+      if (rowsComRegrasAplicadas.length === 0) {
         toast({
           title: 'Atenção',
-          description: 'Clique em Aplicar Regras primeiro para atualizar as categorias antes de ajustar as descrições.',
+          description: 'Nenhum lançamento visível recebeu aplicação de regras. Clique em Aplicar Regras primeiro.',
           variant: 'destructive',
         });
         return;
       }
       setBulkAdjusting(true);
       let ok = 0, skip = 0, fail = 0;
+      const semRegras = rowsView.length - rowsComRegrasAplicadas.length;
+      const jaAjustados = rowsComRegrasAplicadas.filter((r) => r.descricao_ajustada_em).length;
+      const rowsParaAjustar = rowsComRegrasAplicadas.filter((r) => !r.descricao_ajustada_em);
+      if (rowsParaAjustar.length === 0) {
+        toast({
+          title: 'Ajuste de descrições',
+          description: 'Todos os lançamentos visíveis com regras aplicadas já tiveram a descrição ajustada.',
+        });
+        return;
+      }
+      const descricaoAjustadaEm = new Date().toISOString();
       const updates: { id: string; desc: string }[] = [];
-      for (const r of rowsView) {
+      for (const r of rowsParaAjustar) {
         const categoria = (r.categoria_nome || '').trim();
         if (!categoria) { skip++; continue; }
         const nova = `Valor referente a ${categoria}`;
-        if ((r.descricao || '').trim() === nova) { skip++; continue; }
+        const payload = (r.descricao || '').trim() === nova
+          ? { descricao_ajustada_em: descricaoAjustadaEm }
+          : { descricao: nova, descricao_ajustada_em: descricaoAjustadaEm };
         const { error } = await supabase
           .from('movimentos_financeiros')
-          .update({ descricao: nova })
+          .update(payload)
           .eq('id', r.id)
-          .eq('user_id', user.id);
+          .eq('user_id', user.id)
+          .is('descricao_ajustada_em', null);
         if (error) { fail++; continue; }
         ok++;
         updates.push({ id: r.id, desc: nova });
@@ -343,10 +354,10 @@ export default function LancamentosDashboard() {
       if (updates.length > 0) {
         setRows(prev => prev.map(p => {
           const u = updates.find(u => u.id === p.id);
-          return u ? { ...p, descricao: u.desc } : p;
+          return u ? { ...p, descricao: u.desc, descricao_ajustada_em: descricaoAjustadaEm } : p;
         }));
       }
-      toast({ title: 'Ajuste de descrições', description: `Atualizados: ${ok}. Ignorados: ${skip}. Falhas: ${fail}.` });
+      toast({ title: 'Ajuste de descrições', description: `Atualizados: ${ok}. Ignorados: ${skip}. Já ajustados: ${jaAjustados}. Sem regras aplicadas: ${semRegras}. Falhas: ${fail}.` });
     } catch (e: unknown) {
       toast({ title: 'Erro', description: e instanceof Error ? e.message : 'Falha ao ajustar descrições', variant: 'destructive' });
     } finally {
@@ -549,7 +560,7 @@ export default function LancamentosDashboard() {
     (async () => {
       let q = supabase
         .from("movimentos_financeiros")
-        .select("id, user_id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, regras_aplicadas_em, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name,documento)")
+        .select("id, user_id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, regras_aplicadas_em, descricao_ajustada_em, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name,documento)")
         .or(filtroPeriodoMovimentos)
         .order("data");
       if (!isAdmin) {
@@ -582,6 +593,7 @@ export default function LancamentosDashboard() {
         origem: (r.origem as Mov["origem"]) ?? null,
         comprovante_url: r.comprovante_url ?? null,
         regras_aplicadas_em: r.regras_aplicadas_em ?? null,
+        descricao_ajustada_em: r.descricao_ajustada_em ?? null,
       }));
       setRows(arr);
     })();
@@ -1353,7 +1365,6 @@ export default function LancamentosDashboard() {
   async function aplicarRegras() {
     if (!user) return;
     setApplyingRules(true);
-    let rulesRunCompleted = false;
     try {
       type ClassificationRule = {
         id: string;
@@ -1374,7 +1385,6 @@ export default function LancamentosDashboard() {
 
       if (visibleRowsForSelection.length === 0) {
         toast({ title: "Aviso", description: `Nenhum lançamento encontrado no mês ${tituloMes}.`, variant: "destructive" });
-        rulesRunCompleted = true;
         return;
       }
 
@@ -1383,7 +1393,6 @@ export default function LancamentosDashboard() {
           title: "Regras Aplicadas",
           description: "Todos os lançamentos visíveis já receberam aplicação de regras.",
         });
-        rulesRunCompleted = true;
         return;
       }
 
@@ -1408,7 +1417,6 @@ export default function LancamentosDashboard() {
         .filter((rule) => rule.aplica_todos || ruleOwnerIds.includes(rule.user_id));
       if (fetchedRules.length === 0) {
         toast({ title: "Aviso", description: "Nenhuma regra cadastrada", variant: "destructive" });
-        rulesRunCompleted = true;
         return;
       }
 
@@ -1507,7 +1515,6 @@ export default function LancamentosDashboard() {
           title: "Regras Aplicadas",
           description: "Nenhum lançamento do mês visível corresponde aos termos cadastrados.",
         });
-        rulesRunCompleted = true;
         return;
       }
 
@@ -1540,12 +1547,10 @@ export default function LancamentosDashboard() {
         description: `${totalUpdated} lançamento(s) novo(s) atualizado(s) no mês ${tituloMes}.${alreadyAppliedCount ? ` ${alreadyAppliedCount} já tinha(m) regras aplicadas e foi/foram ignorado(s).` : ""}${skippedUnresolved ? ` ${skippedUnresolved} ignorado(s) por categoria/beneficiário inexistente no usuário.` : ""}`
       });
 
-      rulesRunCompleted = true;
       setReloadKey((key) => key + 1);
     } catch (error: unknown) {
       toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao recarregar dados", variant: "destructive" });
     } finally {
-      if (rulesRunCompleted) setRulesAppliedForCurrentView(true);
       setApplyingRules(false);
     }
   }
@@ -1834,7 +1839,7 @@ export default function LancamentosDashboard() {
                   <PopoverContent align="start" className="w-72 text-sm leading-relaxed">
                     <p className="font-medium text-foreground">Ajustar Descrições</p>
                     <p className="mt-1 text-muted-foreground">
-                      Padroniza a descrição dos lançamentos visíveis para "Valor referente a" mais o nome da categoria. Lançamentos sem categoria ou que já estão nesse padrão são ignorados.
+                      Padroniza a descrição apenas dos lançamentos visíveis que já receberam regras, usando "Valor referente a" mais o nome da categoria.
                     </p>
                   </PopoverContent>
                 </Popover>
@@ -2014,6 +2019,11 @@ export default function LancamentosDashboard() {
                               Regras aplicadas
                             </span>
                           ) : null}
+                          {r.descricao_ajustada_em ? (
+                            <span className="inline-flex w-fit items-center rounded border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
+                              Descrição ajustada
+                            </span>
+                          ) : null}
                         </div>
                       </td>
                       <td className="p-2">{r.categoria_nome || ''}</td>
@@ -2088,6 +2098,11 @@ export default function LancamentosDashboard() {
                   {r.regras_aplicadas_em ? (
                     <div className="mt-2 inline-flex w-fit items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
                       Regras aplicadas
+                    </div>
+                  ) : null}
+                  {r.descricao_ajustada_em ? (
+                    <div className="mt-2 inline-flex w-fit items-center rounded border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
+                      Descrição ajustada
                     </div>
                   ) : null}
                   <div className={`mt-2 text-lg font-semibold ${r.tipo === 'ENTRADA' ? 'text-blue-600' : 'text-red-600'}`}>{formatCurrency(r.valor)}</div>

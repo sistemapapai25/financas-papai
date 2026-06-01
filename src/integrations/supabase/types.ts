@@ -650,6 +650,7 @@ export type Database = {
           conta_id: string
           created_at: string
           data: string
+          descricao_ajustada_em: string | null
           descricao: string | null
           id: string
           origem: string | null
@@ -668,6 +669,7 @@ export type Database = {
           conta_id: string
           created_at?: string
           data: string
+          descricao_ajustada_em?: string | null
           descricao?: string | null
           id?: string
           origem?: string | null
@@ -686,6 +688,7 @@ export type Database = {
           conta_id?: string
           created_at?: string
           data?: string
+          descricao_ajustada_em?: string | null
           descricao?: string | null
           id?: string
           origem?: string | null
