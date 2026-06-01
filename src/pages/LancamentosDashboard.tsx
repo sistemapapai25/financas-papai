@@ -2263,11 +2263,11 @@ export default function LancamentosDashboard() {
           </DialogContent>
         </Dialog>
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
-          <DialogContent onOpenAutoFocus={(e) => e.preventDefault()}>
+          <DialogContent className="max-h-[90vh] overflow-hidden p-0 sm:max-w-[520px]" onOpenAutoFocus={(e) => e.preventDefault()}>
             <DialogHeader>
-              <DialogTitle>Editar Movimento</DialogTitle>
+              <DialogTitle className="px-6 pt-6">Editar Movimento</DialogTitle>
             </DialogHeader>
-            <div className="space-y-3">
+            <div className="max-h-[calc(90vh-9rem)] space-y-3 overflow-y-auto px-6 pb-4">
               <div>
                 <Label>Data</Label>
                 <Input type="date" value={editData} onChange={e => setEditData(e.target.value)} />
@@ -2444,12 +2444,12 @@ export default function LancamentosDashboard() {
                   </PopoverContent>
                 </Popover>
               </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
-                <Button onClick={salvarEdicao} disabled={saving || editComprovanteUploading || editNotaFiscalUploading}>
-                  {editComprovanteUploading ? 'Enviando comprovante...' : editNotaFiscalUploading ? 'Enviando nota fiscal...' : saving ? 'Salvando...' : 'Salvar'}
-                </Button>
-              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t bg-background px-6 py-4">
+              <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+              <Button onClick={salvarEdicao} disabled={saving || editComprovanteUploading || editNotaFiscalUploading}>
+                {editComprovanteUploading ? 'Enviando comprovante...' : editNotaFiscalUploading ? 'Enviando nota fiscal...' : saving ? 'Salvando...' : 'Salvar'}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
