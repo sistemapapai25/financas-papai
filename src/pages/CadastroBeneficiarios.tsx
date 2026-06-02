@@ -12,6 +12,7 @@ import { UserPlus, Edit2, Trash2, Search, MoreVertical } from 'lucide-react';
 
 interface Beneficiario {
   id: string;
+  user_id?: string | null;
   name: string;
   documento?: string;
   phone?: string;
@@ -94,7 +95,6 @@ const CadastroBeneficiarios = () => {
       const { data, error } = await supabase
         .from('beneficiaries')
         .select('*')
-        .eq('user_id', user!.id)
         .order('name', { ascending: true });
 
       if (error) throw error;
@@ -169,7 +169,8 @@ const CadastroBeneficiarios = () => {
       supabase.storage.from('Assinaturas').createSignedUrl(beneficiario.assinatura_path, 600).then(({ data }) => setPreviewUrl(data?.signedUrl ?? null));
     } else {
       if (user) {
-        const folder = `assinaturas/${user.id}/beneficiarios`;
+        const ownerId = beneficiario.user_id || user.id;
+        const folder = `assinaturas/${ownerId}/beneficiarios`;
         supabase.storage.from('Assinaturas').list(folder, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } }).then(({ data }) => {
           const match = (data || []).find(f => f.name.startsWith(`${beneficiario.id}-`));
           if (match) {
@@ -230,6 +231,7 @@ const CadastroBeneficiarios = () => {
     b.documento?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     b.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+  const canManageBeneficiario = (beneficiario: Beneficiario) => beneficiario.user_id === user?.id;
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-6xl">
@@ -410,7 +412,8 @@ const CadastroBeneficiarios = () => {
                       <td className="p-4 text-muted-foreground max-w-xs truncate">{b.observacoes || '-'}</td>
 
                       <td className="p-4">
-                        <div className="flex justify-center">
+                        {canManageBeneficiario(b) ? (
+                          <div className="flex justify-center">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
@@ -429,7 +432,8 @@ const CadastroBeneficiarios = () => {
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
-                        </div>
+                          </div>
+                        ) : null}
                       </td>
                     </tr>
                   ))}

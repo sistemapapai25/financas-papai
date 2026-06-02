@@ -73,7 +73,6 @@ const NovoLancamentoDialog = ({ onSuccess, trigger }: NovoLancamentoDialogProps)
       const { data: beneficiariosData } = await supabase
         .from('beneficiaries')
         .select('id, name')
-        .eq('user_id', user?.id)
         .order('name');
 
       setBeneficiarios(beneficiariosData || []);

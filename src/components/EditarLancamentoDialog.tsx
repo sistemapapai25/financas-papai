@@ -115,7 +115,6 @@ const EditarLancamentoDialog = ({ lancamento, open, onOpenChange, onSuccess, res
       const { data: beneficiariosData } = await supabase
         .from('beneficiaries')
         .select('id, name')
-        .eq('user_id', user?.id)
         .order('name');
 
       setBeneficiarios(beneficiariosData || []);

@@ -101,9 +101,8 @@ export default function RegrasClassificacao() {
         const target = isAdmin ? scopeUserId : user.id;
         if (!target) return;
         loadRules(target);
-        const optionsUserId = isAdmin && target === "__ALL__" ? user.id : target;
         loadCategories();
-        loadBeneficiaries(optionsUserId);
+        loadBeneficiaries();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user, roleLoading, isAdmin, scopeUserId]);
 
@@ -174,12 +173,11 @@ export default function RegrasClassificacao() {
         setCategories(data || []);
     };
 
-    const loadBeneficiaries = async (targetUserId: string) => {
+    const loadBeneficiaries = async () => {
         if (!user) return;
         const { data } = await supabase
             .from("beneficiaries")
             .select("id, name")
-            .eq("user_id", targetUserId)
             .order("name");
         setBeneficiaries(data || []);
     };

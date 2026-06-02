@@ -121,18 +121,15 @@ export default function LancamentosDashboard() {
   useEffect(() => {
     if (!user) return;
     if (showReciboModal && (docType === 'REEMBOLSO' || docType === 'RECIBO') && benefOpts.length === 0) {
-      let q = supabase
+      supabase
         .from('beneficiaries')
         .select('id,name')
-        .order('name');
-      if (!isAdmin) {
-        q = q.eq('user_id', user.id);
-      }
-      q.then(({ data }) => {
-        if (data) setBenefOpts(data);
-      });
+        .order('name')
+        .then(({ data }) => {
+          if (data) setBenefOpts(data);
+        });
     }
-  }, [showReciboModal, docType, user, isAdmin, benefOpts.length]);
+  }, [showReciboModal, docType, user, benefOpts.length]);
   const ano = dataRef.getFullYear();
   const mes = dataRef.getMonth();
   const toYmd = (d: Date) => {
@@ -1177,7 +1174,6 @@ export default function LancamentosDashboard() {
     supabase
       .from("beneficiaries")
       .select("id, name")
-      .eq("user_id", user.id)
       .order("name")
       .then(({ data }) => {
         if (data) setBenefOpts(data);
@@ -1630,7 +1626,6 @@ export default function LancamentosDashboard() {
           const { data: bens } = await supabase
             .from('beneficiaries')
             .select('id, name')
-            .eq('user_id', user.id)
             .order('name');
           const norm = (s: string) => s
             .toLowerCase()
