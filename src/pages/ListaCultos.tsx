@@ -45,6 +45,7 @@ interface TipoCulto {
 
 interface Culto {
   id: string;
+  user_id: string;
   data: string;
   tipo_id: string;
   pregador: string | null;
@@ -146,6 +147,8 @@ export default function ListaCultos() {
     );
   }, [cultos]);
 
+  const canManageCulto = (culto: Culto) => culto.user_id === user?.id;
+
   const monthRange = (month: string) => {
     const [yStr, mStr] = month.split("-");
     const y = Number(yStr);
@@ -174,6 +177,15 @@ export default function ListaCultos() {
 
   // Preparar edição de culto
   const prepararEdicao = async (culto: Culto) => {
+    if (!canManageCulto(culto)) {
+      toast({
+        title: "Acesso restrito",
+        description: "Você só pode editar cultos lançados pelo seu usuário.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setEditandoCulto(culto);
       setFormData({
@@ -235,7 +247,6 @@ export default function ListaCultos() {
           *,
           tipo_culto:tipos_culto(id, nome)
         `)
-        .eq("user_id", user.id)
         .gte("data", start)
         .lt("data", end)
         .order("data", { ascending: false });
@@ -285,6 +296,16 @@ export default function ListaCultos() {
 
   // Excluir culto
   const excluirCulto = async (cultoId: string) => {
+    const culto = cultos.find((item) => item.id === cultoId);
+    if (!culto || !canManageCulto(culto)) {
+      toast({
+        title: "Acesso restrito",
+        description: "Você só pode excluir cultos lançados pelo seu usuário.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setExcluindo(cultoId);
 
@@ -362,6 +383,14 @@ export default function ListaCultos() {
   // Salvar edição
   const salvarEdicao = async () => {
     if (!editandoCulto) return;
+    if (!canManageCulto(editandoCulto)) {
+      toast({
+        title: "Acesso restrito",
+        description: "Você só pode editar cultos lançados pelo seu usuário.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       setSalvandoEdicao(true);
@@ -626,48 +655,50 @@ export default function ListaCultos() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-blue-600 hover:text-blue-700"
-                      onClick={() => prepararEdicao(culto)}
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Editar
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700"
-                          disabled={excluindo === culto.id}
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          {excluindo === culto.id ? "Excluindo..." : "Excluir"}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Tem certeza que deseja excluir este culto? Esta ação não pode ser desfeita.
-                            Todos os dízimos e ofertas relacionados também serão excluídos.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => excluirCulto(culto.id)}
-                            className="bg-red-600 hover:bg-red-700"
+                  {canManageCulto(culto) && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-blue-600 hover:text-blue-700"
+                        onClick={() => prepararEdicao(culto)}
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Editar
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700"
+                            disabled={excluindo === culto.id}
                           >
-                            Excluir
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            {excluindo === culto.id ? "Excluindo..." : "Excluir"}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Tem certeza que deseja excluir este culto? Esta ação não pode ser desfeita.
+                              Todos os dízimos e ofertas relacionados também serão excluídos.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => excluirCulto(culto.id)}
+                              className="bg-red-600 hover:bg-red-700"
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
