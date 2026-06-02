@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  CreditCard,
   ExternalLink,
   ListChecks,
   Plus,
@@ -32,6 +33,7 @@ type Conta = {
   id: string;
   user_id: string | null;
   nome: string;
+  logo: string | null;
   saldo_inicial: number;
   saldo_inicial_em: string | null;
 };
@@ -110,6 +112,13 @@ export default function ConferenciaExtrato() {
 
   // Conta selecionada
   const contaSel = useMemo(() => contas.find((c) => c.id === contaId) ?? null, [contas, contaId]);
+  const ContaIcone = ({ conta }: { conta: Conta | null }) => (
+    conta?.logo ? (
+      <img src={conta.logo} alt={conta.nome} className="h-5 w-5 shrink-0 rounded object-contain" />
+    ) : (
+      <CreditCard className="h-5 w-5 shrink-0 text-muted-foreground" />
+    )
+  );
 
   // PDF path (mesma convenção do LancamentosDashboard)
   const pdfName = useMemo(() => `${ano}-${String(mes + 1).padStart(2, "0")}.pdf`, [ano, mes]);
@@ -132,7 +141,7 @@ export default function ConferenciaExtrato() {
     if (!user) return;
     supabase
       .from("contas_financeiras")
-      .select("id,user_id,nome,saldo_inicial,saldo_inicial_em")
+      .select("id,user_id,nome,logo,saldo_inicial,saldo_inicial_em")
       .eq("ativo", true)
       .order("nome")
       .then(({ data }) => {
@@ -140,6 +149,7 @@ export default function ConferenciaExtrato() {
           id: c.id as string,
           user_id: (c.user_id as string) ?? null,
           nome: c.nome as string,
+          logo: (c.logo as string) ?? null,
           saldo_inicial: Number(c.saldo_inicial ?? 0),
           saldo_inicial_em: (c.saldo_inicial_em as string) ?? null,
         }));
@@ -534,11 +544,23 @@ export default function ConferenciaExtrato() {
               <Label>Conta</Label>
               <Select value={contaId} onValueChange={setContaId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
+                  {contaSel ? (
+                    <div className="flex min-w-0 items-center gap-2">
+                      <ContaIcone conta={contaSel} />
+                      <span className="truncate">{contaSel.nome}</span>
+                    </div>
+                  ) : (
+                    <SelectValue placeholder="Selecione" />
+                  )}
                 </SelectTrigger>
                 <SelectContent>
                   {contas.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <ContaIcone conta={c} />
+                        <span className="truncate">{c.nome}</span>
+                      </div>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
