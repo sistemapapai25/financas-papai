@@ -127,6 +127,13 @@ export default function ListaCultos() {
   const tituloMes = Number.isFinite(anoMesAno) && Number.isFinite(anoMesMesIdx) && anoMesMesIdx >= 0 && anoMesMesIdx <= 11
     ? `${capitalize(mesesPt[anoMesMesIdx])} de ${anoMesAno}`
     : mes;
+  const yearOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const selectedYear = Number.isFinite(anoMesAno) ? anoMesAno : currentYear;
+    const startYear = Math.min(currentYear - 10, selectedYear - 5);
+    const endYear = Math.max(currentYear + 2, selectedYear + 5);
+    return Array.from({ length: endYear - startYear + 1 }, (_, idx) => startYear + idx);
+  }, [anoMesAno]);
 
   const totaisMes = useMemo(() => {
     return cultos.reduce(
@@ -480,7 +487,53 @@ export default function ListaCultos() {
                   {tituloMes}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-64 p-2">
+              <PopoverContent className="w-72 p-3">
+                <div className="mb-3 flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => {
+                      const base = Number.isFinite(anoMesAno) && Number.isFinite(anoMesMesIdx) ? new Date(anoMesAno, anoMesMesIdx, 1) : new Date();
+                      setMesFromDate(new Date(base.getFullYear() - 1, base.getMonth(), 1));
+                    }}
+                    aria-label="Ano anterior"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <Select
+                    value={String(Number.isFinite(anoMesAno) ? anoMesAno : new Date().getFullYear())}
+                    onValueChange={(value) => {
+                      const month = Number.isFinite(anoMesMesIdx) && anoMesMesIdx >= 0 && anoMesMesIdx <= 11 ? anoMesMesIdx : new Date().getMonth();
+                      setMes(`${value}-${String(month + 1).padStart(2, "0")}`);
+                    }}
+                  >
+                    <SelectTrigger className="h-9 flex-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {yearOptions.map((year) => (
+                        <SelectItem key={year} value={String(year)}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => {
+                      const base = Number.isFinite(anoMesAno) && Number.isFinite(anoMesMesIdx) ? new Date(anoMesAno, anoMesMesIdx, 1) : new Date();
+                      setMesFromDate(new Date(base.getFullYear() + 1, base.getMonth(), 1));
+                    }}
+                    aria-label="Próximo ano"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
                 <div className="grid grid-cols-3 gap-1">
                   {mesesPt.map((nomeMes, idx) => (
                     <Button
