@@ -33,6 +33,8 @@ type Mov = {
   categoria_nome?: string | null;
   beneficiario_nome?: string | null;
   beneficiario_documento?: string | null;
+  beneficiario_assinatura_path?: string | null;
+  beneficiario_user_id?: string | null;
   tipo: "ENTRADA" | "SAIDA";
   valor: number;
   origem?: "LANCAMENTO" | "CULTO" | "AJUSTE" | null;
@@ -40,6 +42,14 @@ type Mov = {
   nota_fiscal_url?: string | null;
   regras_aplicadas_em?: string | null;
   descricao_ajustada_em?: string | null;
+};
+
+type BenefOption = {
+  id: string;
+  name: string;
+  documento?: string | null;
+  assinatura_path?: string | null;
+  user_id?: string | null;
 };
 
 const mesesPt = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
@@ -70,7 +80,7 @@ export default function LancamentosDashboard() {
   const [editNotaFiscalUploading, setEditNotaFiscalUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [catOpts, setCatOpts] = useState<{ id: string; name: string; tipo: string; parent_id: string | null }[]>([]);
-  const [benefOpts, setBenefOpts] = useState<{ id: string; name: string }[]>([]);
+  const [benefOpts, setBenefOpts] = useState<BenefOption[]>([]);
   const [saving, setSaving] = useState(false);
   const [openCategoria, setOpenCategoria] = useState(false);
   const [openBeneficiario, setOpenBeneficiario] = useState(false);
@@ -120,16 +130,16 @@ export default function LancamentosDashboard() {
 
   useEffect(() => {
     if (!user) return;
-    if (showReciboModal && (docType === 'REEMBOLSO' || docType === 'RECIBO') && benefOpts.length === 0) {
+    if (showReciboModal && (docType === 'REEMBOLSO' || docType === 'RECIBO')) {
       supabase
         .from('beneficiaries')
-        .select('id,name')
+        .select('id,name,documento,assinatura_path,user_id')
         .order('name')
         .then(({ data }) => {
           if (data) setBenefOpts(data);
         });
     }
-  }, [showReciboModal, docType, user, benefOpts.length]);
+  }, [showReciboModal, docType, user]);
   const ano = dataRef.getFullYear();
   const mes = dataRef.getMonth();
   const toYmd = (d: Date) => {
@@ -573,7 +583,7 @@ export default function LancamentosDashboard() {
     (async () => {
       let q = supabase
         .from("movimentos_financeiros")
-        .select("id, user_id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, nota_fiscal_url, regras_aplicadas_em, descricao_ajustada_em, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name,documento)")
+        .select("id, user_id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, nota_fiscal_url, regras_aplicadas_em, descricao_ajustada_em, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name,documento,assinatura_path,user_id)")
         .or(filtroPeriodoMovimentos)
         .order("data");
       if (!isAdmin) {
@@ -601,6 +611,8 @@ export default function LancamentosDashboard() {
         categoria_nome: r.categoria?.name ?? null,
         beneficiario_nome: r.beneficiario?.name ?? null,
         beneficiario_documento: r.beneficiario?.documento ?? null,
+        beneficiario_assinatura_path: r.beneficiario?.assinatura_path ?? null,
+        beneficiario_user_id: r.beneficiario?.user_id ?? null,
         tipo: r.tipo as Mov["tipo"],
         valor: r.valor,
         origem: (r.origem as Mov["origem"]) ?? null,
@@ -682,6 +694,68 @@ export default function LancamentosDashboard() {
     return out;
   }
 
+  async function carregarBeneficiarioRecibo(
+    id: string,
+    fallback: Partial<BenefOption> = {},
+  ): Promise<BenefOption> {
+    const option = benefOpts.find((b) => b.id === id);
+    let fromDb: BenefOption | null = null;
+    try {
+      const { data } = await supabase
+        .from('beneficiaries')
+        .select('id,name,documento,assinatura_path,user_id')
+        .eq('id', id)
+        .maybeSingle();
+      if (data) fromDb = data;
+    } catch {
+      fromDb = null;
+    }
+
+    return {
+      id,
+      name: fromDb?.name || fallback.name || option?.name || '',
+      documento: fromDb?.documento || fallback.documento || option?.documento || null,
+      assinatura_path: fromDb?.assinatura_path || fallback.assinatura_path || option?.assinatura_path || null,
+      user_id: fromDb?.user_id || fallback.user_id || option?.user_id || null,
+    };
+  }
+
+  async function getBeneficiarioAssinaturaUrl(id: string, beneficiario: BenefOption) {
+    const paths: string[] = [];
+    if (beneficiario.assinatura_path) paths.push(beneficiario.assinatura_path);
+
+    if (user) {
+      const folders = Array.from(new Set([
+        `assinaturas/${user.id}/beneficiarios`,
+        beneficiario.user_id ? `assinaturas/${beneficiario.user_id}/beneficiarios` : null,
+      ].filter(Boolean) as string[]));
+
+      for (const folder of folders) {
+        const { data: files } = await supabase.storage.from('Assinaturas').list(folder, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } });
+        const match = (files || []).find((f) => f.name.startsWith(`${id}-`));
+        if (match) paths.push(`${folder}/${match.name}`);
+      }
+    }
+
+    for (const path of Array.from(new Set(paths))) {
+      try {
+        const { data: signed } = await supabase.storage.from('Assinaturas').createSignedUrl(path, 300);
+        if (signed?.signedUrl) return signed.signedUrl;
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  async function getBeneficiarioAssinaturaBytes(id: string, beneficiario: BenefOption) {
+    const signedUrl = await getBeneficiarioAssinaturaUrl(id, beneficiario);
+    if (!signedUrl) return null;
+    const resp = await fetch(signedUrl);
+    if (!resp.ok) return null;
+    return resp.arrayBuffer();
+  }
+
   async function gerarReciboMov(m: Mov, beneficiarioIdOverride?: string, beneficiarioDocOverride?: string | null, beneficiarioNameOverride?: string | null) {
     try {
       if (!user) { toast({ title: 'Sessão', description: 'Faça login para emitir recibo', variant: 'destructive' }); return; }
@@ -759,44 +833,18 @@ export default function LancamentosDashboard() {
       let y = yHeader - 40;
       for (const line of wrapByWidth(corpo, 12)) { drawText(line, MARGIN_L, y, 12, false); y -= 18; }
       if (reciboBenefId) {
-        const { data: ben } = await supabase
-          .from('beneficiaries')
-          .select('name,documento,assinatura_path,user_id')
-          .eq('id', reciboBenefId)
-          .maybeSingle();
-        const signerName = ben?.name || beneficiarioNameOverride || reembBenefNameMov || benefOpts.find(b => b.id === reciboBenefId)?.name || null;
-        const signerDoc = ben?.documento || beneficiarioDocOverride || reembBenefDocMov || m.beneficiario_documento || null;
+        const beneficiario = await carregarBeneficiarioRecibo(reciboBenefId, {
+          name: beneficiarioNameOverride || reembBenefNameMov || m.beneficiario_nome || undefined,
+          documento: beneficiarioDocOverride || reembBenefDocMov || m.beneficiario_documento || null,
+          assinatura_path: m.beneficiario_assinatura_path || null,
+          user_id: m.beneficiario_user_id || null,
+        });
+        const signerName = beneficiario.name || null;
+        const signerDoc = beneficiario.documento || null;
         setReembBenefIdMov(reciboBenefId);
         setReembBenefNameMov(signerName);
         setReembBenefDocMov(signerDoc);
-        let assinaturaImgBytes: ArrayBuffer | null = null;
-        const signerPaths: string[] = [];
-        if (ben?.assinatura_path) signerPaths.push(ben.assinatura_path);
-        if (user) {
-          const folders = Array.from(new Set([
-            `assinaturas/${user.id}/beneficiarios`,
-            ben?.user_id ? `assinaturas/${ben.user_id}/beneficiarios` : null,
-          ].filter(Boolean) as string[]));
-          for (const folder of folders) {
-            const { data: files } = await supabase.storage.from('Assinaturas').list(folder, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } });
-            const match = (files || []).find(f => f.name.startsWith(`${reciboBenefId}-`));
-            if (match) {
-              signerPaths.push(`${folder}/${match.name}`);
-            }
-          }
-        }
-        for (const signerPath of Array.from(new Set(signerPaths))) {
-          try {
-            const { data: signedAss } = await supabase.storage.from('Assinaturas').createSignedUrl(signerPath, 300);
-            if (!signedAss?.signedUrl) continue;
-            const resp = await fetch(signedAss.signedUrl);
-            if (!resp.ok) continue;
-            assinaturaImgBytes = await resp.arrayBuffer();
-            break;
-          } catch {
-            continue;
-          }
-        }
+        const assinaturaImgBytes = await getBeneficiarioAssinaturaBytes(reciboBenefId, beneficiario);
         if (assinaturaImgBytes) {
           let img;
           try { img = await pdfDoc.embedPng(assinaturaImgBytes); }
@@ -890,33 +938,21 @@ export default function LancamentosDashboard() {
       let signerDoc: string | null = null;
       const benefId = reembBenefIdMov || m.beneficiario_id || null;
       if (benefId) {
-        // Preferir dados já carregados via seleção no modal
-        signerName = reembBenefNameMov || null;
-        signerDoc = reembBenefDocMov || null;
-        if (!signerName || !signerDoc) {
-          const { data: ben } = await supabase
-            .from('beneficiaries')
-            .select('name,documento')
-            .eq('id', benefId)
-            .maybeSingle();
-          signerName = signerName || ben?.name || null;
-          signerDoc = signerDoc || ben?.documento || null;
-        }
+        const beneficiario = await carregarBeneficiarioRecibo(benefId, {
+          name: reembBenefNameMov || m.beneficiario_nome || undefined,
+          documento: reembBenefDocMov || m.beneficiario_documento || null,
+          assinatura_path: m.beneficiario_assinatura_path || null,
+          user_id: m.beneficiario_user_id || null,
+        });
+        signerName = beneficiario.name || null;
+        signerDoc = beneficiario.documento || null;
         // Assinatura: usa URL já obtida no modal se houver; senão busca no bucket
         if (reembBenefAssUrlMov) {
           const resp = await fetch(reembBenefAssUrlMov);
           if (resp.ok) assinaturaImgBytes = new Uint8Array(await resp.arrayBuffer());
-        } else if (user) {
-          const folder = `assinaturas/${user.id}/beneficiarios`;
-          const { data: files } = await supabase.storage.from('Assinaturas').list(folder, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } });
-          const match = (files || []).find(f => f.name.startsWith(`${benefId}-`));
-          if (match) {
-            const { data: signed } = await supabase.storage.from('Assinaturas').createSignedUrl(`${folder}/${match.name}`, 300);
-            if (signed?.signedUrl) {
-              const resp = await fetch(signed.signedUrl);
-              if (resp.ok) assinaturaImgBytes = new Uint8Array(await resp.arrayBuffer());
-            }
-          }
+        } else {
+          const bytes = await getBeneficiarioAssinaturaBytes(benefId, beneficiario);
+          if (bytes) assinaturaImgBytes = new Uint8Array(bytes);
         }
       }
       if (!assinaturaImgBytes && church.assinatura_path) {
@@ -943,24 +979,16 @@ export default function LancamentosDashboard() {
   }
 
   async function selecionarBeneficiarioReembolsoMov(id: string, m?: Mov) {
+    let name: string | null = null;
+    let doc: string | null = null;
     try {
       setReembBenefIdMov(id);
-      const name = benefOpts.find(b => b.id === id)?.name || null;
+      const beneficiario = await carregarBeneficiarioRecibo(id);
+      name = beneficiario.name || null;
       setReembBenefNameMov(name);
-      let doc: string | null = null;
-      const { data: ben } = await supabase.from('beneficiaries').select('documento').eq('id', id).maybeSingle();
-      if (ben?.documento) doc = ben.documento;
+      doc = beneficiario.documento || null;
       setReembBenefDocMov(doc);
-      let assUrl: string | null = null;
-      if (user) {
-        const folder = `assinaturas/${user.id}/beneficiarios`;
-        const { data: files } = await supabase.storage.from('Assinaturas').list(folder, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } });
-        const match = (files || []).find(f => f.name.startsWith(`${id}-`));
-        if (match) {
-          const { data: signed } = await supabase.storage.from('Assinaturas').createSignedUrl(`${folder}/${match.name}`, 300);
-          if (signed?.signedUrl) assUrl = signed.signedUrl;
-        }
-      }
+      const assUrl = await getBeneficiarioAssinaturaUrl(id, beneficiario);
       setReembBenefAssUrlMov(assUrl);
       if (m) {
         if (docType === 'RECIBO') await gerarReciboMov(m, id, doc, name);
@@ -1181,7 +1209,7 @@ export default function LancamentosDashboard() {
     // Load all beneficiaries for local filtering
     supabase
       .from("beneficiaries")
-      .select("id, name")
+      .select("id, name, documento, assinatura_path, user_id")
       .order("name")
       .then(({ data }) => {
         if (data) setBenefOpts(data);
@@ -1199,7 +1227,7 @@ export default function LancamentosDashboard() {
       const { data, error } = await supabase
         .from('beneficiaries')
         .insert({ user_id: user.id, name: nome })
-        .select('id,name')
+        .select('id,name,documento,assinatura_path,user_id')
         .single();
       if (error) { throw error; }
       setBenefOpts(prev => [{ id: data.id, name: data.name }, ...prev]);
@@ -1633,7 +1661,7 @@ export default function LancamentosDashboard() {
         if (recebedorNome && user) {
           const { data: bens } = await supabase
             .from('beneficiaries')
-            .select('id, name')
+            .select('id, name, documento, assinatura_path, user_id')
             .order('name');
           const norm = (s: string) => s
             .toLowerCase()
@@ -2508,7 +2536,7 @@ export default function LancamentosDashboard() {
                   <Popover open={openBenefReembMov} onOpenChange={setOpenBenefReembMov}>
                     <PopoverTrigger asChild>
                       <Button variant="outline" role="combobox" aria-expanded={openBenefReembMov} className="w-full justify-between">
-                        {reembBenefIdMov ? (benefOpts.find(b => b.id === reembBenefIdMov)?.name || 'Selecionado') : 'Selecione um beneficiário...'}
+                        {reembBenefIdMov ? (benefOpts.find(b => b.id === reembBenefIdMov)?.name || reembBenefNameMov || 'Selecionado') : 'Selecione um beneficiário...'}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
@@ -2531,7 +2559,7 @@ export default function LancamentosDashboard() {
                                   const { data, error } = await supabase
                                     .from('beneficiaries')
                                     .insert({ user_id: user.id, name: nome })
-                                    .select('id,name')
+                                    .select('id,name,documento,assinatura_path,user_id')
                                     .single();
                                   if (error) throw error;
                                   setBenefOpts(prev => [{ id: data.id, name: data.name }, ...prev]);
