@@ -4,19 +4,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { parseExtratoFile, type LinhaExtrato } from "@/lib/parseExtrato";
+import { CreditCard } from "lucide-react";
 
 type LinhaPreview = LinhaExtrato & { selecionado: boolean };
+type ContaFinanceira = { id: string; nome: string; logo?: string | null };
 
 export default function ImportarExtrato() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [linhas, setLinhas] = useState<LinhaPreview[]>([]);
-  const [contas, setContas] = useState<{ id: string; nome: string }[]>([]);
+  const [contas, setContas] = useState<ContaFinanceira[]>([]);
   const [contaId, setContaId] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [permitirDuplicados, setPermitirDuplicados] = useState(true);
@@ -25,17 +28,20 @@ export default function ImportarExtrato() {
     if (!supabase || !user) return;
     supabase
       .from("contas_financeiras")
-      .select("id,nome")
+      .select("id,nome,logo")
       .eq("ativo", true)
       .order("nome")
       .then(({ data, error }) => {
         if (error) return;
-        const arr: { id: string; nome: string }[] = [];
+        const arr: ContaFinanceira[] = [];
         if (Array.isArray(data)) {
           for (const c of data) {
             const id = (c as Record<string, unknown>)?.id;
             const nome = (c as Record<string, unknown>)?.nome;
-            if (typeof id === "string" && typeof nome === "string") arr.push({ id, nome });
+            const logo = (c as Record<string, unknown>)?.logo;
+            if (typeof id === "string" && typeof nome === "string") {
+              arr.push({ id, nome, logo: typeof logo === "string" ? logo : null });
+            }
           }
         }
       setContas(arr);
@@ -63,6 +69,14 @@ export default function ImportarExtrato() {
   }, [linhas]);
 
   const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
+  const contaSelecionada = useMemo(() => contas.find((c) => c.id === contaId) || null, [contas, contaId]);
+  const ContaIcone = ({ conta }: { conta: ContaFinanceira | null }) => (
+    conta?.logo ? (
+      <img src={conta.logo} alt={conta.nome} className="h-5 w-5 shrink-0 rounded object-contain" />
+    ) : (
+      <CreditCard className="h-5 w-5 shrink-0 text-muted-foreground" />
+    )
+  );
 
   async function importarSelecionados() {
     if (!user) { toast({ title: "Sessão", description: "Você precisa estar logado" }); return; }
@@ -212,10 +226,28 @@ export default function ImportarExtrato() {
             </div>
             <div>
               <Label>Conta financeira</Label>
-              <select className="w-full border rounded-md h-10 px-3" value={contaId} onChange={e => setContaId(e.target.value)}>
-                <option value="">Selecione...</option>
-                {contas.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-              </select>
+              <Select value={contaId} onValueChange={setContaId}>
+                <SelectTrigger>
+                  {contaSelecionada ? (
+                    <div className="flex min-w-0 items-center gap-2">
+                      <ContaIcone conta={contaSelecionada} />
+                      <span className="truncate">{contaSelecionada.nome}</span>
+                    </div>
+                  ) : (
+                    <SelectValue placeholder="Selecione..." />
+                  )}
+                </SelectTrigger>
+                <SelectContent>
+                  {contas.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <ContaIcone conta={c} />
+                        <span className="truncate">{c.nome}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

@@ -133,7 +133,7 @@ export default function LancamentosDashboard() {
     if (showReciboModal && (docType === 'REEMBOLSO' || docType === 'RECIBO')) {
       supabase
         .from('beneficiaries')
-        .select('id,name,documento,assinatura_path,user_id')
+        .select('id,name,documento,user_id')
         .order('name')
         .then(({ data }) => {
           if (data) setBenefOpts(data);
@@ -583,7 +583,7 @@ export default function LancamentosDashboard() {
     (async () => {
       let q = supabase
         .from("movimentos_financeiros")
-        .select("id, user_id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, nota_fiscal_url, regras_aplicadas_em, descricao_ajustada_em, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name,documento,assinatura_path,user_id)")
+        .select("id, user_id, data, descricao, valor, tipo, origem, conta_id, categoria_id, beneficiario_id, comprovante_url, nota_fiscal_url, regras_aplicadas_em, descricao_ajustada_em, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name,documento,user_id)")
         .or(filtroPeriodoMovimentos)
         .order("data");
       if (!isAdmin) {
@@ -611,7 +611,7 @@ export default function LancamentosDashboard() {
         categoria_nome: r.categoria?.name ?? null,
         beneficiario_nome: r.beneficiario?.name ?? null,
         beneficiario_documento: r.beneficiario?.documento ?? null,
-        beneficiario_assinatura_path: r.beneficiario?.assinatura_path ?? null,
+        beneficiario_assinatura_path: null,
         beneficiario_user_id: r.beneficiario?.user_id ?? null,
         tipo: r.tipo as Mov["tipo"],
         valor: r.valor,
@@ -703,7 +703,7 @@ export default function LancamentosDashboard() {
     try {
       const { data } = await supabase
         .from('beneficiaries')
-        .select('id,name,documento,assinatura_path,user_id')
+        .select('id,name,documento,user_id')
         .eq('id', id)
         .maybeSingle();
       if (data) fromDb = data;
@@ -1209,7 +1209,7 @@ export default function LancamentosDashboard() {
     // Load all beneficiaries for local filtering
     supabase
       .from("beneficiaries")
-      .select("id, name, documento, assinatura_path, user_id")
+      .select("id, name, documento, user_id")
       .order("name")
       .then(({ data }) => {
         if (data) setBenefOpts(data);
@@ -1227,7 +1227,7 @@ export default function LancamentosDashboard() {
       const { data, error } = await supabase
         .from('beneficiaries')
         .insert({ user_id: user.id, name: nome })
-        .select('id,name,documento,assinatura_path,user_id')
+        .select('id,name,documento,user_id')
         .single();
       if (error) { throw error; }
       setBenefOpts(prev => [{ id: data.id, name: data.name }, ...prev]);
@@ -1661,7 +1661,7 @@ export default function LancamentosDashboard() {
         if (recebedorNome && user) {
           const { data: bens } = await supabase
             .from('beneficiaries')
-            .select('id, name, documento, assinatura_path, user_id')
+            .select('id, name, documento, user_id')
             .order('name');
           const norm = (s: string) => s
             .toLowerCase()
@@ -2559,7 +2559,7 @@ export default function LancamentosDashboard() {
                                   const { data, error } = await supabase
                                     .from('beneficiaries')
                                     .insert({ user_id: user.id, name: nome })
-                                    .select('id,name,documento,assinatura_path,user_id')
+                                    .select('id,name,documento,user_id')
                                     .single();
                                   if (error) throw error;
                                   setBenefOpts(prev => [{ id: data.id, name: data.name }, ...prev]);
