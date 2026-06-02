@@ -32,6 +32,7 @@ export default function ConfiguracaoIgreja() {
   const [errors, setErrors] = useState<{ igreja_nome?: string; igreja_cnpj?: string; responsavel_nome?: string; responsavel_cpf?: string }>({});
   const [userOptions, setUserOptions] = useState<UserOpt[]>([]);
   const [scopeUserId, setScopeUserId] = useState<string>('');
+  const [settingsOwnerUserId, setSettingsOwnerUserId] = useState<string | null>(null);
 
   function onlyDigits(s: string) { return s.replace(/\D+/g, ''); }
   function formatCPF(s: string) {
@@ -126,16 +127,24 @@ export default function ConfiguracaoIgreja() {
       if (!targetUserId) return;
 
       setPreviewUrl(null);
-      const { data, error } = await supabase
+      let query = supabase
         .from('church_settings')
-        .select('igreja_nome, igreja_cnpj, responsavel_nome, responsavel_cpf, assinatura_path')
-        .eq('user_id', targetUserId)
-        .maybeSingle();
+        .select('user_id, igreja_nome, igreja_cnpj, responsavel_nome, responsavel_cpf, assinatura_path, updated_at')
+        .order('updated_at', { ascending: false });
+      if (isAdmin) {
+        query = query.eq('user_id', targetUserId);
+      }
+      const { data, error } = await query;
       if (error) {
         toast({ title: 'Erro', description: error.message, variant: 'destructive' });
         return;
       }
-      if (!data) {
+      const selected = isAdmin
+        ? (data || [])[0]
+        : (data || []).find((item) => item.user_id === user.id) || (data || [])[0];
+
+      if (!selected) {
+        setSettingsOwnerUserId(null);
         setForm({
           igreja_nome: '',
           igreja_cnpj: '',
@@ -146,22 +155,30 @@ export default function ConfiguracaoIgreja() {
         return;
       }
 
+      setSettingsOwnerUserId(selected.user_id ?? null);
       setForm({
-        igreja_nome: data.igreja_nome,
-        igreja_cnpj: formatCNPJ(data.igreja_cnpj || ''),
-        responsavel_nome: data.responsavel_nome,
-        responsavel_cpf: formatCPF(data.responsavel_cpf || ''),
-        assinatura_path: data.assinatura_path ?? '',
+        igreja_nome: selected.igreja_nome,
+        igreja_cnpj: formatCNPJ(selected.igreja_cnpj || ''),
+        responsavel_nome: selected.responsavel_nome,
+        responsavel_cpf: formatCPF(selected.responsavel_cpf || ''),
+        assinatura_path: selected.assinatura_path ?? '',
       });
-      if (data.assinatura_path) {
-        const { data: signed } = await supabase.storage.from('Assinaturas').createSignedUrl(data.assinatura_path, 600);
+      if (selected.assinatura_path) {
+        const { data: signed } = await supabase.storage.from('Assinaturas').createSignedUrl(selected.assinatura_path, 600);
         setPreviewUrl(signed?.signedUrl ?? null);
       }
     })();
   }, [user, roleLoading, isAdmin, scopeUserId, toast]);
 
+  const isSharedReadOnly = !!settingsOwnerUserId && settingsOwnerUserId !== user?.id && !isAdmin;
+  const canEditSettings = !isSharedReadOnly;
+
   const uploadAssinatura = async (file: File) => {
     if (!user) return;
+    if (!canEditSettings) {
+      toast({ title: 'Configuração', description: 'Esta configuração é compartilhada e está somente para visualização.', variant: 'destructive' });
+      return;
+    }
     if (isAdmin && scopeUserId && scopeUserId !== user.id) {
       toast({ title: 'Assinatura', description: 'Para enviar assinatura, entre com o usuário selecionado.', variant: 'destructive' });
       return;
@@ -185,6 +202,10 @@ export default function ConfiguracaoIgreja() {
 
   const salvar = async () => {
     if (!user) return;
+    if (!canEditSettings) {
+      toast({ title: 'Configuração', description: 'Esta configuração é compartilhada e está somente para visualização.', variant: 'destructive' });
+      return;
+    }
     try {
       setLoading(true);
       const targetUserId = isAdmin ? (scopeUserId || user.id) : user.id;
@@ -270,22 +291,22 @@ export default function ConfiguracaoIgreja() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Nome da Igreja</Label>
-              <Input value={form.igreja_nome} onChange={(e) => setForm({ ...form, igreja_nome: e.target.value })} />
+              <Input value={form.igreja_nome} disabled={!canEditSettings} onChange={(e) => setForm({ ...form, igreja_nome: e.target.value })} />
               {errors.igreja_nome && <div className="text-xs text-red-600">{errors.igreja_nome}</div>}
             </div>
             <div className="space-y-2">
               <Label>CNPJ</Label>
-              <Input value={form.igreja_cnpj} onChange={(e) => setForm({ ...form, igreja_cnpj: formatCNPJ(e.target.value) })} />
+              <Input value={form.igreja_cnpj} disabled={!canEditSettings} onChange={(e) => setForm({ ...form, igreja_cnpj: formatCNPJ(e.target.value) })} />
               {errors.igreja_cnpj && <div className="text-xs text-red-600">{errors.igreja_cnpj}</div>}
             </div>
             <div className="space-y-2">
               <Label>Responsável (Nome)</Label>
-              <Input value={form.responsavel_nome} onChange={(e) => setForm({ ...form, responsavel_nome: e.target.value })} />
+              <Input value={form.responsavel_nome} disabled={!canEditSettings} onChange={(e) => setForm({ ...form, responsavel_nome: e.target.value })} />
               {errors.responsavel_nome && <div className="text-xs text-red-600">{errors.responsavel_nome}</div>}
             </div>
             <div className="space-y-2">
               <Label>Responsável (CPF)</Label>
-              <Input value={form.responsavel_cpf} onChange={(e) => setForm({ ...form, responsavel_cpf: formatCPF(e.target.value) })} />
+              <Input value={form.responsavel_cpf} disabled={!canEditSettings} onChange={(e) => setForm({ ...form, responsavel_cpf: formatCPF(e.target.value) })} />
               {errors.responsavel_cpf && <div className="text-xs text-red-600">{errors.responsavel_cpf}</div>}
             </div>
           </div>
@@ -295,7 +316,7 @@ export default function ConfiguracaoIgreja() {
             <div className="flex items-center gap-2">
               <Button asChild variant="outline">
                 <label className="cursor-pointer">
-                  <input type="file" accept="image/png,image/jpeg" className="hidden" disabled={isAdmin && scopeUserId && scopeUserId !== user?.id} onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadAssinatura(f); }} />
+                  <input type="file" accept="image/png,image/jpeg" className="hidden" disabled={!canEditSettings || (isAdmin && scopeUserId && scopeUserId !== user?.id)} onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadAssinatura(f); }} />
                   <ImageIcon className="w-4 h-4 mr-2" /> Enviar Imagem
                 </label>
               </Button>
@@ -311,7 +332,7 @@ export default function ConfiguracaoIgreja() {
           </div>
 
           <div className="flex justify-end">
-            <Button type="button" onClick={salvar} disabled={loading}>{loading ? 'Salvando...' : 'Salvar'}</Button>
+            <Button type="button" onClick={salvar} disabled={loading || !canEditSettings}>{loading ? 'Salvando...' : 'Salvar'}</Button>
           </div>
         </CardContent>
       </Card>

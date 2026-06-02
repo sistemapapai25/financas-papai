@@ -300,11 +300,19 @@ export default function LancamentosDashboard() {
       });
     supabase
       .from('church_settings')
-      .select('igreja_nome, igreja_cnpj, responsavel_nome, responsavel_cpf, assinatura_path')
-      .eq('user_id', user.id)
-      .maybeSingle()
+      .select('user_id, igreja_nome, igreja_cnpj, responsavel_nome, responsavel_cpf, assinatura_path, updated_at')
+      .order('updated_at', { ascending: false })
       .then(({ data }) => {
-        if (data) setChurch({ igreja_nome: data.igreja_nome, igreja_cnpj: data.igreja_cnpj, responsavel_nome: data.responsavel_nome, responsavel_cpf: data.responsavel_cpf, assinatura_path: data.assinatura_path ?? null });
+        const selected = (data || []).find((item) => item.user_id === user.id) || (data || [])[0];
+        if (selected) {
+          setChurch({
+            igreja_nome: selected.igreja_nome,
+            igreja_cnpj: selected.igreja_cnpj,
+            responsavel_nome: selected.responsavel_nome,
+            responsavel_cpf: selected.responsavel_cpf,
+            assinatura_path: selected.assinatura_path ?? null,
+          });
+        }
       });
   }, [user]);
 
