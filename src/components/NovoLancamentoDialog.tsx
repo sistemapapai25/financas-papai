@@ -65,7 +65,6 @@ const NovoLancamentoDialog = ({ onSuccess, trigger }: NovoLancamentoDialogProps)
       const { data: categoriasData } = await supabase
         .from('categories')
         .select('id, name, tipo')
-        .eq('user_id', user?.id)
         .order('name');
 
       setCategorias(categoriasData || []);

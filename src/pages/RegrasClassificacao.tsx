@@ -102,7 +102,7 @@ export default function RegrasClassificacao() {
         if (!target) return;
         loadRules(target);
         const optionsUserId = isAdmin && target === "__ALL__" ? user.id : target;
-        loadCategories(optionsUserId);
+        loadCategories();
         loadBeneficiaries(optionsUserId);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user, roleLoading, isAdmin, scopeUserId]);
@@ -160,12 +160,11 @@ export default function RegrasClassificacao() {
         setRules(mapped);
     };
 
-    const loadCategories = async (targetUserId: string) => {
+    const loadCategories = async () => {
         if (!user) return;
         const { data, error } = await supabase
             .from("categories")
             .select("id, name")
-            .eq("user_id", targetUserId)
             .order("tipo")
             .order("name");
         if (error) {

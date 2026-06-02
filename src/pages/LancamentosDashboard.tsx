@@ -1152,7 +1152,6 @@ export default function LancamentosDashboard() {
     supabase
       .from("categories")
       .select("id, name, tipo, parent_id")
-      .eq("user_id", user.id)
       .order("name")
       .then(({ data }) => {
         if (data) {

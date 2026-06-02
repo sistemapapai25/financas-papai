@@ -61,7 +61,6 @@ export default function ResumoAnual() {
     supabase
       .from("categories")
       .select("id")
-      .eq("user_id", user.id)
       .eq("name", "Transferência Interna")
       .then(({ data, error }) => {
         if (error) return;

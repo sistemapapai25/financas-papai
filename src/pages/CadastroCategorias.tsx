@@ -19,6 +19,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } fro
 
 interface Categoria {
   id: string;
+  user_id?: string | null;
   name: string;
   tipo: 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA';
   created_at: string;
@@ -103,8 +104,7 @@ const CadastroCategorias = () => {
       await ensureTransferCategory(targetUserId);
       const { data, error } = await supabase
         .from('categories')
-        .select('id,name,tipo,created_at,parent_id,ordem')
-        .eq('user_id', targetUserId)
+        .select('id,user_id,name,tipo,created_at,parent_id,ordem')
         .order('tipo')
         .order('ordem', { ascending: true })
         .order('name', { ascending: true });
@@ -372,6 +372,7 @@ const CadastroCategorias = () => {
   const treeTransferencias = buildTree(filteredCategorias, 'TRANSFERENCIA');
 
   const findSiblings = (cat: Categoria) => filteredCategorias.filter(c => c.tipo === cat.tipo && (c.parent_id ?? null) === (cat.parent_id ?? null)).sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0) || a.name.localeCompare(b.name));
+  const canManageCategoria = (cat: Categoria) => isAdmin || cat.user_id === user?.id;
 
   const moverAcima = async (cat: Categoria) => {
     const siblings = findSiblings(cat);
@@ -407,23 +408,25 @@ const CadastroCategorias = () => {
             <span className="font-medium">{n.name}</span>
           </div>
         </button>
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="ghost"><MoreVertical className="w-4 h-4" /></Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleEdit(n)}>
-                <Edit2 className="w-4 h-4 mr-2" />
-                Editar
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleDelete(n.id, n.name)} className="text-red-600 focus:text-red-600">
-                <Trash2 className="w-4 h-4 mr-2" />
-                Excluir
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        {canManageCategoria(n) ? (
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="ghost"><MoreVertical className="w-4 h-4" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleEdit(n)}>
+                  <Edit2 className="w-4 h-4 mr-2" />
+                  Editar
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDelete(n.id, n.name)} className="text-red-600 focus:text-red-600">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Excluir
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        ) : null}
       </div>
       {n.children.length > 0 && n.children.map((child, idx) => renderNode(child, depth + 1, `${numberPrefix}.${idx + 1}`))}
     </div>

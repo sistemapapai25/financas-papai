@@ -38,7 +38,6 @@ const NovaCategoriaModal = ({ onSuccess, trigger, tipoFiltro, userId }: NovaCate
     supabase
       .from('categories')
       .select('id,name,tipo')
-      .eq('user_id', targetUserId)
       .eq('tipo', formData.tipo)
       .is('parent_id', null)
       .order('name')
