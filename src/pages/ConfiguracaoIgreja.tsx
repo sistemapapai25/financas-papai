@@ -127,21 +127,16 @@ export default function ConfiguracaoIgreja() {
       if (!targetUserId) return;
 
       setPreviewUrl(null);
-      let query = supabase
+      const { data, error } = await supabase
         .from('church_settings')
         .select('user_id, igreja_nome, igreja_cnpj, responsavel_nome, responsavel_cpf, assinatura_path, updated_at')
         .order('updated_at', { ascending: false });
-      if (isAdmin) {
-        query = query.eq('user_id', targetUserId);
-      }
-      const { data, error } = await query;
       if (error) {
         toast({ title: 'Erro', description: error.message, variant: 'destructive' });
         return;
       }
-      const selected = isAdmin
-        ? (data || [])[0]
-        : (data || []).find((item) => item.user_id === user.id) || (data || [])[0];
+      const settings = data || [];
+      const selected = settings.find((item) => item.user_id === targetUserId) || settings[0];
 
       if (!selected) {
         setSettingsOwnerUserId(null);
