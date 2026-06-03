@@ -82,12 +82,12 @@ export default function ImportarCaixa() {
     supabase
       .from("contas_financeiras")
       .select("id,nome,tipo")
-      .eq("user_id", user.id)
+      .eq("tipo", "CAIXA")
       .eq("ativo", true)
       .order("nome")
       .then(({ data, error }) => {
         if (error) return;
-        const list = ((data ?? []) as Conta[]).filter((c) => c.tipo === "CAIXA");
+        const list = (data ?? []) as Conta[];
         setContas(list);
         if (!contaId && list.length > 0) setContaId(list[0].id);
       });
@@ -111,7 +111,6 @@ export default function ImportarCaixa() {
         const { data, error } = await supabase
           .from("ofertas")
           .select(cols)
-          .eq("cultos.user_id", user.id)
           .gte("cultos.data", start)
           .lt("cultos.data", end)
           .order("data", { ascending: true, foreignTable: "cultos" });
@@ -135,7 +134,6 @@ export default function ImportarCaixa() {
         const { data, error } = await supabase
           .from("dizimos")
           .select(cols)
-          .eq("cultos.user_id", user.id)
           .gte("cultos.data", start)
           .lt("cultos.data", end)
           .order("data", { ascending: true, foreignTable: "cultos" });
