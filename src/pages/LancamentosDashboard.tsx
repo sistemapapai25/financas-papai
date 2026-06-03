@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { supabase } from "@/integrations/supabase/client";
-import { Calculator, ChevronLeft, ChevronRight, Filter, Rows, Square, Edit3, Search, X, Wand2, FileText, ExternalLink, ScanText, Receipt, MoreVertical, Plus, CircleHelp, Printer } from "lucide-react";
+import { Calculator, ChevronLeft, ChevronRight, Filter, Rows, Square, Edit3, Search, X, Wand2, FileText, ExternalLink, ScanText, Receipt, MoreVertical, Plus, CircleHelp, Printer, Upload } from "lucide-react";
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { ymdToBr } from "@/utils/date";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -86,6 +86,9 @@ export default function LancamentosDashboard() {
   const [inlineDraft, setInlineDraft] = useState("");
   const [catCellOpen, setCatCellOpen] = useState<string | null>(null);
   const [benefCellOpen, setBenefCellOpen] = useState<string | null>(null);
+  const [comprovanteBusyId, setComprovanteBusyId] = useState<string | null>(null);
+  const comprovanteInputRef = useRef<HTMLInputElement | null>(null);
+  const comprovanteUploadMovRef = useRef<Mov | null>(null);
   const [openCategoria, setOpenCategoria] = useState(false);
   const [openBeneficiario, setOpenBeneficiario] = useState(false);
   const [benefSearch, setBenefSearch] = useState("");
@@ -1633,6 +1636,46 @@ export default function LancamentosDashboard() {
     await salvarCampoInline(mov, { beneficiario_id: benef ? benef.id : null }, { beneficiario_id: benef ? benef.id : null, beneficiario_nome: benef ? benef.name : null });
   }
 
+  function iniciarUploadComprovanteInline(mov: Mov) {
+    comprovanteUploadMovRef.current = mov;
+    if (comprovanteInputRef.current) {
+      comprovanteInputRef.current.value = "";
+      comprovanteInputRef.current.click();
+    }
+  }
+  async function onComprovanteInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    const mov = comprovanteUploadMovRef.current;
+    comprovanteUploadMovRef.current = null;
+    if (!file || !mov || !user) return;
+    setComprovanteBusyId(mov.id);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const slug = String(mov.descricao || "").toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      const suffix = slug && slug.length >= 3 ? `-${slug}` : '';
+      const filePath = `comprovantes/${user.id}/${Date.now()}${suffix}.${fileExt}`;
+      const { error: upErr } = await supabase.storage.from('Comprovantes').upload(filePath, file);
+      if (upErr) throw upErr;
+      const { data } = supabase.storage.from('Comprovantes').getPublicUrl(filePath);
+      const publicUrl = data.publicUrl;
+      const ok = await salvarCampoInline(mov, { comprovante_url: publicUrl }, { comprovante_url: publicUrl });
+      if (ok) toast({ title: 'Comprovante', description: 'Comprovante anexado.' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro', description: err instanceof Error ? err.message : 'Falha ao enviar comprovante', variant: 'destructive' });
+    } finally {
+      setComprovanteBusyId(null);
+    }
+  }
+  async function removerComprovanteInline(mov: Mov) {
+    if (!confirm('Remover o comprovante deste lançamento?')) return;
+    setComprovanteBusyId(mov.id);
+    try {
+      await salvarCampoInline(mov, { comprovante_url: null }, { comprovante_url: null });
+    } finally {
+      setComprovanteBusyId(null);
+    }
+  }
+
   async function aplicarRegras() {
     if (!user) return;
     setApplyingRules(true);
@@ -2278,6 +2321,14 @@ export default function LancamentosDashboard() {
           <div />
         </div>
 
+        <input
+          ref={comprovanteInputRef}
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png"
+          className="hidden"
+          onChange={onComprovanteInputChange}
+        />
+
         {!modoCard ? (
           <div className="overflow-auto rounded border bg-white max-h-[70vh]">
             <table className="min-w-full text-sm">
@@ -2428,22 +2479,35 @@ export default function LancamentosDashboard() {
                         </Popover>
                       </td>
                       <td className="p-2 text-center">
-                        {r.comprovante_url ? (
-                          <div className="flex items-center justify-center gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => openComprovante(r.comprovante_url)} aria-label="Abrir comprovante">
-                              <FileText className="w-4 h-4" />
+                        <div className="flex items-center justify-center gap-1">
+                          {r.comprovante_url ? (
+                            <>
+                              <Button variant="ghost" size="icon" onClick={() => openComprovante(r.comprovante_url)} aria-label="Abrir comprovante" title="Abrir comprovante">
+                                <FileText className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => lerEAplicar(r)}
+                                disabled={analyzingIds.has(r.id)}
+                                aria-label="Ler e aplicar"
+                                title="Ler e aplicar"
+                              >
+                                <ScanText className={`w-4 h-4 ${analyzingIds.has(r.id) ? 'animate-pulse' : ''}`} />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => iniciarUploadComprovanteInline(r)} disabled={comprovanteBusyId === r.id} aria-label="Trocar comprovante" title="Trocar comprovante">
+                                <Upload className={`w-4 h-4 ${comprovanteBusyId === r.id ? 'animate-pulse' : ''}`} />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => removerComprovanteInline(r)} disabled={comprovanteBusyId === r.id} aria-label="Remover comprovante" title="Remover comprovante" className="text-destructive">
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <Button variant="ghost" size="icon" onClick={() => iniciarUploadComprovanteInline(r)} disabled={comprovanteBusyId === r.id} aria-label="Anexar comprovante" title="Anexar comprovante">
+                              <Upload className={`w-4 h-4 ${comprovanteBusyId === r.id ? 'animate-pulse' : ''}`} />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => lerEAplicar(r)}
-                              disabled={analyzingIds.has(r.id)}
-                              aria-label="Ler e aplicar"
-                            >
-                              <ScanText className={`w-4 h-4 ${analyzingIds.has(r.id) ? 'animate-pulse' : ''}`} />
-                            </Button>
-                          </div>
-                        ) : null}
+                          )}
+                        </div>
                       </td>
                       <td className="p-2 text-right">
                         {inlineEdit?.id === r.id && inlineEdit.field === 'valor' ? (
