@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -114,11 +114,6 @@ export default function LancamentosDashboard() {
   const [reembBenefAssUrlMov, setReembBenefAssUrlMov] = useState<string | null>(null);
   const [openBenefReembMov, setOpenBenefReembMov] = useState(false);
   const [rbSearchMov, setRbSearchMov] = useState("");
-  const [calcOpen, setCalcOpen] = useState(false);
-  const [calcDisplay, setCalcDisplay] = useState("0");
-  const [calcStored, setCalcStored] = useState<number | null>(null);
-  const [calcOp, setCalcOp] = useState<"+" | "-" | "*" | "/" | null>(null);
-  const [calcOverwrite, setCalcOverwrite] = useState(true);
   const [extratoPdfOpen, setExtratoPdfOpen] = useState(false);
   const [extratoPdfBusy, setExtratoPdfBusy] = useState(false);
   const [extratoPdfExists, setExtratoPdfExists] = useState(false);
@@ -400,173 +395,6 @@ export default function LancamentosDashboard() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
-
-  const calcReset = () => {
-    setCalcDisplay("0");
-    setCalcStored(null);
-    setCalcOp(null);
-    setCalcOverwrite(true);
-  };
-
-  const calcParseDisplay = () => {
-    const n = Number(calcDisplay);
-    return Number.isFinite(n) ? n : 0;
-  };
-
-  const calcSetDisplayFromNumber = (n: number) => {
-    if (!Number.isFinite(n)) {
-      setCalcDisplay("Erro");
-      setCalcStored(null);
-      setCalcOp(null);
-      setCalcOverwrite(true);
-      return;
-    }
-    if (Object.is(n, -0)) n = 0;
-    setCalcDisplay(String(n));
-    setCalcOverwrite(true);
-  };
-
-  const calcCompute = (a: number, b: number, op: "+" | "-" | "*" | "/") => {
-    if (op === "+") return a + b;
-    if (op === "-") return a - b;
-    if (op === "*") return a * b;
-    if (op === "/") return b === 0 ? Number.NaN : a / b;
-    return Number.NaN;
-  };
-
-  const calcPressDigit = (d: string) => {
-    if (calcDisplay === "Erro") calcReset();
-    setCalcDisplay((prev) => {
-      if (calcOverwrite) {
-        setCalcOverwrite(false);
-        return d;
-      }
-      if (prev === "0") return d;
-      return prev + d;
-    });
-  };
-
-  const calcPressDecimal = () => {
-    if (calcDisplay === "Erro") calcReset();
-    setCalcDisplay((prev) => {
-      if (calcOverwrite) {
-        setCalcOverwrite(false);
-        return "0.";
-      }
-      if (prev.includes(".")) return prev;
-      return prev + ".";
-    });
-  };
-
-  const calcBackspace = () => {
-    if (calcDisplay === "Erro") {
-      calcReset();
-      return;
-    }
-    setCalcDisplay((prev) => {
-      if (calcOverwrite) return prev;
-      if (prev.length <= 1) {
-        setCalcOverwrite(true);
-        return "0";
-      }
-      const next = prev.slice(0, -1);
-      if (next === "-" || next === "") {
-        setCalcOverwrite(true);
-        return "0";
-      }
-      return next;
-    });
-  };
-
-  const calcToggleSign = () => {
-    if (calcDisplay === "Erro") {
-      calcReset();
-      return;
-    }
-    setCalcDisplay((prev) => {
-      if (prev === "0") return prev;
-      if (prev.startsWith("-")) return prev.slice(1);
-      return "-" + prev;
-    });
-  };
-
-  const calcPressOp = (op: "+" | "-" | "*" | "/") => {
-    if (calcDisplay === "Erro") return;
-    const current = calcParseDisplay();
-    if (calcStored === null || calcOp === null) {
-      setCalcStored(current);
-      setCalcOp(op);
-      setCalcOverwrite(true);
-      return;
-    }
-    if (calcOverwrite) {
-      setCalcOp(op);
-      return;
-    }
-    const next = calcCompute(calcStored, current, calcOp);
-    setCalcStored(next);
-    setCalcOp(op);
-    calcSetDisplayFromNumber(next);
-  };
-
-  const calcPressEquals = () => {
-    if (calcDisplay === "Erro") return;
-    if (calcStored === null || calcOp === null) return;
-    if (calcOverwrite) return;
-    const current = calcParseDisplay();
-    const next = calcCompute(calcStored, current, calcOp);
-    setCalcStored(null);
-    setCalcOp(null);
-    calcSetDisplayFromNumber(next);
-  };
-
-  const onCalcKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    const k = e.key;
-    if (k >= "0" && k <= "9") {
-      e.preventDefault();
-      calcPressDigit(k);
-      return;
-    }
-    if (k === "." || k === ",") {
-      e.preventDefault();
-      calcPressDecimal();
-      return;
-    }
-    if (k === "Backspace") {
-      e.preventDefault();
-      calcBackspace();
-      return;
-    }
-    if (k === "Escape") {
-      setCalcOpen(false);
-      return;
-    }
-    if (k === "Enter" || k === "=") {
-      e.preventDefault();
-      calcPressEquals();
-      return;
-    }
-    if (k === "+") {
-      e.preventDefault();
-      calcPressOp("+");
-      return;
-    }
-    if (k === "-") {
-      e.preventDefault();
-      calcPressOp("-");
-      return;
-    }
-    if (k === "*" || k === "x" || k === "X") {
-      e.preventDefault();
-      calcPressOp("*");
-      return;
-    }
-    if (k === "/") {
-      e.preventDefault();
-      calcPressOp("/");
-      return;
-    }
-  };
 
   const ensureTransferCategories = async () => {
     if (!user) return;
@@ -2680,44 +2508,6 @@ export default function LancamentosDashboard() {
                 )}
               </div>
             )}
-          </DialogContent>
-        </Dialog>
-        <Dialog open={calcOpen} onOpenChange={setCalcOpen}>
-          <DialogContent className="sm:max-w-[360px]" onKeyDownCapture={onCalcKeyDown}>
-            <DialogHeader>
-              <DialogTitle>Calculadora</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3">
-              <div className="text-xs text-muted-foreground text-right">
-                {calcStored !== null && calcOp ? `${calcStored} ${calcOp}` : ""}
-              </div>
-              <Input value={calcDisplay} readOnly className="text-right font-mono text-lg" />
-              <div className="grid grid-cols-4 gap-2">
-                <Button variant="outline" onClick={calcReset}>C</Button>
-                <Button variant="outline" onClick={calcBackspace}>⌫</Button>
-                <Button variant="outline" onClick={calcToggleSign}>±</Button>
-                <Button variant="outline" onClick={() => calcPressOp("/")}>÷</Button>
-
-                <Button variant="outline" onClick={() => calcPressDigit("7")}>7</Button>
-                <Button variant="outline" onClick={() => calcPressDigit("8")}>8</Button>
-                <Button variant="outline" onClick={() => calcPressDigit("9")}>9</Button>
-                <Button variant="outline" onClick={() => calcPressOp("*")}>×</Button>
-
-                <Button variant="outline" onClick={() => calcPressDigit("4")}>4</Button>
-                <Button variant="outline" onClick={() => calcPressDigit("5")}>5</Button>
-                <Button variant="outline" onClick={() => calcPressDigit("6")}>6</Button>
-                <Button variant="outline" onClick={() => calcPressOp("-")}>−</Button>
-
-                <Button variant="outline" onClick={() => calcPressDigit("1")}>1</Button>
-                <Button variant="outline" onClick={() => calcPressDigit("2")}>2</Button>
-                <Button variant="outline" onClick={() => calcPressDigit("3")}>3</Button>
-                <Button variant="outline" onClick={() => calcPressOp("+")}>+</Button>
-
-                <Button variant="outline" className="col-span-2" onClick={() => calcPressDigit("0")}>0</Button>
-                <Button variant="outline" onClick={calcPressDecimal}>.</Button>
-                <Button onClick={calcPressEquals}>=</Button>
-              </div>
-            </div>
           </DialogContent>
         </Dialog>
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
