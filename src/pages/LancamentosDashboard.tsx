@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { supabase } from "@/integrations/supabase/client";
-import { Calculator, ChevronLeft, ChevronRight, Filter, Rows, Square, Edit3, Search, X, Wand2, FileText, ExternalLink, ScanText, Receipt, MoreVertical, Plus, CircleHelp } from "lucide-react";
+import { Calculator, ChevronLeft, ChevronRight, Filter, Rows, Square, Edit3, Search, X, Wand2, FileText, ExternalLink, ScanText, Receipt, MoreVertical, Plus, CircleHelp, Printer } from "lucide-react";
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { ymdToBr } from "@/utils/date";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -117,6 +117,7 @@ export default function LancamentosDashboard() {
   const [extratoPdfExists, setExtratoPdfExists] = useState(false);
   const [extratoPdfUrl, setExtratoPdfUrl] = useState<string | null>(null);
   const [extratoPdfFoundPath, setExtratoPdfFoundPath] = useState<string | null>(null);
+  const [extratoGerando, setExtratoGerando] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [novoOpen, setNovoOpen] = useState(false);
   const [novoData, setNovoData] = useState<string>("");
@@ -976,6 +977,132 @@ export default function LancamentosDashboard() {
     } catch (e: unknown) {
       toast({ title: 'Erro ao gerar reembolso', description: e instanceof Error ? e.message : 'Falha', variant: 'destructive' });
     } finally { setReciboLoading(false); }
+  }
+
+  async function gerarExtratoPdf() {
+    try {
+      if (!contaExtrato) {
+        toast({ title: 'Extrato', description: "Selecione uma única conta (não 'Todas') para gerar o extrato.", variant: 'destructive' });
+        return;
+      }
+      setExtratoGerando(true);
+
+      // Mantém apenas caracteres suportados pela fonte padrão (WinAnsi/Latin-1)
+      const pdfText = (s: string | null | undefined) => String(s ?? '')
+        .replace(/[‘’]/g, "'")
+        .replace(/[“”]/g, '"')
+        .replace(/[–—]/g, '-')
+        .replace(/[^\x00-\xFF]/g, '');
+
+      const pdfDoc = await PDFDocument.create();
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+      const PAGE_W = 595.28, PAGE_H = 841.89;
+      const M = 40;
+      const RIGHT = PAGE_W - M;
+      const colData = M;
+      const colHist = M + 62;
+      const colEntradaR = M + 360;
+      const colSaidaR = M + 445;
+      const colSaldoR = RIGHT;
+      const histMaxW = colEntradaR - 78 - colHist;
+
+      const drawText = (p: typeof page, text: string, x: number, yy: number, size = 9, bold = false) => {
+        p.drawText(pdfText(text), { x, y: yy, size, font: bold ? fontBold : font, color: rgb(0, 0, 0) });
+      };
+      const drawRight = (p: typeof page, text: string, xRight: number, yy: number, size = 9, bold = false) => {
+        const t = pdfText(text);
+        const w = (bold ? fontBold : font).widthOfTextAtSize(t, size);
+        p.drawText(t, { x: xRight - w, y: yy, size, font: bold ? fontBold : font, color: rgb(0, 0, 0) });
+      };
+      const center = (p: typeof page, text: string, yy: number, size: number, bold = false) => {
+        const t = pdfText(text);
+        const w = (bold ? fontBold : font).widthOfTextAtSize(t, size);
+        p.drawText(t, { x: (PAGE_W - w) / 2, y: yy, size, font: bold ? fontBold : font, color: rgb(0, 0, 0) });
+      };
+      const truncate = (text: string, maxW: number, size = 9) => {
+        let t = pdfText(text);
+        if (font.widthOfTextAtSize(t, size) <= maxW) return t;
+        const ell = '...';
+        while (t.length > 1 && font.widthOfTextAtSize(t + ell, size) > maxW) t = t.slice(0, -1);
+        return t + ell;
+      };
+
+      const drawHeader = (p: typeof page) => {
+        let yy = PAGE_H - M;
+        if (church?.igreja_nome) { center(p, church.igreja_nome, yy, 14, true); yy -= 16; }
+        if (church?.igreja_cnpj) { center(p, `CNPJ: ${formatCNPJ(church.igreja_cnpj)}`, yy, 9); yy -= 14; }
+        yy -= 6;
+        center(p, 'EXTRATO DE CONTA', yy, 12, true); yy -= 16;
+        center(p, `${contaExtrato.nome}  -  ${tituloMes}`, yy, 10, true); yy -= 20;
+        drawText(p, 'Data', colData, yy, 9, true);
+        drawText(p, 'Histórico', colHist, yy, 9, true);
+        drawRight(p, 'Entrada', colEntradaR, yy, 9, true);
+        drawRight(p, 'Saída', colSaidaR, yy, 9, true);
+        drawRight(p, 'Saldo', colSaldoR, yy, 9, true);
+        yy -= 5;
+        p.drawLine({ start: { x: M, y: yy }, end: { x: RIGHT, y: yy }, thickness: 0.5, color: rgb(0, 0, 0) });
+        yy -= 13;
+        return yy;
+      };
+
+      let page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+      let y = drawHeader(page);
+      const rowH = 14;
+      const bottomLimit = M + 50;
+
+      drawText(page, 'Saldo anterior', colHist, y, 9, true);
+      drawRight(page, formatCurrency(saldoInicial), colSaldoR, y, 9, true);
+      y -= rowH;
+
+      const ordered = [...rows].sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
+      let saldo = saldoInicial;
+      let totEnt = 0, totSai = 0;
+      for (const r of ordered) {
+        if (y < bottomLimit) { page = pdfDoc.addPage([PAGE_W, PAGE_H]); y = drawHeader(page); }
+        const ent = r.tipo === 'ENTRADA' ? Number(r.valor || 0) : 0;
+        const sai = r.tipo === 'SAIDA' ? Number(r.valor || 0) : 0;
+        saldo += ent - sai;
+        totEnt += ent; totSai += sai;
+        drawText(page, ymdToBr(r.data), colData, y, 9);
+        drawText(page, truncate(r.descricao || r.categoria_nome || 'Lançamento', histMaxW), colHist, y, 9);
+        if (ent) drawRight(page, formatCurrency(ent), colEntradaR, y, 9);
+        if (sai) drawRight(page, formatCurrency(sai), colSaidaR, y, 9);
+        drawRight(page, formatCurrency(saldo), colSaldoR, y, 9);
+        y -= rowH;
+      }
+
+      if (y < bottomLimit + 34) { page = pdfDoc.addPage([PAGE_W, PAGE_H]); y = drawHeader(page); }
+      y -= 5;
+      page.drawLine({ start: { x: M, y: y }, end: { x: RIGHT, y: y }, thickness: 0.5, color: rgb(0, 0, 0) });
+      y -= 14;
+      drawText(page, 'Totais do período', colHist, y, 9, true);
+      drawRight(page, formatCurrency(totEnt), colEntradaR, y, 9, true);
+      drawRight(page, formatCurrency(totSai), colSaidaR, y, 9, true);
+      y -= rowH;
+      drawText(page, 'Saldo final', colHist, y, 10, true);
+      drawRight(page, formatCurrency(saldo), colSaldoR, y, 10, true);
+
+      const geradoEm = new Date().toLocaleString('pt-BR');
+      const pages = pdfDoc.getPages();
+      const total = pages.length;
+      pages.forEach((p, i) => {
+        drawText(p, `Gerado em ${geradoEm}`, M, 25, 8);
+        drawRight(p, `Página ${i + 1} de ${total}`, RIGHT, 25, 8);
+      });
+
+      const bytes = await pdfDoc.save();
+      const ab = new ArrayBuffer(bytes.byteLength);
+      new Uint8Array(ab).set(bytes);
+      const blob = new Blob([ab], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (e: unknown) {
+      toast({ title: 'Erro ao gerar extrato', description: e instanceof Error ? e.message : 'Falha', variant: 'destructive' });
+    } finally {
+      setExtratoGerando(false);
+    }
   }
 
   async function selecionarBeneficiarioReembolsoMov(id: string, m?: Mov) {
@@ -1906,6 +2033,16 @@ export default function LancamentosDashboard() {
                 {contaExtrato && extratoPdfExists ? (
                   <span className="ml-2 inline-flex items-center rounded border px-2 py-0.5 text-xs">OK</span>
                 ) : null}
+              </Button>
+              <Button
+                className="w-48 justify-start"
+                variant="outline"
+                onClick={gerarExtratoPdf}
+                disabled={!contaExtrato || extratoGerando}
+                title={!contaExtrato ? "Selecione uma única conta para gerar o extrato" : undefined}
+              >
+                <Printer className="w-4 h-4 mr-2" />
+                {extratoGerando ? 'Gerando...' : 'Gerar Extrato (PDF)'}
               </Button>
               <Button className="w-48 justify-start" variant="outline" onClick={() => setCalcOpen(true)} aria-label="Abrir calculadora">
                 <Calculator className="w-4 h-4 mr-2" />
