@@ -31,6 +31,7 @@ import RegrasClassificacao from "./pages/RegrasClassificacao";
 import ConfiguracaoIgreja from "./pages/ConfiguracaoIgreja";
 import ResumoAnual from "./pages/ResumoAnual";
 import Consultas from "./pages/Consultas";
+import Graficos from "./pages/Graficos";
 import Pessoas from "./pages/Pessoas";
 import Desafios from "./pages/Desafios";
 import Carne from "./pages/Carne";
@@ -119,6 +120,7 @@ export default function App() {
 
                   {/* Relatórios */}
                   <Route path="/relatorios/consultas" element={<Consultas />} />
+                  <Route path="/relatorios/graficos" element={<Graficos />} />
 
                   {/* Cadastros */}
                   <Route path="/cadastros/beneficiarios" element={<CadastroBeneficiarios />} />
