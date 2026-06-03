@@ -82,6 +82,10 @@ export default function LancamentosDashboard() {
   const [catOpts, setCatOpts] = useState<{ id: string; name: string; tipo: string; parent_id: string | null }[]>([]);
   const [benefOpts, setBenefOpts] = useState<BenefOption[]>([]);
   const [saving, setSaving] = useState(false);
+  const [inlineEdit, setInlineEdit] = useState<{ id: string; field: 'descricao' | 'valor' | 'data' } | null>(null);
+  const [inlineDraft, setInlineDraft] = useState("");
+  const [catCellOpen, setCatCellOpen] = useState<string | null>(null);
+  const [benefCellOpen, setBenefCellOpen] = useState<string | null>(null);
   const [openCategoria, setOpenCategoria] = useState(false);
   const [openBeneficiario, setOpenBeneficiario] = useState(false);
   const [benefSearch, setBenefSearch] = useState("");
@@ -988,11 +992,17 @@ export default function LancamentosDashboard() {
       setExtratoGerando(true);
 
       // Mantém apenas caracteres suportados pela fonte padrão (WinAnsi/Latin-1)
-      const pdfText = (s: string | null | undefined) => String(s ?? '')
-        .replace(/[‘’]/g, "'")
-        .replace(/[“”]/g, '"')
-        .replace(/[–—]/g, '-')
-        .replace(/[^\x00-\xFF]/g, '');
+      const pdfText = (s: string | null | undefined) => {
+        const cleaned = String(s ?? '')
+          .replace(/[‘’]/g, "'")
+          .replace(/[“”]/g, '"')
+          .replace(/[–—]/g, '-');
+        let out = '';
+        for (const ch of cleaned) {
+          if (ch.charCodeAt(0) <= 0xFF) out += ch;
+        }
+        return out;
+      };
 
       const pdfDoc = await PDFDocument.create();
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -1343,6 +1353,25 @@ export default function LancamentosDashboard() {
       });
   }, [editOpen, user]);
 
+  // Carrega categorias/beneficiários na montagem para a edição inline na tabela
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("categories")
+      .select("id, name, tipo, parent_id")
+      .order("name")
+      .then(({ data }) => {
+        if (data) setCatOpts(data.filter((c) => c.parent_id !== null));
+      });
+    supabase
+      .from("beneficiaries")
+      .select("id, name, documento, user_id")
+      .order("name")
+      .then(({ data }) => {
+        if (data) setBenefOpts(data);
+      });
+  }, [user]);
+
 
 
   async function criarBeneficiarioInline() {
@@ -1542,6 +1571,66 @@ export default function LancamentosDashboard() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // Edição inline (clicar direto na célula da linha)
+  async function salvarCampoInline(mov: Mov, patch: Record<string, unknown>, optimistic: Partial<Mov>) {
+    if (!user) return false;
+    let q = supabase.from("movimentos_financeiros").update(patch).eq("id", mov.id);
+    if (!isAdmin) q = q.eq("user_id", user.id);
+    const { data, error } = await q.select("id");
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      return false;
+    }
+    if (!data || data.length === 0) {
+      toast({ title: "Nada salvo", description: "Sem permissão para editar este lançamento.", variant: "destructive" });
+      return false;
+    }
+    setRows(prev => prev.map(r => r.id === mov.id ? { ...r, ...optimistic } : r));
+    return true;
+  }
+
+  function startInline(r: Mov, field: 'descricao' | 'valor' | 'data', initial: string) {
+    setInlineEdit({ id: r.id, field });
+    setInlineDraft(initial);
+  }
+  function cancelInline() {
+    setInlineEdit(null);
+    setInlineDraft("");
+  }
+  async function commitInline(mov: Mov) {
+    if (!inlineEdit || inlineEdit.id !== mov.id) return;
+    const field = inlineEdit.field;
+    if (field === 'descricao') {
+      const novo = inlineDraft.trim();
+      if ((mov.descricao || '') !== novo) {
+        await salvarCampoInline(mov, { descricao: novo || null }, { descricao: novo || null });
+      }
+    } else if (field === 'valor') {
+      const valorNum = Number(String(inlineDraft).replace(",", "."));
+      if (!Number.isFinite(valorNum) || valorNum <= 0) {
+        toast({ title: "Atenção", description: "Informe um valor válido (maior que zero).", variant: "destructive" });
+        return;
+      }
+      if (Number(mov.valor) !== valorNum) {
+        await salvarCampoInline(mov, { valor: valorNum }, { valor: valorNum });
+      }
+    } else if (field === 'data') {
+      const novaData = inlineDraft;
+      if (novaData && mov.data !== novaData) {
+        await salvarCampoInline(mov, { data: novaData }, { data: novaData });
+      }
+    }
+    cancelInline();
+  }
+  async function aplicarCategoriaInline(mov: Mov, cat: { id: string; name: string } | null) {
+    setCatCellOpen(null);
+    await salvarCampoInline(mov, { categoria_id: cat ? cat.id : null }, { categoria_id: cat ? cat.id : null, categoria_nome: cat ? cat.name : null });
+  }
+  async function aplicarBeneficiarioInline(mov: Mov, benef: { id: string; name: string } | null) {
+    setBenefCellOpen(null);
+    await salvarCampoInline(mov, { beneficiario_id: benef ? benef.id : null }, { beneficiario_id: benef ? benef.id : null, beneficiario_nome: benef ? benef.name : null });
   }
 
   async function aplicarRegras() {
@@ -2235,10 +2324,39 @@ export default function LancamentosDashboard() {
                           </span>
                         )}
                       </td>
-                      <td className="p-2">{ymdToBr(r.data)}</td>
+                      <td className="p-2">
+                        {inlineEdit?.id === r.id && inlineEdit.field === 'data' ? (
+                          <Input
+                            type="date"
+                            autoFocus
+                            value={inlineDraft}
+                            onChange={(e) => setInlineDraft(e.target.value)}
+                            onBlur={() => commitInline(r)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitInline(r); } if (e.key === 'Escape') cancelInline(); }}
+                            className="h-8 w-36"
+                          />
+                        ) : (
+                          <button type="button" className="text-left rounded px-1 -mx-1 hover:bg-muted/60" onClick={() => startInline(r, 'data', r.data)}>
+                            {ymdToBr(r.data)}
+                          </button>
+                        )}
+                      </td>
                       <td className="p-2">
                         <div className="flex flex-col gap-1">
-                          <span>{r.descricao}</span>
+                          {inlineEdit?.id === r.id && inlineEdit.field === 'descricao' ? (
+                            <Input
+                              autoFocus
+                              value={inlineDraft}
+                              onChange={(e) => setInlineDraft(e.target.value)}
+                              onBlur={() => commitInline(r)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitInline(r); } if (e.key === 'Escape') cancelInline(); }}
+                              className="h-8 min-w-[200px]"
+                            />
+                          ) : (
+                            <button type="button" className="text-left rounded px-1 -mx-1 hover:bg-muted/60 min-h-[1.5rem]" onClick={() => startInline(r, 'descricao', r.descricao || '')}>
+                              {r.descricao || <span className="text-muted-foreground italic">Sem descrição</span>}
+                            </button>
+                          )}
                           {r.regras_aplicadas_em ? (
                             <span className="inline-flex w-fit items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
                               Regras aplicadas
@@ -2251,8 +2369,64 @@ export default function LancamentosDashboard() {
                           ) : null}
                         </div>
                       </td>
-                      <td className="p-2">{r.categoria_nome || ''}</td>
-                      <td className="p-2">{r.beneficiario_nome || ''}</td>
+                      <td className="p-2">
+                        <Popover open={catCellOpen === r.id} onOpenChange={(o) => setCatCellOpen(o ? r.id : null)}>
+                          <PopoverTrigger asChild>
+                            <button type="button" className="text-left rounded px-1 -mx-1 hover:bg-muted/60 min-h-[1.5rem] w-full">
+                              {r.categoria_nome || <span className="text-muted-foreground italic">Sem categoria</span>}
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="p-0 w-64" align="start">
+                            <Command>
+                              <CommandInput placeholder="Buscar categoria..." />
+                              <CommandList>
+                                <CommandEmpty>Nenhuma categoria</CommandEmpty>
+                                <CommandGroup className="max-h-60 overflow-auto">
+                                  <CommandItem value="sem categoria" onSelect={() => aplicarCategoriaInline(r, null)}>
+                                    <Check className={cn("mr-2 h-4 w-4", !r.categoria_id ? "opacity-100" : "opacity-0")} />
+                                    — Sem categoria —
+                                  </CommandItem>
+                                  {catOpts.map((c) => (
+                                    <CommandItem key={c.id} value={c.name} onSelect={() => aplicarCategoriaInline(r, c)}>
+                                      <Check className={cn("mr-2 h-4 w-4", r.categoria_id === c.id ? "opacity-100" : "opacity-0")} />
+                                      {c.name}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </td>
+                      <td className="p-2">
+                        <Popover open={benefCellOpen === r.id} onOpenChange={(o) => setBenefCellOpen(o ? r.id : null)}>
+                          <PopoverTrigger asChild>
+                            <button type="button" className="text-left rounded px-1 -mx-1 hover:bg-muted/60 min-h-[1.5rem] w-full">
+                              {r.beneficiario_nome || <span className="text-muted-foreground italic">Sem beneficiário</span>}
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="p-0 w-64" align="start">
+                            <Command>
+                              <CommandInput placeholder="Buscar beneficiário..." />
+                              <CommandList>
+                                <CommandEmpty>Nenhum beneficiário</CommandEmpty>
+                                <CommandGroup className="max-h-60 overflow-auto">
+                                  <CommandItem value="sem beneficiario" onSelect={() => aplicarBeneficiarioInline(r, null)}>
+                                    <Check className={cn("mr-2 h-4 w-4", !r.beneficiario_id ? "opacity-100" : "opacity-0")} />
+                                    — Sem beneficiário —
+                                  </CommandItem>
+                                  {benefOpts.map((b) => (
+                                    <CommandItem key={b.id} value={b.name} onSelect={() => aplicarBeneficiarioInline(r, b)}>
+                                      <Check className={cn("mr-2 h-4 w-4", r.beneficiario_id === b.id ? "opacity-100" : "opacity-0")} />
+                                      {b.name}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </td>
                       <td className="p-2 text-center">
                         {r.comprovante_url ? (
                           <div className="flex items-center justify-center gap-1">
@@ -2271,7 +2445,23 @@ export default function LancamentosDashboard() {
                           </div>
                         ) : null}
                       </td>
-                      <td className="p-2 text-right"><span className={r.tipo === 'ENTRADA' ? 'text-blue-600' : 'text-red-600'}>{formatCurrency(r.valor)}</span></td>
+                      <td className="p-2 text-right">
+                        {inlineEdit?.id === r.id && inlineEdit.field === 'valor' ? (
+                          <Input
+                            autoFocus
+                            inputMode="decimal"
+                            value={inlineDraft}
+                            onChange={(e) => setInlineDraft(e.target.value)}
+                            onBlur={() => commitInline(r)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitInline(r); } if (e.key === 'Escape') cancelInline(); }}
+                            className="h-8 w-28 text-right ml-auto"
+                          />
+                        ) : (
+                          <button type="button" className="text-right rounded px-1 -mx-1 hover:bg-muted/60 w-full" onClick={() => startInline(r, 'valor', String(r.valor ?? ''))}>
+                            <span className={r.tipo === 'ENTRADA' ? 'text-blue-600' : 'text-red-600'}>{formatCurrency(r.valor)}</span>
+                          </button>
+                        )}
+                      </td>
                       <td className={`p-2 text-right ${isLast ? (sd >= 0 ? 'text-blue-600' : 'text-red-600') : ''}`}>{isLast ? formatCurrency(sd) : ''}</td>
                       <td className="p-2 text-right">
                         <DropdownMenu>
