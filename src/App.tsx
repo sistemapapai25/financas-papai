@@ -30,6 +30,7 @@ import Agenda from "@/pages/Agenda";
 import RegrasClassificacao from "./pages/RegrasClassificacao";
 import ConfiguracaoIgreja from "./pages/ConfiguracaoIgreja";
 import ResumoAnual from "./pages/ResumoAnual";
+import Consultas from "./pages/Consultas";
 import Pessoas from "./pages/Pessoas";
 import Desafios from "./pages/Desafios";
 import Carne from "./pages/Carne";
@@ -115,6 +116,9 @@ export default function App() {
                   <Route path="/financeiro/lancamentos" element={<LancamentosDashboard />} />
                   <Route path="/financeiro/agenda" element={<Agenda />} />
                   <Route path="/financeiro/resumo-anual" element={<ResumoAnual />} />
+
+                  {/* Relatórios */}
+                  <Route path="/relatorios/consultas" element={<Consultas />} />
 
                   {/* Cadastros */}
                   <Route path="/cadastros/beneficiarios" element={<CadastroBeneficiarios />} />

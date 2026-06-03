@@ -76,6 +76,13 @@ const Navigation = () => {
                       </div>
 
                       <div>
+                        <div className={groupTitleCls(['/relatorios/consultas'])}>Relatórios</div>
+                        <div className="flex flex-col">
+                          <Link to="/relatorios/consultas" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Consultas</Link>
+                        </div>
+                      </div>
+
+                      <div>
                         <div className={groupTitleCls(['/movimentacoes/entradas-culto', '/lista-cultos'])}>Cultos</div>
                         <div className="flex flex-col">
                           <Link to="/movimentacoes/entradas-culto" className="px-3 py-2 rounded-md text-sm hover:bg-muted" onClick={() => setIsOpen(false)}>Entradas de Culto</Link>
@@ -173,6 +180,17 @@ const Navigation = () => {
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/financeiro/resumo-anual">Resumo Anual</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className={groupCls(['/relatorios/consultas'])}>Relatórios</button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem asChild>
+                  <Link to="/relatorios/consultas">Consultas</Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
