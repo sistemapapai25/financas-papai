@@ -23,6 +23,7 @@ type Linha = {
   tipo: "ENTRADA" | "SAIDA";
   conta_id: string | null;
   conta_nome: string | null;
+  conta_logo: string | null;
   categoria_nome: string | null;
   beneficiario_nome: string | null;
 };
@@ -48,6 +49,17 @@ function formatCNPJ(s: string | null | undefined) {
   if (p[3]) out += "/" + p[3];
   if (p[4]) out += "-" + p[4];
   return out;
+}
+
+function ContaIcone({ nome, logo }: { nome: string | null; logo: string | null }) {
+  if (logo) {
+    return <img src={logo} alt={nome || ""} title={nome || ""} className="w-6 h-6 object-contain rounded inline-block" />;
+  }
+  return (
+    <span title={nome || ""} className="inline-flex items-center justify-center w-6 h-6 rounded bg-muted text-[10px] font-semibold">
+      {(nome || "?").slice(0, 2).toUpperCase()}
+    </span>
+  );
 }
 
 function ComboFiltro({ value, onChange, options, placeholder, emptyLabel }: { value: string; onChange: (v: string) => void; options: Opcao[]; placeholder: string; emptyLabel: string }) {
@@ -169,7 +181,7 @@ export default function Consultas() {
     try {
       let q = supabase
         .from("movimentos_financeiros")
-        .select("id, user_id, data, descricao, valor, tipo, conta_id, categoria_id, beneficiario_id, contas:contas_financeiras(nome), categoria:categories(name), beneficiario:beneficiaries(name)")
+        .select("id, user_id, data, descricao, valor, tipo, conta_id, categoria_id, beneficiario_id, contas:contas_financeiras(nome,logo), categoria:categories(name), beneficiario:beneficiaries(name)")
         .order("data", { ascending: false })
         .limit(LIMITE);
       if (!isAdmin) q = q.eq("user_id", user.id);
@@ -196,6 +208,7 @@ export default function Consultas() {
         tipo: r.tipo as Linha["tipo"],
         conta_id: r.conta_id ?? null,
         conta_nome: r.contas?.nome ?? null,
+        conta_logo: r.contas?.logo ?? null,
         categoria_nome: r.categoria?.name ?? null,
         beneficiario_nome: r.beneficiario?.name ?? null,
       }));
@@ -560,6 +573,7 @@ export default function Consultas() {
                       <tbody>
                         {g.itens.map((l) => (
                           <tr key={l.id} className="border-t">
+                            <td className="p-2 text-center w-10"><ContaIcone nome={l.conta_nome} logo={l.conta_logo} /></td>
                             <td className="p-2 w-24">{ymdToBr(l.data)}</td>
                             <td className="p-2">{l.descricao || <span className="text-muted-foreground italic">—</span>}</td>
                             <td className="p-2 text-muted-foreground hidden md:table-cell">{agrupamento === "CATEGORIA" ? (l.beneficiario_nome || "") : (l.categoria_nome || "")}</td>
@@ -577,6 +591,7 @@ export default function Consultas() {
               <table className="min-w-full text-sm">
                 <thead className="bg-muted">
                   <tr>
+                    <th className="p-2 text-center w-10">Conta</th>
                     <th className="p-2 text-left cursor-pointer select-none" onClick={() => toggleOrden("data")}>Data{setaOrd("data")}</th>
                     <th className="p-2 text-left">Beneficiário</th>
                     <th className="p-2 text-left">Categoria</th>
@@ -587,6 +602,7 @@ export default function Consultas() {
                 <tbody>
                   {resultadoOrdenado.map((l) => (
                     <tr key={l.id} className="border-t">
+                      <td className="p-2 text-center"><ContaIcone nome={l.conta_nome} logo={l.conta_logo} /></td>
                       <td className="p-2 whitespace-nowrap">{ymdToBr(l.data)}</td>
                       <td className="p-2">{l.beneficiario_nome || <span className="text-muted-foreground italic">—</span>}</td>
                       <td className="p-2">{l.categoria_nome || <span className="text-muted-foreground italic">—</span>}</td>
