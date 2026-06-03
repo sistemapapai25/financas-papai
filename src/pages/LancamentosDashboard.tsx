@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { supabase } from "@/integrations/supabase/client";
-import { Calculator, ChevronLeft, ChevronRight, Filter, Rows, Square, Edit3, Search, X, Wand2, FileText, ExternalLink, ScanText, Receipt, MoreVertical, Plus, CircleHelp, Printer, Upload } from "lucide-react";
+import { ChevronLeft, ChevronRight, Filter, Rows, Square, Edit3, Search, X, Wand2, FileText, ExternalLink, ScanText, Receipt, MoreVertical, Plus, CircleHelp, Printer, Upload } from "lucide-react";
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { ymdToBr } from "@/utils/date";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -2161,7 +2161,7 @@ export default function LancamentosDashboard() {
             <div className="flex flex-col items-start gap-2">
               <Button className="w-48 justify-start" variant="outline" onClick={() => setExtratoPdfOpen(true)} disabled={extratoPdfBusy}>
                 <FileText className="w-4 h-4 mr-2" />
-                Extrato PDF
+                Extrato Bancário PDF
                 {contaExtrato && extratoPdfExists ? (
                   <span className="ml-2 inline-flex items-center rounded border px-2 py-0.5 text-xs">OK</span>
                 ) : null}
@@ -2175,10 +2175,6 @@ export default function LancamentosDashboard() {
               >
                 <Printer className="w-4 h-4 mr-2" />
                 {extratoGerando ? 'Gerando...' : 'Gerar Extrato (PDF)'}
-              </Button>
-              <Button className="w-48 justify-start" variant="outline" onClick={() => setCalcOpen(true)} aria-label="Abrir calculadora">
-                <Calculator className="w-4 h-4 mr-2" />
-                Calculadora
               </Button>
             </div>
           </div>
