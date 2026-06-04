@@ -87,6 +87,7 @@ export default function LancamentosDashboard() {
   const [catCellOpen, setCatCellOpen] = useState<string | null>(null);
   const [benefCellOpen, setBenefCellOpen] = useState<string | null>(null);
   const [comprovanteBusyId, setComprovanteBusyId] = useState<string | null>(null);
+  const [comprovanteAtivoId, setComprovanteAtivoId] = useState<string | null>(null);
   const comprovanteInputRef = useRef<HTMLInputElement | null>(null);
   const comprovanteUploadMovRef = useRef<Mov | null>(null);
   const [openCategoria, setOpenCategoria] = useState(false);
@@ -2303,35 +2304,55 @@ export default function LancamentosDashboard() {
                         </Popover>
                       </td>
                       <td className="p-2 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          {r.comprovante_url ? (
-                            <>
-                              <Button variant="ghost" size="icon" onClick={() => openComprovante(r.comprovante_url)} aria-label="Abrir comprovante" title="Abrir comprovante">
-                                <FileText className="w-4 h-4" />
+                        {r.comprovante_url ? (
+                          <div className="flex items-center justify-center gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => openComprovante(r.comprovante_url)} aria-label="Abrir comprovante" title="Abrir comprovante">
+                              <FileText className="w-4 h-4" />
+                            </Button>
+                            {comprovanteAtivoId === r.id ? (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => lerEAplicar(r)}
+                                  disabled={analyzingIds.has(r.id)}
+                                  aria-label="Ler e aplicar"
+                                  title="Ler e aplicar"
+                                >
+                                  <ScanText className={`w-4 h-4 ${analyzingIds.has(r.id) ? 'animate-pulse' : ''}`} />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => iniciarUploadComprovanteInline(r)} disabled={comprovanteBusyId === r.id} aria-label="Trocar comprovante" title="Trocar comprovante">
+                                  <Upload className={`w-4 h-4 ${comprovanteBusyId === r.id ? 'animate-pulse' : ''}`} />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => removerComprovanteInline(r)} disabled={comprovanteBusyId === r.id} aria-label="Remover comprovante" title="Remover comprovante" className="text-destructive">
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </>
+                            ) : (
+                              <Button variant="ghost" size="icon" onClick={() => setComprovanteAtivoId(r.id)} aria-label="Mais opções do comprovante" title="Mais opções">
+                                <MoreVertical className="w-4 h-4 text-muted-foreground" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => lerEAplicar(r)}
-                                disabled={analyzingIds.has(r.id)}
-                                aria-label="Ler e aplicar"
-                                title="Ler e aplicar"
-                              >
-                                <ScanText className={`w-4 h-4 ${analyzingIds.has(r.id) ? 'animate-pulse' : ''}`} />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => iniciarUploadComprovanteInline(r)} disabled={comprovanteBusyId === r.id} aria-label="Trocar comprovante" title="Trocar comprovante">
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center">
+                            {comprovanteAtivoId === r.id ? (
+                              <Button variant="ghost" size="icon" onClick={() => iniciarUploadComprovanteInline(r)} disabled={comprovanteBusyId === r.id} aria-label="Anexar comprovante" title="Anexar comprovante">
                                 <Upload className={`w-4 h-4 ${comprovanteBusyId === r.id ? 'animate-pulse' : ''}`} />
                               </Button>
-                              <Button variant="ghost" size="icon" onClick={() => removerComprovanteInline(r)} disabled={comprovanteBusyId === r.id} aria-label="Remover comprovante" title="Remover comprovante" className="text-destructive">
-                                <X className="w-4 h-4" />
-                              </Button>
-                            </>
-                          ) : (
-                            <Button variant="ghost" size="icon" onClick={() => iniciarUploadComprovanteInline(r)} disabled={comprovanteBusyId === r.id} aria-label="Anexar comprovante" title="Anexar comprovante">
-                              <Upload className={`w-4 h-4 ${comprovanteBusyId === r.id ? 'animate-pulse' : ''}`} />
-                            </Button>
-                          )}
-                        </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setComprovanteAtivoId(r.id)}
+                                aria-label="Anexar comprovante"
+                                title="Anexar comprovante"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground/25 transition-colors hover:bg-accent hover:text-foreground"
+                              >
+                                <Plus className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="p-2 text-right">
                         {inlineEdit?.id === r.id && inlineEdit.field === 'valor' ? (
