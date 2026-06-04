@@ -301,8 +301,14 @@ export default function LancamentosDashboard() {
       if (alvo && alvo.closest('[data-comprovante-cell]')) return;
       setComprovanteAtivoId(null);
     }
-    document.addEventListener('click', handleClickFora);
-    return () => document.removeEventListener('click', handleClickFora);
+    // Adia o registro para o proximo tick: assim o clique que abriu (e que
+    // remove o botao do DOM) termina antes do listener existir, evitando que
+    // ele feche na mesma hora por causa do alvo ja desanexado.
+    const t = window.setTimeout(() => document.addEventListener('click', handleClickFora), 0);
+    return () => {
+      window.clearTimeout(t);
+      document.removeEventListener('click', handleClickFora);
+    };
   }, [comprovanteAtivoId]);
 
   useEffect(() => {
