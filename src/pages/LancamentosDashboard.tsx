@@ -293,6 +293,18 @@ export default function LancamentosDashboard() {
     setExtratoPdfUrl(null);
   }, [user, extratoPdfFolder, extratoPdfName]);
 
+  // Recolhe as acoes do comprovante ao clicar em qualquer lugar fora da celula ativa.
+  useEffect(() => {
+    if (!comprovanteAtivoId) return;
+    function handleClickFora(e: MouseEvent) {
+      const alvo = e.target as Element | null;
+      if (alvo && alvo.closest('[data-comprovante-cell]')) return;
+      setComprovanteAtivoId(null);
+    }
+    document.addEventListener('click', handleClickFora);
+    return () => document.removeEventListener('click', handleClickFora);
+  }, [comprovanteAtivoId]);
+
   useEffect(() => {
     if (!extratoPdfOpen) return;
     refreshExtratoPdfExists().then(() => carregarExtratoPdfUrl());
@@ -2303,7 +2315,7 @@ export default function LancamentosDashboard() {
                           </PopoverContent>
                         </Popover>
                       </td>
-                      <td className="p-2 text-center">
+                      <td className="p-2 text-center" data-comprovante-cell="true">
                         {r.comprovante_url ? (
                           <div className="flex items-center justify-center gap-1">
                             <Button variant="ghost" size="icon" onClick={() => openComprovante(r.comprovante_url)} aria-label="Abrir comprovante" title="Abrir comprovante">
