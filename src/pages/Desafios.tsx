@@ -108,6 +108,9 @@ export default function Desafios() {
   const [destinatario, setDestinatario] = useState<string>("__all__");
   const [sendingMensagem, setSendingMensagem] = useState(false);
 
+  const [lembreteDest, setLembreteDest] = useState<string>("");
+  const [sendingLembrete, setSendingLembrete] = useState(false);
+
   const sortedParticipantes = useMemo(() => {
     const getNome = (p: ParticipanteRow) => (p.pessoas?.nome ?? p.pessoa_id ?? "").trim();
     return [...participantes].sort((a, b) => {
@@ -606,6 +609,56 @@ export default function Desafios() {
     setMensagem("");
   };
 
+  // Envia o lembrete automático (texto da tela "Configuração de Mensagens") SOMENTE para a pessoa escolhida — teste.
+  const enviarLembreteTeste = async () => {
+    if (!canManage) return;
+    if (!lembreteDest) {
+      toast({ title: "Atenção", description: "Selecione uma pessoa para o teste.", variant: "destructive" });
+      return;
+    }
+    setSendingLembrete(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("desafio-lembrete-vencimento", {
+        body: { participante_id: lembreteDest },
+      });
+      if (error) throw error;
+      const enviados = (data as any)?.enviados ?? 0;
+      if (enviados > 0) {
+        toast({ title: "Lembrete enviado", description: "Mensagem de teste enviada com sucesso." });
+      } else {
+        toast({
+          title: "Nada enviado",
+          description: "A pessoa não tem parcela em aberto, está sem telefone, ou o template não está ativo.",
+          variant: "destructive",
+        });
+      }
+    } catch (e) {
+      toast({ title: "Erro", description: e instanceof Error ? e.message : "Falha ao enviar lembrete.", variant: "destructive" });
+    } finally {
+      setSendingLembrete(false);
+    }
+  };
+
+  // Dispara o lembrete AGORA para todos que vencem hoje/amanhã (mesmo do envio automático das 8h) — emergência.
+  const dispararLembretesAgora = async () => {
+    if (!canManage) return;
+    if (!confirm("Isso vai enviar o lembrete AGORA para TODAS as pessoas com parcela vencendo hoje ou amanhã. Deseja continuar?")) return;
+    setSendingLembrete(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("desafio-lembrete-vencimento", {
+        body: {},
+      });
+      if (error) throw error;
+      const enviados = (data as any)?.enviados ?? 0;
+      const falhas = (data as any)?.falhas ?? 0;
+      toast({ title: "Disparo concluído", description: `Enviados: ${enviados} • Falhas: ${falhas}` });
+    } catch (e) {
+      toast({ title: "Erro", description: e instanceof Error ? e.message : "Falha ao disparar lembretes.", variant: "destructive" });
+    } finally {
+      setSendingLembrete(false);
+    }
+  };
+
   if (!user) return null;
 
   if (!roleLoading && !isAdmin) {
@@ -879,6 +932,59 @@ export default function Desafios() {
                         <li><strong>{`{pix}`}</strong>: Chave Pix para pagamento</li>
                       </ul>
                     </div>
+                  </div>
+                </div>
+
+                <div className="border rounded-lg p-4 space-y-3">
+                  <div>
+                    <Label className="text-base font-semibold">Lembrete de vencimento (teste / emergência)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Usa o texto da tela "Configuração de Mensagens" e a parcela em aberto da pessoa — o mesmo
+                      lembrete que o sistema envia automaticamente todo dia às 8h.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+                    <div className="space-y-2 flex-1">
+                      <Label>Enviar teste para</Label>
+                      <Select value={lembreteDest} onValueChange={setLembreteDest}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma pessoa" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sortedParticipantes.map((p) => (
+                            <SelectItem key={`lemb-${p.id}`} value={p.id}>
+                              {p.pessoas?.nome ?? p.pessoa_id}
+                              {!p.pessoas?.telefone ? " (sem telefone)" : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="sm:w-48">
+                      <Button
+                        variant="secondary"
+                        className="w-full"
+                        onClick={enviarLembreteTeste}
+                        disabled={sendingLembrete || !lembreteDest}
+                      >
+                        {sendingLembrete ? "Enviando..." : "Enviar teste"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t">
+                    <Button
+                      variant="destructive"
+                      className="w-full sm:w-auto"
+                      onClick={dispararLembretesAgora}
+                      disabled={sendingLembrete}
+                    >
+                      {sendingLembrete ? "Processando..." : "Disparar lembretes agora (todos)"}
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Emergência: envia imediatamente para todos que vencem hoje/amanhã. Pede confirmação antes.
+                    </p>
                   </div>
                 </div>
               </>

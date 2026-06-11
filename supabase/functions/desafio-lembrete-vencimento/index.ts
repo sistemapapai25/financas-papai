@@ -1,6 +1,5 @@
 import "../deno-shim.d.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -12,15 +11,14 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const UAZAPI_BASE_URL = Deno.env.get("UAZAPI_BASE_URL");
 const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
-const ENABLE_DESAFIO_LEMBRETES = (
-  Deno.env.get("ENABLE_DESAFIO_LEMBRETES") ??
-  Deno.env.get("enable_desafio_lembretes") ??
-  "false"
-).toLowerCase() === "true";
+// URL base publica do app (ex.: https://meusistema.com). Usada para montar o link do carne {link}.
+const PUBLIC_APP_URL = (Deno.env.get("PUBLIC_APP_URL") ?? "").trim().replace(/\/+$/, "");
+const ENABLE_DESAFIO_LEMBRETES =
+  (Deno.env.get("ENABLE_DESAFIO_LEMBRETES") ?? "true").toLowerCase() === "true";
 
 function formatarNumero(numero: string): string {
-  const numeroLimpo = numero.replace(/\D/g, "");
-  return numeroLimpo.startsWith("55") ? numeroLimpo : `55${numeroLimpo}`;
+  const n = numero.replace(/\D/g, "");
+  return n.startsWith("55") ? n : `55${n}`;
 }
 
 function formatCurrency(value: number): string {
@@ -38,38 +36,26 @@ function toYmd(date: Date): string {
 function parseDiasLembrete(value: unknown): number[] {
   const fallback = [0, 1];
   if (!Array.isArray(value)) return fallback;
-  const list = value
-    .map((n) => (typeof n === "number" ? n : Number(n)))
-    .filter((n) => Number.isFinite(n) && Number.isInteger(n) && n >= 0 && n <= 365) as number[];
+  const list = (value as unknown[])
+    .map((n) => Number(n))
+    .filter((n) => Number.isInteger(n) && n >= 0 && n <= 365);
   const unique = Array.from(new Set(list)).sort((a, b) => a - b);
   return unique.length > 0 ? unique : fallback;
 }
 
 async function enviarWhatsApp(numero: string, mensagem: string): Promise<boolean> {
   if (!UAZAPI_BASE_URL || !UAZAPI_TOKEN) {
-    console.error("Credenciais UazAPI não configuradas");
+    console.error("Credenciais UazAPI nao configuradas");
     return false;
   }
-
   try {
-    const numeroFormatado = formatarNumero(numero);
-    console.log(`Enviando lembrete para: ${numeroFormatado}`);
-
     const response = await fetch(`${UAZAPI_BASE_URL}/send/text`, {
       method: "POST",
-      headers: {
-        "token": UAZAPI_TOKEN,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        number: numeroFormatado,
-        text: mensagem,
-      }),
+      headers: { "token": UAZAPI_TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify({ number: formatarNumero(numero), text: mensagem }),
     });
-
     const result = await response.json();
     console.log("Resposta UazAPI:", JSON.stringify(result));
-
     return response.ok;
   } catch (error) {
     console.error("Erro ao enviar WhatsApp:", error);
@@ -83,7 +69,13 @@ serve(async (req) => {
   }
 
   try {
-    if (!ENABLE_DESAFIO_LEMBRETES) {
+    // Corpo opcional: { participante_id } => envia SOMENTE para essa pessoa (modo teste/individual)
+    const body = await req.json().catch(() => ({} as any));
+    const participanteFiltro = typeof body?.participante_id === "string" ? body.participante_id : null;
+    const modoIndividual = !!participanteFiltro;
+
+    // No modo geral (cron/emergencia), respeita a trava. No modo individual (teste) sempre roda.
+    if (!ENABLE_DESAFIO_LEMBRETES && !modoIndividual) {
       return new Response(JSON.stringify({ disabled: true }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -92,166 +84,118 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Calcular datas
-    const agora = new Date();
-    const dataHoje = toYmd(agora);
+    const dataHoje = toYmd(new Date());
     const hojeNoon = ymdFromLocalNoon(dataHoje);
 
-    let supportsLembreteDias = true;
-    let desafiosCfg: any[] = [];
+    const { data: desafiosCfg } = await supabase
+      .from("desafios")
+      .select("id,lembrete_dias_antes")
+      .eq("ativo", true);
 
-    const cfgWith = await supabase.from("desafios").select("id,lembrete_dias_antes").eq("ativo", true);
-    if (!cfgWith.error) {
-      desafiosCfg = (cfgWith.data as any[]) ?? [];
-    } else if (String(cfgWith.error.message || "").includes("lembrete_dias_antes") && String(cfgWith.error.message || "").includes("does not exist")) {
-      supportsLembreteDias = false;
-      const cfgWithout = await supabase.from("desafios").select("id").eq("ativo", true);
-      if (cfgWithout.error) {
-        console.error("Erro ao buscar desafios:", cfgWithout.error);
-        return new Response(JSON.stringify({ error: cfgWithout.error.message }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      desafiosCfg = (cfgWithout.data as any[]) ?? [];
+    const offsetsAll = (desafiosCfg ?? []).flatMap((d: any) => parseDiasLembrete(d?.lembrete_dias_antes));
+    const maxOffset = Math.min(Math.max(0, ...offsetsAll, 1), 365);
+    const datas = Array.from({ length: maxOffset + 1 }, (_, i) =>
+      toYmd(new Date(hojeNoon.getTime() + i * 86400000))
+    );
+
+    const selectExpr = `
+      id, vencimento, valor, competencia, participante_id,
+      desafio_participantes!inner (
+        id, token_link, desafio_id, pessoa_id,
+        pessoas!inner ( id, nome, telefone ),
+        desafios!inner ( id, titulo, lembrete_dias_antes )
+      )
+    `;
+
+    let parcelaQuery = supabase
+      .from("desafio_parcelas")
+      .select(selectExpr)
+      .eq("status", "ABERTO")
+      .is("pago_em", null);
+
+    if (modoIndividual) {
+      // Teste: pega a parcela em aberto mais proxima dessa pessoa, sem filtro de data
+      parcelaQuery = parcelaQuery
+        .eq("participante_id", participanteFiltro)
+        .order("vencimento", { ascending: true })
+        .limit(1);
     } else {
-      console.error("Erro ao buscar configuração de desafios:", cfgWith.error);
-      return new Response(JSON.stringify({ error: cfgWith.error.message }), {
+      // Geral: somente as que vencem na janela configurada
+      parcelaQuery = parcelaQuery.in("vencimento", datas);
+    }
+
+    const { data: parcelas, error: parcelasError } = await parcelaQuery;
+
+    if (parcelasError) {
+      console.error("Erro ao buscar parcelas:", parcelasError);
+      return new Response(JSON.stringify({ error: parcelasError.message }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const offsetsAll = supportsLembreteDias
-      ? (desafiosCfg || []).flatMap((d: any) => parseDiasLembrete(d?.lembrete_dias_antes))
-      : [0, 1];
-    const maxOffset = Math.min(Math.max(0, ...offsetsAll), 365);
-    const datas = Array.from({ length: maxOffset + 1 }, (_, i) => toYmd(new Date(hojeNoon.getTime() + i * 86400000)));
+    console.log(`Modo: ${modoIndividual ? "individual" : "geral"} | parcelas: ${parcelas?.length || 0}`);
 
-    console.log(`Data base: ${dataHoje}`);
-    console.log(`Offsets máximos: ${maxOffset} dia(s)`);
-    console.log(`Datas avaliadas: ${datas.length}`);
-
-    // Buscar parcelas que vencem nas datas configuradas
-    const selectWith = `
-      id,
-      vencimento,
-      valor,
-      competencia,
-      participante_id,
-      desafio_participantes!inner (
-        id,
-        token_link,
-        desafio_id,
-        pessoa_id,
-        pessoas!inner (
-          id,
-          nome,
-          telefone
-        ),
-        desafios!inner (
-          id,
-          titulo,
-          lembrete_dias_antes
-        )
-      )
-    `;
-
-    const selectWithout = `
-      id,
-      vencimento,
-      valor,
-      competencia,
-      participante_id,
-      desafio_participantes!inner (
-        id,
-        token_link,
-        desafio_id,
-        pessoa_id,
-        pessoas!inner (
-          id,
-          nome,
-          telefone
-        ),
-        desafios!inner (
-          id,
-          titulo
-        )
-      )
-    `;
-
-    const { data: parcelas, error: parcelasError } = await supabase
-      .from("desafio_parcelas")
-      .select(supportsLembreteDias ? selectWith : selectWithout)
-      .in("vencimento", datas)
-      .eq("status", "ABERTO")
-      .is("pago_em", null);
-
-    if (parcelasError) {
-      console.error("Erro ao buscar parcelas:", parcelasError);
-      return new Response(
-        JSON.stringify({ error: parcelasError.message }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log(`Encontradas ${parcelas?.length || 0} parcelas (faixa configurada)`);
-
-    let enviados = 0;
-    let falhas = 0;
-    let pulados = 0;
-
-    // Buscar configurações de mensagens
     const { data: configsMsg } = await supabase
       .from("configuracao_mensagens")
       .select("*")
       .eq("ativo", true);
 
+    const templateHoje = configsMsg?.find((c: any) => c.tipo === "LEMBRETE_VENCIMENTO_HOJE") ?? null;
+    const templateAmanha = configsMsg?.find((c: any) => c.tipo === "LEMBRETE_VENCIMENTO_AMANHA") ?? null;
+
     const getTemplate = (diffDays: number) => {
-      if (!configsMsg) return null;
-      if (diffDays === 0) return configsMsg.find((c: any) => c.tipo === "LEMBRETE_VENCIMENTO_HOJE");
-      if (diffDays === 1) return configsMsg.find((c: any) => c.tipo === "LEMBRETE_VENCIMENTO_AMANHA");
-      return null;
+      if (diffDays === 0) return templateHoje;
+      if (diffDays === 1) return templateAmanha;
+      // No modo individual, se nao bater 0/1, usa o de "hoje" como padrao para o teste
+      return modoIndividual ? (templateHoje ?? templateAmanha) : null;
     };
 
-    for (const parcela of parcelas || []) {
+    let enviados = 0;
+    let falhas = 0;
+    let pulados = 0;
+
+    for (const parcela of parcelas ?? []) {
       const participante = parcela.desafio_participantes as any;
       const pessoa = participante?.pessoas;
       const desafio = participante?.desafios;
 
       if (!pessoa?.telefone) {
-        console.log(`Pessoa ${pessoa?.nome || "?"} sem telefone, pulando...`);
         pulados++;
         continue;
       }
 
-      const diasLembrete = supportsLembreteDias ? parseDiasLembrete(desafio?.lembrete_dias_antes) : [0, 1];
       const vencNoon = ymdFromLocalNoon(parcela.vencimento);
       const diffDays = Math.round((vencNoon.getTime() - hojeNoon.getTime()) / 86400000);
 
-      if (!diasLembrete.includes(diffDays)) {
-        pulados++;
-        continue;
+      if (!modoIndividual) {
+        const diasLembrete = parseDiasLembrete(desafio?.lembrete_dias_antes);
+        if (!diasLembrete.includes(diffDays)) {
+          pulados++;
+          continue;
+        }
       }
 
       const template = getTemplate(diffDays);
       if (!template) {
-        console.log(`Template não encontrado para D-${diffDays}, pulando...`);
         pulados++;
         continue;
       }
 
       const vencBr = vencNoon.toLocaleDateString("pt-BR");
-      
+      const carneUrl = PUBLIC_APP_URL && participante?.token_link
+        ? `${PUBLIC_APP_URL}/carne/${participante.token_link}`
+        : "";
+
       let mensagem = template.template_mensagem;
-      
-      // Substituições
-      mensagem = mensagem.replace(/{nome}/g, pessoa.nome.split(" ")[0]);
+      mensagem = mensagem.replace(/{nome}/g, String(pessoa.nome).split(" ")[0]);
       mensagem = mensagem.replace(/{nome_completo}/g, pessoa.nome);
       mensagem = mensagem.replace(/{desafio}/g, desafio?.titulo || "");
       mensagem = mensagem.replace(/{valor}/g, formatCurrency(parcela.valor));
       mensagem = mensagem.replace(/{vencimento}/g, vencBr);
       mensagem = mensagem.replace(/{dias_restantes}/g, String(diffDays));
+      mensagem = mensagem.replace(/{link}/g, carneUrl);
+      mensagem = mensagem.replace(/{carne}/g, carneUrl);
 
       const enviado = await enviarWhatsApp(pessoa.telefone, mensagem);
       if (enviado) {
@@ -262,11 +206,11 @@ serve(async (req) => {
         console.log(`Falha ao enviar para ${pessoa.nome}`);
       }
 
-      // Pequeno delay entre mensagens para não sobrecarregar a API
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
     const resultado = {
+      modo: modoIndividual ? "individual" : "geral",
       data_hoje: dataHoje,
       total_parcelas: parcelas?.length || 0,
       enviados,
@@ -277,16 +221,16 @@ serve(async (req) => {
 
     console.log("Resultado:", resultado);
 
-    return new Response(
-      JSON.stringify(resultado),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify(resultado), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (error) {
     console.error("Erro na edge function:", error);
     const message = error instanceof Error ? error.message : "Erro interno";
-    return new Response(
-      JSON.stringify({ error: message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

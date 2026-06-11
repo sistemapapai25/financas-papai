@@ -135,6 +135,7 @@ export default function ConfiguracaoMensagens() {
                         <li><strong>{`{valor}`}</strong>: Valor formatado (R$)</li>
                         <li><strong>{`{vencimento}`}</strong>: Data de vencimento</li>
                         <li><strong>{`{dias_restantes}`}</strong>: Dias para vencer</li>
+                        <li><strong>{`{link}`}</strong>: Link do carnê da pessoa</li>
                       </ul>
                     </div>
                   </div>
