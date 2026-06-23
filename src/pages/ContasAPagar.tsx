@@ -3,14 +3,16 @@ import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Filter, Rows, Square, ChevronLeft, ChevronRight, Pencil, Calendar, Tag, User, FileText, FileCheck2, MoreVertical, Search } from 'lucide-react';
+import { Filter, Rows, Square, ChevronLeft, ChevronRight, Pencil, Calendar, Tag, User, FileText, FileCheck2, MoreVertical, Search, Send, Eye, Users, Copy, Loader2 } from 'lucide-react';
 
 import NovoLancamentoDialog from '@/components/NovoLancamentoDialog';
 import EditarLancamentoDialog from '@/components/EditarLancamentoDialog';
@@ -56,6 +58,89 @@ export default function ContasAPagar() {
   const [modalPagamentoOpen, setModalPagamentoOpen] = useState(false);
 
   const [updateTrigger, setUpdateTrigger] = useState(0);
+
+  // 🔹 Resumo no grupo do WhatsApp
+  const GRUPO_LS_KEY = 'contas_pagar_grupo_jid';
+  const [grupoJid, setGrupoJid] = useState<string>(() => {
+    try { return localStorage.getItem(GRUPO_LS_KEY) || ''; } catch { return ''; }
+  });
+  const [grupoBusy, setGrupoBusy] = useState<null | 'listar' | 'preview' | 'enviar'>(null);
+  const [gruposDialogOpen, setGruposDialogOpen] = useState(false);
+  const [gruposLista, setGruposLista] = useState<Array<{ id: string; nome: string }>>([]);
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
+  const [previewTexto, setPreviewTexto] = useState('');
+
+  const salvarGrupoJid = (jid: string) => {
+    const v = (jid || '').trim();
+    setGrupoJid(v);
+    try { v ? localStorage.setItem(GRUPO_LS_KEY, v) : localStorage.removeItem(GRUPO_LS_KEY); } catch { /* ignore */ }
+  };
+
+  const listarGrupos = async () => {
+    setGrupoBusy('listar');
+    try {
+      const { data, error } = await supabase.functions.invoke('contas-pagar-grupo', {
+        body: { listar_grupos: true },
+      });
+      if (error) throw error;
+      const grupos = ((data as any)?.grupos ?? []) as Array<{ id: string; nome: string }>;
+      setGruposLista(grupos);
+      setGruposDialogOpen(true);
+      if (!grupos.length) {
+        toast({
+          title: 'Nenhum grupo retornado',
+          description: 'Não consegui listar os grupos pela uazapiGO. Você pode colar o JID do grupo manualmente no campo.',
+        });
+      }
+    } catch (e) {
+      toast({ title: 'Erro', description: e instanceof Error ? e.message : 'Falha ao listar grupos.', variant: 'destructive' });
+    } finally {
+      setGrupoBusy(null);
+    }
+  };
+
+  const preVisualizarResumo = async () => {
+    setGrupoBusy('preview');
+    try {
+      const { data, error } = await supabase.functions.invoke('contas-pagar-grupo', {
+        body: { dry_run: true, grupo_id: grupoJid || undefined },
+      });
+      if (error) throw error;
+      setPreviewTexto((data as any)?.mensagem || '(sem mensagem)');
+      setPreviewDialogOpen(true);
+    } catch (e) {
+      toast({ title: 'Erro', description: e instanceof Error ? e.message : 'Falha ao gerar prévia.', variant: 'destructive' });
+    } finally {
+      setGrupoBusy(null);
+    }
+  };
+
+  const enviarResumoAgora = async () => {
+    if (!grupoJid) {
+      toast({ title: 'Defina o grupo', description: 'Escolha/cole o JID do grupo antes de enviar.', variant: 'destructive' });
+      return;
+    }
+    if (!confirm('Enviar o resumo de contas a pagar de hoje para o grupo do WhatsApp AGORA?')) return;
+    setGrupoBusy('enviar');
+    try {
+      const { data, error } = await supabase.functions.invoke('contas-pagar-grupo', {
+        body: { grupo_id: grupoJid },
+      });
+      if (error) throw error;
+      const d = data as any;
+      if (d?.enviado) {
+        toast({ title: 'Enviado ao grupo', description: `${d?.qtd ?? 0} conta(s) • Total ${d?.total_formatado ?? ''}` });
+      } else if (d?.motivo === 'sem_contas') {
+        toast({ title: 'Nada a enviar', description: 'Nenhuma conta vence hoje nem está atrasada.' });
+      } else {
+        toast({ title: 'Não enviado', description: d?.error || 'A uazapiGO não confirmou o envio.', variant: 'destructive' });
+      }
+    } catch (e) {
+      toast({ title: 'Erro', description: e instanceof Error ? e.message : 'Falha ao enviar resumo.', variant: 'destructive' });
+    } finally {
+      setGrupoBusy(null);
+    }
+  };
 
   const ano = dataRef.getFullYear();
   const mes = dataRef.getMonth();
@@ -218,6 +303,45 @@ export default function ContasAPagar() {
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">Contas a Pagar</h1>
+
+        <Card className="mb-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Send className="w-4 h-4" /> Resumo no grupo do WhatsApp
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Envia ao grupo uma mensagem com as contas que vencem hoje (e as atrasadas em aberto).
+              O envio automático acontece todo dia às 8h.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              <div className="flex-1">
+                <Label className="text-xs text-muted-foreground">JID do grupo</Label>
+                <Input
+                  placeholder="120363...@g.us"
+                  value={grupoJid}
+                  onChange={(e) => salvarGrupoJid(e.target.value)}
+                  className="font-mono text-sm"
+                />
+              </div>
+              <Button variant="outline" className="gap-2 sm:self-end" onClick={listarGrupos} disabled={grupoBusy !== null}>
+                {grupoBusy === 'listar' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+                Listar grupos
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" className="gap-2" onClick={preVisualizarResumo} disabled={grupoBusy !== null}>
+                {grupoBusy === 'preview' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+                Pré-visualizar
+              </Button>
+              <Button className="gap-2 bg-green-600 hover:bg-green-700" onClick={enviarResumoAgora} disabled={grupoBusy !== null}>
+                {grupoBusy === 'enviar' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                Enviar ao grupo agora
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 mb-4">
           <div className="flex items-center gap-3 justify-start">
@@ -474,6 +598,65 @@ export default function ContasAPagar() {
           onSuccess={handleSuccessPagamento}
         />
       )}
+
+      {/* Lista de grupos do WhatsApp para escolher o JID */}
+      <Dialog open={gruposDialogOpen} onOpenChange={setGruposDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Grupos do WhatsApp</DialogTitle>
+            <DialogDescription>
+              Clique em "Usar" no grupo que deve receber o resumo diário das contas a pagar.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-80 overflow-auto divide-y">
+            {gruposLista.length === 0 && (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                Nenhum grupo encontrado. Cole o JID manualmente no campo da tela.
+              </p>
+            )}
+            {gruposLista.map((g) => (
+              <div key={g.id} className="flex items-center justify-between gap-2 py-2">
+                <div className="min-w-0">
+                  <div className="font-medium truncate">{g.nome || '(sem nome)'}</div>
+                  <div className="text-xs text-muted-foreground font-mono truncate">{g.id}</div>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title="Copiar JID"
+                    onClick={() => { navigator.clipboard?.writeText(g.id); toast({ title: 'JID copiado' }); }}
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => { salvarGrupoJid(g.id); setGruposDialogOpen(false); toast({ title: 'Grupo selecionado', description: g.nome || g.id }); }}
+                  >
+                    Usar
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Prévia da mensagem que vai ao grupo */}
+      <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Prévia do resumo</DialogTitle>
+            <DialogDescription>É exatamente isto que será enviado ao grupo.</DialogDescription>
+          </DialogHeader>
+          <div className="bg-muted p-4 rounded-md whitespace-pre-wrap text-sm max-h-96 overflow-auto">
+            {previewTexto}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewDialogOpen(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
