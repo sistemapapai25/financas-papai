@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { makePublicUrl } from "@/lib/utils";
+import { enviarWhatsAppMensagem } from "@/lib/whatsapp";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value || 0));
@@ -342,41 +343,6 @@ export default function Desafios() {
     setOpen(true);
   };
 
-  const enviarWhatsApp = async (
-    numero: string,
-    mensagem: string
-  ): Promise<{ ok: boolean; motivo?: string }> => {
-    try {
-      const { data, error } = await supabase.functions.invoke("whatsapp-send-message", {
-        body: { numero, mensagem },
-      });
-      const body = data as {
-        success?: boolean;
-        error?: string;
-        details?: { message?: string; error?: boolean };
-      } | null;
-
-      const motivoApi =
-        body?.details?.message ||
-        body?.error ||
-        (error ? error.message : null);
-
-      if (error || body?.error || body?.success === false) {
-        console.error("Erro ao enviar WhatsApp:", error || body);
-        return { ok: false, motivo: motivoApi || "Falha ao enviar WhatsApp" };
-      }
-
-      console.log("WhatsApp enviado:", data);
-      return { ok: true };
-    } catch (e) {
-      console.error("Erro ao enviar WhatsApp:", e);
-      return {
-        ok: false,
-        motivo: e instanceof Error ? e.message : "Erro inesperado ao enviar WhatsApp",
-      };
-    }
-  };
-
   const addParticipante = async () => {
     if (!canManage) return;
     if (!selectedId) return;
@@ -417,7 +383,7 @@ export default function Desafios() {
       const valorMsg = valorFinal ?? selected.valor_mensal;
       const mensagem = `Olá, ${pessoa.nome}! 🙌\n\nVocê foi adicionado ao ${selected.titulo}.\n\n📌 Informações do voto\n• Parcelamento: ${selected.qtd_parcelas}x\n• Vencimento: dia ${selected.dia_vencimento}\n\n🔑 Chave PIX: 44582345000176\n🏛 Em nome de: Igreja Apostólica e Profética Águas Purificadoras\n\nObrigado pela sua fidelidade! Deus abençoe sua vida e sua casa! 🙏`;
 
-      const enviado = await enviarWhatsApp(pessoa.telefone, mensagem);
+      const enviado = await enviarWhatsAppMensagem(pessoa.telefone, mensagem);
       if (enviado.ok) {
         toast({ title: "WhatsApp enviado", description: `Mensagem enviada para ${pessoa.nome}` });
       } else {
@@ -611,7 +577,7 @@ export default function Desafios() {
       textoFinal = textoFinal.replace(/{valor}/g, valorFormatado);
       textoFinal = textoFinal.replace(/{pix}/g, pixKey);
 
-      const result = await enviarWhatsApp(item.telefone as string, textoFinal);
+      const result = await enviarWhatsAppMensagem(item.telefone as string, textoFinal);
       if (result.ok) enviados++;
       else falhas++;
       // Intervalo de 5 segundos para evitar bloqueios no WhatsApp
