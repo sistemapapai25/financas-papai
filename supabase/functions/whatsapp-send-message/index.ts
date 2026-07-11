@@ -1,6 +1,10 @@
 import "../deno-shim.d.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
+import {
+  enviarTemplateMeta,
+  enviarTextoMeta,
+  formatarNumeroBr,
+} from "../_shared/whatsapp-meta.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,90 +12,82 @@ const corsHeaders = {
 };
 
 interface RequestBody {
+  /** Número do destinatário (BR com ou sem 55) */
   numero: string;
-  mensagem: string;
-}
-
-function formatarNumero(numero: string): string {
-  // Remove todos os caracteres não numéricos
-  const numeroLimpo = numero.replace(/\D/g, "");
-  // Adiciona 55 se não começar com ele
-  return numeroLimpo.startsWith("55") ? numeroLimpo : `55${numeroLimpo}`;
+  /** Texto livre (janela de 24h). Obrigatório se não enviar template. */
+  mensagem?: string;
+  /** Nome do template aprovado na Meta (fora da janela de 24h). */
+  template?: string;
+  /** Código do idioma do template (default pt_BR). */
+  language?: string;
+  /** Components do template (Graph API). */
+  components?: unknown[];
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const UAZAPI_BASE_URL = Deno.env.get("UAZAPI_BASE_URL");
-    const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
-
-    if (!UAZAPI_BASE_URL || !UAZAPI_TOKEN) {
-      console.error("Missing UAZAPI credentials");
-      return new Response(
-        JSON.stringify({ error: "Configuração de WhatsApp não encontrada" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const body: RequestBody = await req.json();
-    const { numero, mensagem } = body;
+    const { numero, mensagem, template, language, components } = body;
 
-    if (!numero || !mensagem) {
+    if (!numero) {
+      return new Response(JSON.stringify({ error: "Número é obrigatório" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const to = formatarNumeroBr(numero);
+    console.log(`WhatsApp Cloud API → ${to}${template ? ` template=${template}` : " texto"}`);
+
+    let envio;
+    if (template) {
+      envio = await enviarTemplateMeta({
+        numero: to,
+        templateName: template,
+        languageCode: language || "pt_BR",
+        components,
+      });
+    } else if (mensagem) {
+      envio = await enviarTextoMeta(to, mensagem);
+    } else {
       return new Response(
-        JSON.stringify({ error: "Número e mensagem são obrigatórios" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Informe mensagem (texto) ou template" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
       );
     }
 
-    const numeroFormatado = formatarNumero(numero);
-    console.log(`Enviando mensagem para: ${numeroFormatado}`);
-
-    const response = await fetch(`${UAZAPI_BASE_URL}/send/text`, {
-      method: "POST",
-      headers: {
-        "token": UAZAPI_TOKEN,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        number: numeroFormatado,
-        text: mensagem,
-      }),
-    });
-
-    const result = await response.json();
-    console.log("Resposta UazAPI:", JSON.stringify(result));
-
-    // Algumas respostas da uazapiGO vêm com HTTP 2xx, mas body.error = true
-    // (ex.: "WhatsApp disconnected: session is not reconnectable")
-    const bodyError =
-      result &&
-      typeof result === "object" &&
-      ((result as { error?: unknown }).error === true ||
-        (typeof (result as { error?: unknown }).error === "string" &&
-          (result as { error?: string }).error) ||
-        (result as { success?: unknown }).success === false);
-
-    if (!response.ok || bodyError) {
-      console.error("Erro UazAPI:", result);
-      const status = !response.ok ? response.status : 503;
+    if (!envio.ok) {
+      console.error("Falha Meta:", envio.error, envio.result);
       return new Response(
-        JSON.stringify({ error: "Falha ao enviar mensagem", details: result }),
-        { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          error: envio.error,
+          details: envio.result,
+          provider: envio.provider,
+        }),
+        {
+          status: envio.httpStatus >= 400 && envio.httpStatus < 600 ? envio.httpStatus : 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
       );
     }
 
     return new Response(
-      JSON.stringify({ success: true, result }),
+      JSON.stringify({ success: true, provider: envio.provider, result: envio.result }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
     console.error("Erro na edge function:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Erro interno" }),
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "Erro interno",
+      }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

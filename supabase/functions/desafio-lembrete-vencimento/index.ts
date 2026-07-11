@@ -1,6 +1,7 @@
 import "../deno-shim.d.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { enviarTextoMeta } from "../_shared/whatsapp-meta.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,17 +10,10 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const UAZAPI_BASE_URL = Deno.env.get("UAZAPI_BASE_URL");
-const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
 // URL base publica do app (ex.: https://meusistema.com). Usada para montar o link do carne {link}.
 const PUBLIC_APP_URL = (Deno.env.get("PUBLIC_APP_URL") ?? "").trim().replace(/\/+$/, "");
 const ENABLE_DESAFIO_LEMBRETES =
   (Deno.env.get("ENABLE_DESAFIO_LEMBRETES") ?? "true").toLowerCase() === "true";
-
-function formatarNumero(numero: string): string {
-  const n = numero.replace(/\D/g, "");
-  return n.startsWith("55") ? n : `55${n}`;
-}
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -44,23 +38,11 @@ function parseDiasLembrete(value: unknown): number[] {
 }
 
 async function enviarWhatsApp(numero: string, mensagem: string): Promise<boolean> {
-  if (!UAZAPI_BASE_URL || !UAZAPI_TOKEN) {
-    console.error("Credenciais UazAPI nao configuradas");
-    return false;
+  const envio = await enviarTextoMeta(numero, mensagem);
+  if (!envio.ok) {
+    console.error("Erro WhatsApp Cloud API:", envio.error, envio.result);
   }
-  try {
-    const response = await fetch(`${UAZAPI_BASE_URL}/send/text`, {
-      method: "POST",
-      headers: { "token": UAZAPI_TOKEN, "Content-Type": "application/json" },
-      body: JSON.stringify({ number: formatarNumero(numero), text: mensagem }),
-    });
-    const result = await response.json();
-    console.log("Resposta UazAPI:", JSON.stringify(result));
-    return response.ok;
-  } catch (error) {
-    console.error("Erro ao enviar WhatsApp:", error);
-    return false;
-  }
+  return envio.ok;
 }
 
 serve(async (req) => {

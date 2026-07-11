@@ -1,6 +1,7 @@
 import "../deno-shim.d.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { enviarTextoMeta, formatarNumeroBr } from "../_shared/whatsapp-meta.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,6 +10,7 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+// Fallback legado (grupos): uazapiGO ainda é usado se configurado, pois Cloud API não envia para @g.us.
 const UAZAPI_BASE_URL = Deno.env.get("UAZAPI_BASE_URL");
 const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
 // JID do grupo de destino (ex.: 120363012345678901@g.us). Descubra com o modo { listar_grupos: true }.
@@ -38,12 +40,20 @@ function diasEntre(ymdA: string, ymdB: string): number {
   return Math.round((a - b) / 86400000);
 }
 
-// Envia texto para um NÚMERO ou para um GRUPO (JID ...@g.us). Não reformata o destino:
-// para grupo o campo "number" deve ser o JID exatamente como veio.
+// Envia texto: número individual → Meta Cloud API; grupo (@g.us) → uazapiGO (se configurado).
 async function enviarTexto(destino: string, mensagem: string): Promise<{ ok: boolean; result: unknown }> {
+  const isGrupo = /@g\.us/i.test(destino) || destino.includes("@g.us");
+
+  if (!isGrupo) {
+    const envio = await enviarTextoMeta(formatarNumeroBr(destino), mensagem);
+    return { ok: envio.ok, result: envio.ok ? envio.result : { error: envio.error, details: envio.result } };
+  }
+
   if (!UAZAPI_BASE_URL || !UAZAPI_TOKEN) {
-    console.error("Credenciais UazAPI nao configuradas");
-    return { ok: false, result: { error: "Credenciais UazAPI nao configuradas" } };
+    const err =
+      "Envio para grupo WhatsApp não é suportado pela Cloud API da Meta. Configure UAZAPI_* ou use um número individual.";
+    console.error(err);
+    return { ok: false, result: { error: err } };
   }
   try {
     const response = await fetch(`${UAZAPI_BASE_URL}/send/text`, {
@@ -52,10 +62,10 @@ async function enviarTexto(destino: string, mensagem: string): Promise<{ ok: boo
       body: JSON.stringify({ number: destino, text: mensagem }),
     });
     const result = await response.json().catch(() => ({}));
-    console.log("Resposta UazAPI:", JSON.stringify(result));
+    console.log("Resposta UazAPI (grupo):", JSON.stringify(result));
     return { ok: response.ok, result };
   } catch (error) {
-    console.error("Erro ao enviar WhatsApp:", error);
+    console.error("Erro ao enviar WhatsApp (grupo):", error);
     return { ok: false, result: { error: String(error) } };
   }
 }
