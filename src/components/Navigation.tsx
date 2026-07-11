@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -10,11 +10,29 @@ const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { user, signOut } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const isActive = (path: string) => location.pathname === path;
   const subLinkCls = (path: string) => `py-3 border-b-2 ${isActive(path) ? 'border-blue-700 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`;
   const groupCls = (paths: string[]) => `py-3 border-b-2 ${paths.some(p => isActive(p)) ? 'border-blue-700 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`;
   const groupTitleCls = (paths: string[]) => `px-3 py-1 text-xs font-semibold ${paths.some(p => isActive(p)) ? 'text-blue-700' : 'text-muted-foreground'}`;
+
+  /** Logout sem full reload em /auth (evita 404 NOT_FOUND da hospedagem SPA). */
+  const handleLogout = async () => {
+    try {
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith('sb-') || k.includes('supabase'))
+        .forEach((k) => localStorage.removeItem(k));
+    } catch {
+      // ignora
+    }
+    try {
+      await signOut();
+    } catch {
+      // ignora — limpeza local já feita
+    }
+    navigate('/auth', { replace: true });
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full">
@@ -30,15 +48,7 @@ const Navigation = () => {
               variant="outline"
               size="sm"
               onClick={() => {
-                try {
-                  Object.keys(localStorage)
-                    .filter((k) => k.startsWith('sb-') || k.includes('supabase'))
-                    .forEach((k) => localStorage.removeItem(k));
-                } catch {
-                  // ignora
-                }
-                signOut().catch(() => undefined);
-                window.location.replace('/auth');
+                void handleLogout();
               }}
               className="hidden sm:flex bg-white text-blue-700 hover:bg-white/90"
             >
@@ -138,15 +148,7 @@ const Navigation = () => {
                       className="w-full"
                       onClick={() => {
                         setIsOpen(false);
-                        try {
-                          Object.keys(localStorage)
-                            .filter((k) => k.startsWith('sb-') || k.includes('supabase'))
-                            .forEach((k) => localStorage.removeItem(k));
-                        } catch {
-                          // ignora
-                        }
-                        signOut().catch(() => undefined);
-                        window.location.replace('/auth');
+                        void handleLogout();
                       }}
                     >
                       <LogOut className="w-4 h-4 mr-2" />
