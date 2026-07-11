@@ -342,20 +342,38 @@ export default function Desafios() {
     setOpen(true);
   };
 
-  const enviarWhatsApp = async (numero: string, mensagem: string) => {
+  const enviarWhatsApp = async (
+    numero: string,
+    mensagem: string
+  ): Promise<{ ok: boolean; motivo?: string }> => {
     try {
       const { data, error } = await supabase.functions.invoke("whatsapp-send-message", {
         body: { numero, mensagem },
       });
-      if (error) {
-        console.error("Erro ao enviar WhatsApp:", error);
-        return false;
+      const body = data as {
+        success?: boolean;
+        error?: string;
+        details?: { message?: string; error?: boolean };
+      } | null;
+
+      const motivoApi =
+        body?.details?.message ||
+        body?.error ||
+        (error ? error.message : null);
+
+      if (error || body?.error || body?.success === false) {
+        console.error("Erro ao enviar WhatsApp:", error || body);
+        return { ok: false, motivo: motivoApi || "Falha ao enviar WhatsApp" };
       }
+
       console.log("WhatsApp enviado:", data);
-      return true;
+      return { ok: true };
     } catch (e) {
       console.error("Erro ao enviar WhatsApp:", e);
-      return false;
+      return {
+        ok: false,
+        motivo: e instanceof Error ? e.message : "Erro inesperado ao enviar WhatsApp",
+      };
     }
   };
 
@@ -400,10 +418,16 @@ export default function Desafios() {
       const mensagem = `Olá, ${pessoa.nome}! 🙌\n\nVocê foi adicionado ao ${selected.titulo}.\n\n📌 Informações do voto\n• Parcelamento: ${selected.qtd_parcelas}x\n• Vencimento: dia ${selected.dia_vencimento}\n\n🔑 Chave PIX: 44582345000176\n🏛 Em nome de: Igreja Apostólica e Profética Águas Purificadoras\n\nObrigado pela sua fidelidade! Deus abençoe sua vida e sua casa! 🙏`;
 
       const enviado = await enviarWhatsApp(pessoa.telefone, mensagem);
-      if (enviado) {
+      if (enviado.ok) {
         toast({ title: "WhatsApp enviado", description: `Mensagem enviada para ${pessoa.nome}` });
       } else {
-        toast({ title: "Aviso", description: "Não foi possível enviar WhatsApp, mas o participante foi adicionado.", variant: "destructive" });
+        const detalhe = enviado.motivo ? ` Motivo: ${enviado.motivo}` : "";
+        toast({
+          title: "Aviso",
+          description: `Não foi possível enviar WhatsApp, mas o participante foi adicionado.${detalhe}`,
+          variant: "destructive",
+          duration: 8000,
+        });
       }
     }
 
@@ -587,8 +611,8 @@ export default function Desafios() {
       textoFinal = textoFinal.replace(/{valor}/g, valorFormatado);
       textoFinal = textoFinal.replace(/{pix}/g, pixKey);
 
-      const ok = await enviarWhatsApp(item.telefone as string, textoFinal);
-      if (ok) enviados++;
+      const result = await enviarWhatsApp(item.telefone as string, textoFinal);
+      if (result.ok) enviados++;
       else falhas++;
       // Intervalo de 5 segundos para evitar bloqueios no WhatsApp
       await new Promise((r) => setTimeout(r, 5000));

@@ -367,20 +367,39 @@ export default function Carne() {
     setParcelas((prev) => prev.map((p) => (p.id === parcelaId ? { ...p, valor } : p)));
   };
 
-  const enviarWhatsApp = async (numero: string, mensagem: string) => {
+  const enviarWhatsApp = async (
+    numero: string,
+    mensagem: string
+  ): Promise<{ ok: boolean; motivo?: string }> => {
     try {
       const { data, error } = await supabase.functions.invoke("whatsapp-send-message", {
         body: { numero, mensagem },
       });
-      if (error) {
-        console.error("Erro ao enviar WhatsApp:", error);
-        return false;
+      const body = data as {
+        success?: boolean;
+        error?: string;
+        details?: { message?: string; error?: boolean };
+      } | null;
+
+      // A edge function devolve o motivo real em data mesmo quando o HTTP é 4xx/5xx
+      const motivoApi =
+        body?.details?.message ||
+        body?.error ||
+        (error ? error.message : null);
+
+      if (error || body?.error || body?.success === false) {
+        console.error("Erro ao enviar WhatsApp:", error || body);
+        return { ok: false, motivo: motivoApi || "Falha ao enviar WhatsApp" };
       }
+
       console.log("WhatsApp enviado:", data);
-      return true;
+      return { ok: true };
     } catch (e) {
       console.error("Erro ao enviar WhatsApp:", e);
-      return false;
+      return {
+        ok: false,
+        motivo: e instanceof Error ? e.message : "Erro inesperado ao enviar WhatsApp",
+      };
     }
   };
 
@@ -427,10 +446,16 @@ export default function Carne() {
       const mensagem = `Olá ${nome}! 🙏\n\nAgradecemos de coração pelo seu pagamento da *parcela ${numeroParcela}* no valor de ${formatCurrency(valor)} referente ao desafio *${desafioAtual?.titulo}*.\n\nSua fidelidade na aliança feita com Deus é inspiradora e abençoa a todos nós!\n\n"O Senhor é fiel em todas as suas promessas e bondoso em tudo o que faz." - Salmos 145:13\n\nQue Deus continue abençoando sua vida abundantemente! 🙌`;
 
       const enviado = await enviarWhatsApp(telefone, mensagem);
-      if (enviado) {
+      if (enviado.ok) {
         toast({ title: "WhatsApp enviado", description: `Mensagem de agradecimento enviada para ${nome}`, duration: 3000 });
       } else {
-        toast({ title: "Aviso", description: "Pagamento registrado, mas não foi possível enviar WhatsApp.", variant: "destructive", duration: 4000 });
+        const detalhe = enviado.motivo ? ` Motivo: ${enviado.motivo}` : "";
+        toast({
+          title: "Aviso",
+          description: `Pagamento registrado, mas não foi possível enviar WhatsApp.${detalhe}`,
+          variant: "destructive",
+          duration: 8000,
+        });
       }
     }
 

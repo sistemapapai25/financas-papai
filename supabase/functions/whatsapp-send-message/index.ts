@@ -65,11 +65,22 @@ serve(async (req) => {
     const result = await response.json();
     console.log("Resposta UazAPI:", JSON.stringify(result));
 
-    if (!response.ok) {
+    // Algumas respostas da uazapiGO vêm com HTTP 2xx, mas body.error = true
+    // (ex.: "WhatsApp disconnected: session is not reconnectable")
+    const bodyError =
+      result &&
+      typeof result === "object" &&
+      ((result as { error?: unknown }).error === true ||
+        (typeof (result as { error?: unknown }).error === "string" &&
+          (result as { error?: string }).error) ||
+        (result as { success?: unknown }).success === false);
+
+    if (!response.ok || bodyError) {
       console.error("Erro UazAPI:", result);
+      const status = !response.ok ? response.status : 503;
       return new Response(
         JSON.stringify({ error: "Falha ao enviar mensagem", details: result }),
-        { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
