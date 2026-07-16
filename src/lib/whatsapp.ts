@@ -16,6 +16,16 @@ type WhatsAppSendBody = {
 
 export type WhatsAppSendResult = { ok: boolean; motivo?: string };
 
+type WhatsAppTemplateTextParameter = {
+  type: "text";
+  text: string;
+};
+
+type WhatsAppTemplateComponent = {
+  type: "body";
+  parameters: WhatsAppTemplateTextParameter[];
+};
+
 function extrairMotivo(body: WhatsAppSendBody | null, fallback?: string | null): string {
   if (!body) return fallback || "Falha ao enviar WhatsApp";
 
@@ -98,6 +108,62 @@ export async function enviarWhatsAppMensagem(
     return {
       ok: false,
       motivo: e instanceof Error ? e.message : "Erro inesperado ao enviar WhatsApp",
+    };
+  }
+}
+
+export async function enviarWhatsAppTemplate(
+  numero: string,
+  template: string,
+  parametros: string[],
+  language = "pt_BR"
+): Promise<WhatsAppSendResult> {
+  const components: WhatsAppTemplateComponent[] = [
+    {
+      type: "body",
+      parameters: parametros.map((text) => ({
+        type: "text",
+        text: String(text ?? ""),
+      })),
+    },
+  ];
+
+  try {
+    const { data, error } = await supabase.functions.invoke("whatsapp-send-message", {
+      body: { numero, template, language, components },
+    });
+
+    let body = (data as WhatsAppSendBody | null) ?? null;
+
+    if (!body && error && typeof error === "object" && "context" in error) {
+      const ctx = (error as { context?: Response }).context;
+      if (ctx && typeof ctx.json === "function") {
+        try {
+          body = (await ctx.clone().json()) as WhatsAppSendBody;
+        } catch {
+          try {
+            body = (await ctx.json()) as WhatsAppSendBody;
+          } catch {
+            body = null;
+          }
+        }
+      }
+    }
+
+    if (error || body?.error || body?.success === false) {
+      console.error("Erro ao enviar template WhatsApp:", error || body);
+      return {
+        ok: false,
+        motivo: extrairMotivo(body, error instanceof Error ? error.message : null),
+      };
+    }
+
+    return { ok: true };
+  } catch (e) {
+    console.error("Erro ao enviar template WhatsApp:", e);
+    return {
+      ok: false,
+      motivo: e instanceof Error ? e.message : "Erro inesperado ao enviar template WhatsApp",
     };
   }
 }

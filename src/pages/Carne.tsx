@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
-import { enviarWhatsAppMensagem } from "@/lib/whatsapp";
+import { enviarWhatsAppTemplate } from "@/lib/whatsapp";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -74,6 +74,8 @@ const formatDate = (dateStr: string) => {
   const [year, month, day] = dateStr.split("-");
   return `${day}/${month}/${year}`;
 };
+
+const TEMPLATE_CONFIRMAR_PAGAMENTO_MANTENEDOR = "confirmacao_pagamento_mantenedor";
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -406,11 +408,15 @@ export default function Carne() {
     const nome = selectedParticipante.pessoa?.nome || "Irmão(ã)";
     const desafioAtual = desafios.find((d) => d.id === desafioId);
     const numeroParcela = `${parcelaIndex + 1}/${desafioAtual?.qtd_parcelas || "?"}`;
+    const primeiroNome = nome.split(" ")[0] || nome;
+    const tituloDesafio = desafioAtual?.titulo || "Mantenedores";
 
     if (telefone) {
-      const mensagem = `Olá ${nome}! 🙏\n\nAgradecemos de coração pelo seu pagamento da *parcela ${numeroParcela}* no valor de ${formatCurrency(valor)} referente ao desafio *${desafioAtual?.titulo}*.\n\nSua fidelidade na aliança feita com Deus é inspiradora e abençoa a todos nós!\n\n"O Senhor é fiel em todas as suas promessas e bondoso em tudo o que faz." - Salmos 145:13\n\nQue Deus continue abençoando sua vida abundantemente! 🙌`;
-
-      const enviado = await enviarWhatsAppMensagem(telefone, mensagem);
+      const enviado = await enviarWhatsAppTemplate(
+        telefone,
+        TEMPLATE_CONFIRMAR_PAGAMENTO_MANTENEDOR,
+        [primeiroNome, numeroParcela, formatCurrency(valor), tituloDesafio]
+      );
       if (enviado.ok) {
         toast({ title: "WhatsApp enviado", description: `Mensagem de agradecimento enviada para ${nome}`, duration: 3000 });
       } else {

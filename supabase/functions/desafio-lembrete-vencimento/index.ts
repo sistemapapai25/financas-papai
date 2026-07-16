@@ -1,7 +1,7 @@
 import "../deno-shim.d.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { enviarTextoMeta } from "../_shared/whatsapp-meta.ts";
+import { enviarTextoMeta, enviarTemplateMeta } from "../_shared/whatsapp-meta.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,10 +37,37 @@ function parseDiasLembrete(value: unknown): number[] {
   return unique.length > 0 ? unique : fallback;
 }
 
-async function enviarWhatsApp(numero: string, mensagem: string): Promise<boolean> {
+async function enviarWhatsAppTexto(numero: string, mensagem: string): Promise<boolean> {
   const envio = await enviarTextoMeta(numero, mensagem);
   if (!envio.ok) {
-    console.error("Erro WhatsApp Cloud API:", envio.error, envio.result);
+    console.error("Erro WhatsApp Cloud API (texto):", envio.error, envio.result);
+  }
+  return envio.ok;
+}
+
+async function enviarWhatsAppTemplateHoje(
+  numero: string,
+  nome: string,
+  valorFormatado: string,
+  vencimentoFormatado: string
+): Promise<boolean> {
+  const envio = await enviarTemplateMeta({
+    numero,
+    templateName: "lembrete_vencimento_hoje",
+    languageCode: "pt_BR",
+    components: [
+      {
+        type: "body",
+        parameters: [
+          { type: "text", text: nome },
+          { type: "text", text: valorFormatado },
+          { type: "text", text: vencimentoFormatado },
+        ],
+      },
+    ],
+  });
+  if (!envio.ok) {
+    console.error("Erro WhatsApp Cloud API (template hoje):", envio.error, envio.result);
   }
   return envio.ok;
 }
@@ -168,18 +195,30 @@ serve(async (req) => {
       const carneUrl = PUBLIC_APP_URL && participante?.token_link
         ? `${PUBLIC_APP_URL}/carne/${participante.token_link}`
         : "";
+      const primeiroNome = String(pessoa.nome).split(" ")[0];
 
-      let mensagem = template.template_mensagem;
-      mensagem = mensagem.replace(/{nome}/g, String(pessoa.nome).split(" ")[0]);
-      mensagem = mensagem.replace(/{nome_completo}/g, pessoa.nome);
-      mensagem = mensagem.replace(/{desafio}/g, desafio?.titulo || "");
-      mensagem = mensagem.replace(/{valor}/g, formatCurrency(parcela.valor));
-      mensagem = mensagem.replace(/{vencimento}/g, vencBr);
-      mensagem = mensagem.replace(/{dias_restantes}/g, String(diffDays));
-      mensagem = mensagem.replace(/{link}/g, carneUrl);
-      mensagem = mensagem.replace(/{carne}/g, carneUrl);
+      let enviado: boolean;
 
-      const enviado = await enviarWhatsApp(pessoa.telefone, mensagem);
+      if (diffDays === 0) {
+        enviado = await enviarWhatsAppTemplateHoje(
+          pessoa.telefone,
+          primeiroNome,
+          formatCurrency(parcela.valor),
+          vencBr
+        );
+      } else {
+        let mensagem = template.template_mensagem;
+        mensagem = mensagem.replace(/{nome}/g, primeiroNome);
+        mensagem = mensagem.replace(/{nome_completo}/g, pessoa.nome);
+        mensagem = mensagem.replace(/{desafio}/g, desafio?.titulo || "");
+        mensagem = mensagem.replace(/{valor}/g, formatCurrency(parcela.valor));
+        mensagem = mensagem.replace(/{vencimento}/g, vencBr);
+        mensagem = mensagem.replace(/{dias_restantes}/g, String(diffDays));
+        mensagem = mensagem.replace(/{link}/g, carneUrl);
+        mensagem = mensagem.replace(/{carne}/g, carneUrl);
+
+        enviado = await enviarWhatsAppTexto(pessoa.telefone, mensagem);
+      }
       if (enviado) {
         enviados++;
         console.log(`Lembrete enviado para ${pessoa.nome} (D-${diffDays})`);
