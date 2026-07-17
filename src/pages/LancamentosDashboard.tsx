@@ -86,6 +86,7 @@ export default function LancamentosDashboard() {
   const [inlineDraft, setInlineDraft] = useState("");
   const [catCellOpen, setCatCellOpen] = useState<string | null>(null);
   const [benefCellOpen, setBenefCellOpen] = useState<string | null>(null);
+  const [benefCellSearch, setBenefCellSearch] = useState("");
   const [comprovanteBusyId, setComprovanteBusyId] = useState<string | null>(null);
   const [comprovanteAtivoId, setComprovanteAtivoId] = useState<string | null>(null);
   const comprovanteInputRef = useRef<HTMLInputElement | null>(null);
@@ -1248,6 +1249,29 @@ export default function LancamentosDashboard() {
     }
   }
 
+  async function criarEAplicarBeneficiarioCelula(mov: Mov) {
+    if (!user) { toast({ title: "Sessão", description: "Faça login para criar beneficiário", variant: "destructive" }); return; }
+    const nome = benefCellSearch.trim();
+    if (nome.length < 3) { toast({ title: "Nome muito curto", description: "Digite pelo menos 3 caracteres" }); return; }
+    try {
+      setAddingBenef(true);
+      const { data, error } = await supabase
+        .from('beneficiaries')
+        .insert({ user_id: user.id, name: nome })
+        .select('id,name,documento,user_id')
+        .single();
+      if (error) throw error;
+      setBenefOpts(prev => [{ id: data.id, name: data.name }, ...prev]);
+      await aplicarBeneficiarioInline(mov, { id: data.id, name: data.name });
+      setBenefCellSearch("");
+      toast({ title: 'Beneficiário criado', description: data.name });
+    } catch (err: unknown) {
+      toast({ title: 'Erro ao criar beneficiário', description: err instanceof Error ? err.message : 'Falha ao criar', variant: 'destructive' });
+    } finally {
+      setAddingBenef(false);
+    }
+  }
+
   async function salvarEdicao() {
     if (!editMov || !user) return;
     if (editComprovanteUploading) {
@@ -2293,7 +2317,7 @@ export default function LancamentosDashboard() {
                         </Popover>
                       </td>
                       <td className="p-2">
-                        <Popover open={benefCellOpen === r.id} onOpenChange={(o) => setBenefCellOpen(o ? r.id : null)}>
+                        <Popover open={benefCellOpen === r.id} onOpenChange={(o) => { setBenefCellOpen(o ? r.id : null); if (o) setBenefCellSearch(""); }}>
                           <PopoverTrigger asChild>
                             <button type="button" className="text-left rounded px-1 -mx-1 hover:bg-muted/60 min-h-[1.5rem] w-full">
                               {r.beneficiario_nome || <span className="text-muted-foreground italic">Sem beneficiário</span>}
@@ -2301,9 +2325,24 @@ export default function LancamentosDashboard() {
                           </PopoverTrigger>
                           <PopoverContent className="p-0 w-64" align="start">
                             <Command>
-                              <CommandInput placeholder="Buscar beneficiário..." />
+                              <CommandInput placeholder="Buscar beneficiário..." value={benefCellSearch} onValueChange={setBenefCellSearch} />
                               <CommandList>
-                                <CommandEmpty>Nenhum beneficiário</CommandEmpty>
+                                <CommandEmpty>
+                                  <div className="p-2 flex flex-col items-center gap-2">
+                                    <span className="text-sm text-muted-foreground">Não encontrado.</span>
+                                    {benefCellSearch.trim().length > 2 && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="w-full h-8"
+                                        onClick={() => criarEAplicarBeneficiarioCelula(r)}
+                                        disabled={addingBenef}
+                                      >
+                                        {addingBenef ? 'Criando...' : `Criar "${benefCellSearch.trim()}"`}
+                                      </Button>
+                                    )}
+                                  </div>
+                                </CommandEmpty>
                                 <CommandGroup className="max-h-60 overflow-auto">
                                   <CommandItem value="sem beneficiario" onSelect={() => aplicarBeneficiarioInline(r, null)}>
                                     <Check className={cn("mr-2 h-4 w-4", !r.beneficiario_id ? "opacity-100" : "opacity-0")} />
