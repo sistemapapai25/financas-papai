@@ -1189,8 +1189,19 @@ export default function LancamentosDashboard() {
           // Let's stick to "parent_id IS NOT NULL" based on the request "somente a categoria filho".
           // This implies excluding the "Pai" (Root).
 
-          const childrenOnly = data.filter(c => c.parent_id !== null);
-          setCatOpts(childrenOnly);
+          // Subcategorias (parent_id != null) + categorias de transferencia
+          // (parent_id nulo, tipo TRANSFERENCIA), deduplicadas por nome para
+          // nao repetir "Transferencia Interna" quando ha registros duplicados.
+          const seenTransfer = new Set<string>();
+          const catList = data.filter((c) => {
+            if (c.parent_id !== null) return true;
+            if (c.tipo === "TRANSFERENCIA" && !seenTransfer.has(c.name)) {
+              seenTransfer.add(c.name);
+              return true;
+            }
+            return false;
+          });
+          setCatOpts(catList);
         }
       });
 
@@ -1212,7 +1223,19 @@ export default function LancamentosDashboard() {
       .select("id, name, tipo, parent_id")
       .order("name")
       .then(({ data }) => {
-        if (data) setCatOpts(data.filter((c) => c.parent_id !== null));
+        if (data) {
+          const seenTransfer = new Set<string>();
+          setCatOpts(
+            data.filter((c) => {
+              if (c.parent_id !== null) return true;
+              if (c.tipo === "TRANSFERENCIA" && !seenTransfer.has(c.name)) {
+                seenTransfer.add(c.name);
+                return true;
+              }
+              return false;
+            })
+          );
+        }
       });
     supabase
       .from("beneficiaries")
